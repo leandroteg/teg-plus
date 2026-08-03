@@ -83,6 +83,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
   const [bancoAgencia, setBancoAgencia] = useState('')
   const [bancoConta, setBancoConta] = useState('')
   const [dataPrevistaEntrega, setDataPrevistaEntrega] = useState('')
+  const [valorDesconto, setValorDesconto] = useState(0)
   const [justificativa, setJustificativa] = useState('')
   const [observacoes, setObservacoes] = useState('')
   const [itens, setItens] = useState<ItemDireto[]>([emptyItem()])
@@ -109,7 +110,8 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
   const classeSel = classes.find(c => c.id === classeId)
   const obraSel = obras.find(o => o.id === obraId)
 
-  const total = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario, 0)
+  const subtotal = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario, 0)
+  const total = Math.max(0, Math.round((subtotal - (valorDesconto || 0)) * 100) / 100)
 
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -253,6 +255,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
         empresaId: empresaId || undefined,
         formaPagamento: formaPagamento || undefined,
         cartaoId: formaPagamento === 'cartao' ? cartaoId || undefined : undefined,
+        valorDesconto: valorDesconto || undefined,
       })
       onSuccess?.(result.numero_pedido)
       onClose()
@@ -688,9 +691,29 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
                 </div>
               ))}
             </div>
-            {total > 0 && (
-              <div className="mt-2 flex justify-end">
-                <span className="text-sm font-extrabold text-orange-600">{fmt(total)}</span>
+            {subtotal > 0 && (
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-[10px] text-slate-400 font-semibold">Desconto (R$)</label>
+                  <div className="relative w-36">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">R$</span>
+                    <NumericInput
+                      min={0} step={0.01}
+                      className="w-full border border-slate-200 rounded-lg pl-8 pr-2 py-1.5 text-sm text-right bg-white focus:ring-2 focus:ring-orange-300 outline-none"
+                      value={valorDesconto}
+                      onChange={setValorDesconto}
+                    />
+                  </div>
+                </div>
+                {valorDesconto >= subtotal && valorDesconto > 0 && (
+                  <p className="text-[10px] text-red-600 text-right">Desconto maior ou igual ao total dos itens — confira.</p>
+                )}
+                <div className="flex justify-end items-baseline gap-2">
+                  {valorDesconto > 0 && (
+                    <span className="text-[11px] text-slate-400 line-through">{fmt(subtotal)}</span>
+                  )}
+                  <span className="text-sm font-extrabold text-orange-600">{fmt(total)}</span>
+                </div>
               </div>
             )}
           </div>

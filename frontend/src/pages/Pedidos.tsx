@@ -547,7 +547,15 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
     <div class="section-title">Dados do Pedido</div>
     <div class="fields">
       <div class="field"><div class="label">Fornecedor</div><div class="value">${esc(pedido.fornecedor_nome)}</div></div>
-      <div class="field"><div class="label">Valor Total</div><div class="value big">${fmtBRL(pedido.valor_total)}</div></div>
+      <div class="field"><div class="label">Valor Total</div><div class="value big">${fmtBRL(pedido.valor_total)}</div>${
+        (Number(pedido.valor_frete) > 0 || Number(pedido.valor_desconto) > 0)
+          ? `<div style="font-size:10px;color:#64748b;margin-top:2px">${[
+              `Produtos: ${fmtBRL((pedido.valor_total ?? 0) - (Number(pedido.valor_frete) || 0) + (Number(pedido.valor_desconto) || 0))}`,
+              Number(pedido.valor_frete) > 0 ? `Frete: ${fmtBRL(Number(pedido.valor_frete))}` : null,
+              Number(pedido.valor_desconto) > 0 ? `Desconto: −${fmtBRL(Number(pedido.valor_desconto))}` : null,
+            ].filter(Boolean).join(' · ')}</div>`
+          : ''
+      }</div>
       ${pedido.requisicao ? `
       <div class="field"><div class="label">Requisicao</div><div class="value">${esc(pedido.requisicao.numero)} — ${esc(pedido.requisicao.descricao)}</div></div>
       <div class="field"><div class="label">Obra / Projeto</div><div class="value">${esc(pedido.requisicao.obra_nome ?? '—')}</div></div>` : ''}

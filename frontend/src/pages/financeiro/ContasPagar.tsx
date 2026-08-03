@@ -15,6 +15,7 @@ import { useRegistrarPagamento } from '../../hooks/usePedidos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar } from '../../types/financeiro'
 import { UpperInput } from '../../components/UpperInput'
+import NumericInput from '../../components/NumericInput'
 import { supabase } from '../../services/supabase'
 import AuditoriaCard from '../../components/AuditoriaCard'
 import { MedicaoDocLink } from '../../components/MedicaoDocLink'
@@ -155,6 +156,10 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
   const [editCC, setEditCC] = useState(cp.centro_custo ?? '')
   const [editClasse, setEditClasse] = useState(cp.classe_financeira ?? '')
   const [editObra, setEditObra] = useState(cp.obra_id ?? '')
+  // Desconto financeiro / juros e multa da baixa (mig 203)
+  const [valorDesconto, setValorDesconto] = useState(cp.valor_desconto ?? 0)
+  const [valorJurosMulta, setValorJurosMulta] = useState(cp.valor_juros_multa ?? 0)
+  const valorLiquido = Math.max(0, Math.round((cp.valor_original - (valorDesconto || 0) + (valorJurosMulta || 0)) * 100) / 100)
 
   const { data: anexosPedido = [] } = useAnexosPedido(cp.pedido_id)
   const uploadAnexo = useUploadAnexo()
@@ -199,11 +204,25 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
 
       // 3. Register payment
       if (cp.pedido_id) {
+        // Carimba desconto/juros ANTES da baixa — o trigger do pedido
+        // (atualizar_cp_ao_liberar_pagamento) calcula o valor_pago líquido a partir deles.
+        if ((valorDesconto || 0) > 0 || (valorJurosMulta || 0) > 0) {
+          const { error: descErr } = await supabase
+            .from('fin_contas_pagar')
+            .update({ valor_desconto: valorDesconto || 0, valor_juros_multa: valorJurosMulta || 0 })
+            .eq('id', cp.id)
+          if (descErr) throw new Error('Erro ao gravar desconto/juros: ' + descErr.message)
+        }
         // Via cmp_pedidos trigger chain
         await registrarPag.mutateAsync(cp.pedido_id)
       } else {
         // Direct CP update (Omie-imported or manual)
-        await marcarCPPago.mutateAsync({ cpId: cp.id })
+        await marcarCPPago.mutateAsync({
+          cpId: cp.id,
+          valorOriginal: cp.valor_original,
+          valorDesconto: valorDesconto || 0,
+          valorJurosMulta: valorJurosMulta || 0,
+        })
       }
 
       onClose()
@@ -237,6 +256,39 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
               {cp.valor_original.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </p>
           </div>
+
+          {/* Desconto / Juros e multa da baixa */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Desconto (R$)</label>
+              <NumericInput
+                min={0} step={0.01}
+                className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-300 ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-white' : 'border-slate-200'}`}
+                value={valorDesconto}
+                onChange={setValorDesconto}
+              />
+            </div>
+            <div>
+              <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Juros / Multa (R$)</label>
+              <NumericInput
+                min={0} step={0.01}
+                className={`w-full border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-300 ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-white' : 'border-slate-200'}`}
+                value={valorJurosMulta}
+                onChange={setValorJurosMulta}
+              />
+            </div>
+          </div>
+          {((valorDesconto || 0) > 0 || (valorJurosMulta || 0) > 0) && (
+            <div className={`flex items-center justify-between rounded-xl px-3 py-2 border ${isDark ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-100'}`}>
+              <span className={`text-[11px] font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>Valor a pagar (líquido)</span>
+              <span className={`text-sm font-extrabold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                {valorLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </span>
+            </div>
+          )}
+          {(valorDesconto || 0) >= cp.valor_original && (valorDesconto || 0) > 0 && (
+            <p className="text-[11px] text-red-500">Desconto maior ou igual ao valor original — confira.</p>
+          )}
 
           {/* Comprovante upload */}
           {cp.pedido_id && (

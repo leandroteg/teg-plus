@@ -18,6 +18,7 @@ export function usePedidos(status?: string) {
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id, empresa_id,
           condicao_pagamento, parcelas_preview, sem_cotacao, justificativa_sem_cotacao, itens_direto,
+          valor_frete, valor_desconto,
           requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, arquivo_url, base_destino_id, base_destino:est_bases!base_destino_id(nome), itens:cmp_requisicao_itens(id, descricao, descricao_complementar, quantidade, unidade, valor_unitario_estimado, natureza)),
           comprador:cmp_compradores(nome),
           cotacao:cmp_cotacoes!cotacao_id(concluido_por_nome)
@@ -394,7 +395,7 @@ export function useEmitirPedido() {
       try {
         let { data: cotFor } = await supabase
           .from('cmp_cotacao_fornecedores')
-          .select('itens_precos')
+          .select('itens_precos, valor_frete, valor_desconto')
           .eq('cotacao_id', cotacaoId)
           .eq('fornecedor_nome', fornecedorNome)
           .eq('selecionado', true)
@@ -409,13 +410,24 @@ export function useEmitirPedido() {
         if (!cotFor) {
           const { data: cotForSel } = await supabase
             .from('cmp_cotacao_fornecedores')
-            .select('itens_precos')
+            .select('itens_precos, valor_frete, valor_desconto')
             .eq('cotacao_id', cotacaoId)
             .eq('selecionado', true)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
           cotFor = cotForSel
+        }
+
+        // Frete/desconto da proposta vencedora → quadro Subtotal/Frete/Desconto do PDF
+        if (Number(cotFor?.valor_frete) > 0 || Number(cotFor?.valor_desconto) > 0) {
+          await supabase
+            .from('cmp_pedidos')
+            .update({
+              valor_frete: Number(cotFor?.valor_frete) || 0,
+              valor_desconto: Number(cotFor?.valor_desconto) || 0,
+            })
+            .eq('id', pedido.id)
         }
 
         const itensPrecos = (cotFor?.itens_precos ?? []) as Array<{ descricao?: string; valor_unitario?: number; selecionado?: boolean }>
@@ -622,6 +634,7 @@ export interface PedidoDiretoPayload {
   empresaId?: string
   formaPagamento?: string
   cartaoId?: string
+  valorDesconto?: number
 }
 
 export function useEmitirPedidoDireto() {
@@ -695,6 +708,7 @@ export function useEmitirPedidoDireto() {
           empresa_id: payload.empresaId || null,
           observacoes: payload.observacoes || null,
           comprador_id: compradorIdResolvido,
+          valor_desconto: payload.valorDesconto || 0,
           parcelas_preview: parcelasResolvidas,
           sem_cotacao: true,
           justificativa_sem_cotacao: payload.justificativaSemCotacao,

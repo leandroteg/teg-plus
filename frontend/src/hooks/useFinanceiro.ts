@@ -489,12 +489,28 @@ export function useAprovarPagamento() {
 export function useMarcarCPPago() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ cpId, dataPagamento }: { cpId: string; dataPagamento?: string }) => {
+    mutationFn: async ({ cpId, dataPagamento, valorOriginal, valorDesconto, valorJurosMulta }: {
+      cpId: string
+      dataPagamento?: string
+      /** Quando informado junto com desconto/juros, grava valor_pago líquido (mig 203). */
+      valorOriginal?: number
+      valorDesconto?: number
+      valorJurosMulta?: number
+    }) => {
+      const desconto = valorDesconto ?? 0
+      const juros = valorJurosMulta ?? 0
       const { error } = await supabase
         .from('fin_contas_pagar')
         .update({
           status: 'pago',
           data_pagamento: dataPagamento ?? new Date().toISOString().split('T')[0],
+          ...(desconto > 0 || juros > 0 ? {
+            valor_desconto: desconto,
+            valor_juros_multa: juros,
+            ...(valorOriginal != null
+              ? { valor_pago: Math.round((valorOriginal - desconto + juros) * 100) / 100 }
+              : {}),
+          } : {}),
         })
         .eq('id', cpId)
       if (error) throw error

@@ -44,6 +44,7 @@ interface FornecedorForm {
   fornecedor_cnpj:    string
   valor_total:        number   // subtotal de produtos (soma dos itens ou valor digitado)
   valor_frete:        number
+  valor_desconto:     number   // desconto comercial sobre o total da proposta
   prazo_entrega_dias: number
   condicao_pagamento: string
   observacao:         string
@@ -53,16 +54,16 @@ interface FornecedorForm {
 
 const emptyFornecedor = (): FornecedorForm => ({
   fornecedor_nome: '', fornecedor_contato: '', fornecedor_telefone: '', fornecedor_email: '', fornecedor_cnpj: '',
-  valor_total: 0, valor_frete: 0, prazo_entrega_dias: 0, condicao_pagamento: '', observacao: '',
+  valor_total: 0, valor_frete: 0, valor_desconto: 0, prazo_entrega_dias: 0, condicao_pagamento: '', observacao: '',
   arquivo_urls: [], itens_precos: [],
 })
 
 const calcTotalItems = (itens: ItemPreco[]) =>
   Math.round(itens.reduce((s, i) => s + i.valor_total, 0) * 100) / 100
 
-// Custo entregue = produtos + frete (usado p/ comparar fornecedores e na aprovacao)
+// Custo entregue = produtos + frete − desconto (usado p/ comparar fornecedores e na aprovacao)
 const calcTotalEntregue = (f: FornecedorForm) =>
-  Math.round((f.valor_total + (f.valor_frete || 0)) * 100) / 100
+  Math.round((f.valor_total + (f.valor_frete || 0) - (f.valor_desconto || 0)) * 100) / 100
 
 // ── Tabela de itens e preços por fornecedor ──────────────────────────────────
 type ReqItem = { id: string; descricao: string; quantidade: number; unidade: string; valor_unitario_estimado: number }
@@ -1068,6 +1069,7 @@ export default function CotacaoForm() {
         fornecedor_cnpj:    f.fornecedor_cnpj ?? '',
         valor_total:        f.valor_total ?? 0,
         valor_frete:        (f as any).valor_frete ?? 0,
+        valor_desconto:     (f as any).valor_desconto ?? 0,
         prazo_entrega_dias: f.prazo_entrega_dias ?? 0,
         condicao_pagamento: f.condicao_pagamento ?? '',
         observacao:         f.observacao ?? '',
@@ -1416,6 +1418,7 @@ export default function CotacaoForm() {
           fornecedor_email:   email,
           valor_total:        valorTotal,
           valor_frete:        0,
+          valor_desconto:     0,
           prazo_entrega_dias: p.prazo_entrega_dias || 0,
           condicao_pagamento: toUpperNorm(p.condicao_pagamento || ''),
           observacao:         toUpperNorm(p.observacao || ''),
@@ -1829,6 +1832,7 @@ export default function CotacaoForm() {
             fornecedor_cnpj:    f.fornecedor_cnpj || undefined,
             valor_total:        calcTotalEntregue(f),
             valor_frete:        f.valor_frete || undefined,
+            valor_desconto:     f.valor_desconto || undefined,
             prazo_entrega_dias: f.prazo_entrega_dias || undefined,
             condicao_pagamento: f.condicao_pagamento ? toUpperNorm(f.condicao_pagamento) : undefined,
             observacao:         f.observacao ? toUpperNorm(f.observacao) : undefined,
@@ -2255,6 +2259,18 @@ export default function CotacaoForm() {
                 </div>
               </div>
               <div>
+                <label className="text-[10px] text-slate-400 font-semibold">Desconto (R$)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">R$</span>
+                  <NumericInput
+                    min={0} step={0.01}
+                    className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
+                    value={forn.valor_desconto}
+                    onChange={v => updateFornecedor(idx, 'valor_desconto', v)}
+                  />
+                </div>
+              </div>
+              <div>
                 <label className="text-[10px] text-slate-400 font-semibold">Prazo (dias)</label>
                 <NumericInput
                   min={1}
@@ -2265,9 +2281,14 @@ export default function CotacaoForm() {
               </div>
             </div>
 
-            {forn.valor_frete > 0 && (
+            {forn.valor_desconto > 0 && forn.valor_desconto >= forn.valor_total + (forn.valor_frete || 0) && (
+              <p className="text-[10px] text-red-600">Desconto maior ou igual ao total da proposta — confira o valor.</p>
+            )}
+            {(forn.valor_frete > 0 || forn.valor_desconto > 0) && (
               <div className="flex items-center justify-between rounded-xl bg-teal-50 border border-teal-100 px-3 py-1.5">
-                <span className="text-[11px] font-semibold text-teal-600">Total entregue (produtos + frete)</span>
+                <span className="text-[11px] font-semibold text-teal-600">
+                  Total entregue (produtos{forn.valor_frete > 0 ? ' + frete' : ''}{forn.valor_desconto > 0 ? ' − desconto' : ''})
+                </span>
                 <span className="text-sm font-bold text-teal-700">{fmt(calcTotalEntregue(forn))}</span>
               </div>
             )}

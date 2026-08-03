@@ -80,6 +80,10 @@ export interface ContaPagar {
   origem?: OrigemCP
   valor_original: number
   valor_pago: number
+  /** Desconto financeiro obtido na baixa (mig 203). valor_pago = original − desconto + juros/multa. */
+  valor_desconto?: number
+  /** Juros/multa pagos na baixa por atraso (mig 203). */
+  valor_juros_multa?: number
   data_emissao: string
   data_vencimento: string
   data_vencimento_orig: string

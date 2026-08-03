@@ -157,6 +157,7 @@ export interface FinalizarCotacaoPayload {
     fornecedor_cnpj?: string
     valor_total: number
     valor_frete?: number
+    valor_desconto?: number
     prazo_entrega_dias?: number
     condicao_pagamento?: string
     observacao?: string
@@ -196,6 +197,7 @@ export function useFinalizarCotacao() {
         fornecedor_cnpj: f.fornecedor_cnpj || null,
         valor_total: f.valor_total,
         valor_frete: f.valor_frete ?? 0,
+        valor_desconto: f.valor_desconto ?? 0,
         prazo_entrega_dias: f.prazo_entrega_dias || null,
         condicao_pagamento: f.condicao_pagamento || null,
         itens_precos: f.itens_precos ?? [],

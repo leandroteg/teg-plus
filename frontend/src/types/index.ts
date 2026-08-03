@@ -61,6 +61,8 @@ export interface Pedido {
   centro_custo?: string
   classe_financeira?: string
   condicao_pagamento?: string
+  valor_frete?: number
+  valor_desconto?: number
   parcelas_preview?: Array<{ numero: number; valor: number; data_vencimento: string; descricao?: string }>
   created_at: string
   updated_at?: string
