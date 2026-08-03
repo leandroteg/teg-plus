@@ -91,6 +91,9 @@ export function useSuperTEG() {
       setMessages(prev => [...prev, userMsg])
 
       try {
+        // O agente le os indicadores COM ESTE token: a RPC roda sob o RLS de
+        // quem perguntou, entao o numero bate com o painel da propria pessoa.
+        const { data: sess } = await supabase.auth.getSession()
         const res = await fetch(WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -98,6 +101,7 @@ export function useSuperTEG() {
             message: text.trim(),
             session_id: sessionRef.current,
             perfil_id: perfil?.id || null,
+            access_token: sess?.session?.access_token ?? null,
           }),
         })
 
