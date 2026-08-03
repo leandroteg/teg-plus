@@ -19,6 +19,7 @@ export function usePedidos(status?: string) {
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id, empresa_id,
           condicao_pagamento, parcelas_preview, sem_cotacao, justificativa_sem_cotacao, itens_direto,
           valor_frete, valor_desconto,
+          docs_conferidos, docs_conferidos_por_nome, docs_conferidos_em,
           requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, arquivo_url, base_destino_id, base_destino:est_bases!base_destino_id(nome), itens:cmp_requisicao_itens(id, descricao, descricao_complementar, quantidade, unidade, valor_unitario_estimado, natureza)),
           comprador:cmp_compradores(nome),
           cotacao:cmp_cotacoes!cotacao_id(concluido_por_nome)
@@ -149,6 +150,31 @@ export function useDesfazerRecebimento() {
       qc.invalidateQueries({ queryKey: ['pat-imobilizados'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
+  })
+}
+
+// ── Conferência de documentos do pedido entregue (NF/boleto) ─────────────────
+// Aprovar carimba quem conferiu e libera o botão de pagamento; a reprovação é
+// feita pelo "Voltar etapa — desfazer recebimento" (pedido volta a Emitido).
+export function useConferirDocsPedido() {
+  const qc = useQueryClient()
+  const { perfil } = useAuth()
+  return useMutation({
+    mutationFn: async (pedidoId: string) => {
+      const { data, error } = await supabase
+        .from('cmp_pedidos')
+        .update({
+          docs_conferidos: true,
+          docs_conferidos_por_nome: perfil?.nome ?? null,
+          docs_conferidos_em: new Date().toISOString(),
+        })
+        .eq('id', pedidoId)
+        .select('id')
+      if (error) throw error
+      // RLS sem match = 0 linhas sem erro — não deixa passar como sucesso
+      if (!data?.length) throw new Error('Sem permissão para registrar a conferência deste pedido.')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
   })
 }
 
