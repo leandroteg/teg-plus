@@ -1,4 +1,4 @@
-// hooks/usePonto.ts â€” dados do mÃ³dulo Ponto (DP), lendo do espelho do Secullum
+// hooks/usePonto.ts — dados do módulo Ponto (DP), lendo do espelho do Secullum
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { proximoMes } from '../lib/ponto'
@@ -6,7 +6,7 @@ import type {
   PontoResumoMes, PontoDia, PontoAfastamento, PontoRetificacao, HoraExtraItem, AprovKey, AprovStatus, PontoDiaLista,
 } from '../types/ponto'
 
-// Conjunto de ids de colaboradores ATIVOS (para filtrar a lista de ponto por situaÃ§Ã£o)
+// Conjunto de ids de colaboradores ATIVOS (para filtrar a lista de ponto por situação)
 // Quem o Ponto deve cobrar. Nem todo colaborador ativo bate ponto:
 //   cargo de confianca -> isento por definicao;
 //   afastado           -> licenca medica / suspensao / maternidade.
@@ -44,7 +44,7 @@ export function useColabAtivosIds() {
   })
 }
 
-// VisÃ£o diÃ¡ria: todas as marcaÃ§Ãµes/apuraÃ§Ã£o de UM dia
+// Visão diária: todas as marcações/apuração de UM dia
 export function usePontoDia(dataISO: string, baseId?: string) {
   return useQuery<PontoDiaLista[]>({
     queryKey: ['ponto-dia', dataISO, baseId || 'all'],
@@ -61,7 +61,7 @@ export function usePontoDia(dataISO: string, baseId?: string) {
   })
 }
 
-// Colaboradores ativos no ponto: pico diÃ¡rio de batedores nos Ãºltimos 7 dias vs headcount (ativos)
+// Colaboradores ativos no ponto: pico diário de batedores nos últimos 7 dias vs headcount (ativos)
 export function usePontoColabAtivos() {
   return useQuery<{ pico: number; headcount: number }>({
     queryKey: ['ponto-colab-ativos-7d'],
@@ -69,13 +69,13 @@ export function usePontoColabAtivos() {
       const d = new Date(); d.setDate(d.getDate() - 6)
       const desde = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       const [pontos, head] = await Promise.all([
-        // sÃ³ batida real: Origem <> 2 (exclui inclusÃ£o manual/import)
+        // só batida real: Origem <> 2 (exclui inclusão manual/import)
         supabase.from('rh_ponto_dia').select('colaborador_id, data').gte('data', desde).not('entrada1', 'is', null)
           .neq('raw->FonteDadosEntrada1->>Origem', '2').limit(5000),
         // Denominador = quem REALMENTE deve bater ponto: ativo no de-para do Secullum
-        // E ativo no TEG+ E fora de cargo de confianÃ§a / afastamento. O !inner tambÃ©m
-        // derruba link sem colaborador vinculado â€” esse nunca poderia entrar no
-        // numerador (o pico conta colaborador_id), entÃ£o inflava o denominador Ã  toa.
+        // E ativo no TEG+ E fora de cargo de confiança / afastamento. O !inner também
+        // derruba link sem colaborador vinculado — esse nunca poderia entrar no
+        // numerador (o pico conta colaborador_id), então inflava o denominador à toa.
         supabase.from('rh_ponto_linkcolab')
           .select('secullum_func_id, colaborador:rh_colaboradores!inner(id)', { count: 'exact', head: true })
           .eq('status', 'ativo')
@@ -96,7 +96,7 @@ export function usePontoColabAtivos() {
   })
 }
 
-// Resumo mensal por colaborador (Registros / ConsolidaÃ§Ã£o)
+// Resumo mensal por colaborador (Registros / Consolidação)
 export function usePontoResumoMes(anoMes: string, baseId?: string) {
   return useQuery<PontoResumoMes[]>({
     queryKey: ['ponto-resumo', anoMes, baseId || 'all'],
@@ -110,7 +110,7 @@ export function usePontoResumoMes(anoMes: string, baseId?: string) {
   })
 }
 
-// Resumo por PERÃ���ODO (de..ate em 'YYYY-MM') â€” agrega vÃ¡rios meses (Painel DP)
+// Resumo por PERÍODO (de..ate em 'YYYY-MM') — agrega vários meses (Painel DP)
 export function usePontoResumoPeriodo(de: string, ate: string) {
   return useQuery<PontoResumoMes[]>({
     queryKey: ['ponto-resumo-periodo', de, ate],
@@ -127,7 +127,7 @@ export function usePontoResumoPeriodo(de: string, ate: string) {
   })
 }
 
-// Horas extras por PERÃ���ODO (de..ate em 'YYYY-MM')
+// Horas extras por PERÍODO (de..ate em 'YYYY-MM')
 export function usePontoHorasExtrasPeriodo(de: string, ate: string) {
   return useQuery<HoraExtraItem[]>({
     queryKey: ['ponto-he-periodo', de, ate],
@@ -142,7 +142,7 @@ export function usePontoHorasExtrasPeriodo(de: string, ate: string) {
   })
 }
 
-// CartÃ£o (dia a dia) de um colaborador no mÃªs
+// Cartão (dia a dia) de um colaborador no mês
 export function usePontoCartao(colaboradorId?: string, anoMes?: string) {
   return useQuery<PontoDia[]>({
     queryKey: ['ponto-cartao', colaboradorId, anoMes],
@@ -160,9 +160,9 @@ export function usePontoCartao(colaboradorId?: string, anoMes?: string) {
 }
 
 // O PostgREST do Supabase capa em 1000 linhas por request mesmo com .limit()
-// maior â€” um .limit(3000) devolve 1000 em silÃªncio e o total da tela mente.
-// Pagina em lotes e concatena. A ordenaÃ§Ã£o precisa ser TOTAL (com desempate),
-// senÃ£o linha repete ou some entre um lote e outro.
+// maior — um .limit(3000) devolve 1000 em silêncio e o total da tela mente.
+// Pagina em lotes e concatena. A ordenação precisa ser TOTAL (com desempate),
+// senão linha repete ou some entre um lote e outro.
 const PAGE = 1000
 async function paginar<T>(
   lote: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>,
@@ -179,10 +179,10 @@ async function paginar<T>(
   return all
 }
 
-// RetificaÃ§Ãµes = dias com batida de Origem 2 (inclusÃ£o manual no Secullum).
-// LÃª a view, que desempacota o rh_ponto_dia.raw jÃ¡ gravado â€” o endpoint
-// /FonteDados (que trazia o texto do motivo) saiu do sync em 29/06, entÃ£o
-// `motivo` sÃ³ vem preenchido atÃ© essa data.
+// Retificações = dias com batida de Origem 2 (inclusão manual no Secullum).
+// Lê a view, que desempacota o rh_ponto_dia.raw já gravado — o endpoint
+// /FonteDados (que trazia o texto do motivo) saiu do sync em 29/06, então
+// `motivo` só vem preenchido até essa data.
 export function usePontoRetificacoes(anoMes: string) {
   return useQuery<PontoRetificacao[]>({
     queryKey: ['ponto-retificacoes', anoMes],
@@ -232,14 +232,14 @@ export function usePontoAtestados(anoMes: string) {
   })
 }
 
-// Enviar itens selecionados para aprovaÃ§Ã£o (pendente -> em_aprovacao), em lote
+// Enviar itens selecionados para aprovação (pendente -> em_aprovacao), em lote
 export function useEnviarItens() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (v: { keys: AprovKey[]; por: string }) => {
       const patch = { aprov_status: 'em_aprovacao', aprov_por: v.por, aprov_em: new Date().toISOString() }
-      // retificaÃ§Ã£o tem tabela de aprovaÃ§Ã£o PRÃ“PRIA: 75% dos dias com retificaÃ§Ã£o
-      // tambÃ©m tÃªm hora extra, e rh_ponto_dia.aprov_status Ã© uma coluna sÃ³ â€”
+      // retificação tem tabela de aprovação PRÓPRIA: 75% dos dias com retificação
+      // também têm hora extra, e rh_ponto_dia.aprov_status é uma coluna só —
       // aprovar um marcaria o outro.
       const rets = v.keys.filter(k => k.tipo === 'retificacao' && k.data && k.secullum_func_id != null)
       const ids = v.keys.filter(k => k.tipo === 'atestado').map(k => k.id).filter((x): x is string => !!x)
@@ -260,7 +260,7 @@ export function useEnviarItens() {
   })
 }
 
-// Aprovar / reprovar um item (status no prÃ³prio registro)
+// Aprovar / reprovar um item (status no próprio registro)
 export function useAprovarItem() {
   const qc = useQueryClient()
   return useMutation({
@@ -282,7 +282,7 @@ export function useAprovarItem() {
   })
 }
 
-// dispositivos de ponto (Ponto Virtual) â€” p/ o filtro da tela Registros Ponto
+// dispositivos de ponto (Ponto Virtual) — p/ o filtro da tela Registros Ponto
 export function usePontoDispositivos() {
   return useQuery<{ secullum_equip_id: number; descricao: string; base_id: string | null }[]>({
     queryKey: ['ponto-dispositivos'],
@@ -295,16 +295,16 @@ export function usePontoDispositivos() {
   })
 }
 
-// â”€â”€ Fechamento mensal do ponto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// NÃ£o trava o rh_ponto_dia: o sync sÃ³ cobre o mÃªs corrente, entÃ£o mÃªs passado
-// jÃ¡ congela sozinho. O fechamento guarda o snapshot dos totais e o estado.
+// ── Fechamento mensal do ponto ───────────────────────────────────────────────
+// Não trava o rh_ponto_dia: o sync só cobre o mês corrente, então mês passado
+// já congela sozinho. O fechamento guarda o snapshot dos totais e o estado.
 export interface PontoFechamento {
   ano_mes: string
   status: 'fechado' | 'liberado'
   fechado_por: string | null; fechado_em: string | null
   liberado_por: string | null; liberado_em: string | null; liberado_motivo: string | null
   colaboradores: number | null; hh_min: number | null; extras_min: number | null; faltas_min: number | null
-  /** intervalo REAL que foi fechado (competÃªncia da folha, 26â†’25) */
+  /** intervalo REAL que foi fechado (competência da folha, 26→25) */
   periodo_ini: string | null; periodo_fim: string | null
 }
 
@@ -319,7 +319,7 @@ export function usePontoFechamentos() {
   })
 }
 
-/** janela padrÃ£o da folha: 26 do mÃªs anterior â†’ 25 da competÃªncia */
+/** janela padrão da folha: 26 do mês anterior → 25 da competência */
 export function janelaPadrao(anoMes: string) {
   const [y, m] = anoMes.slice(0, 7).split('-').map(Number)
   const ini = new Date(y, m - 2, 26)
@@ -331,7 +331,7 @@ export function janelaPadrao(anoMes: string) {
 export function useFecharMes() {
   const qc = useQueryClient()
   return useMutation({
-    // o intervalo vai explÃ­cito: a competÃªncia da folha Ã© 26â†’25, nÃ£o o mÃªs civil
+    // o intervalo vai explícito: a competência da folha é 26→25, não o mês civil
     mutationFn: async (v: { anoMes: string; por: string; ini?: string; fim?: string }) => {
       const j = janelaPadrao(v.anoMes)
       const { error } = await supabase.rpc('rh_ponto_fechar_mes', {
