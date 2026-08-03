@@ -320,7 +320,9 @@ export function useEnviarLoteAprovacao() {
 
       // 4. Create apr_aprovacoes record for the batch
       const nivel = lote.valor_total > 100000 ? 4 : lote.valor_total > 25000 ? 3 : lote.valor_total > 5000 ? 2 : 1
-      const aprovadorNome = lote.valor_total > 25000 ? 'Laucidio' : 'Welton'
+      // Decisão da Diretoria 03/ago/2026: Welton saiu da aprovação financeira
+      // (fica só em validação técnica e Compras) — Laucídio aprova todas as faixas.
+      const aprovadorNome = 'Laucidio'
       const loteData = new Date().toLocaleDateString('pt-BR')
       const entidadeNumero = `${lote.numero_lote} • ${loteData} • ${lote.valor_total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
 

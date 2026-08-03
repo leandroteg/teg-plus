@@ -473,7 +473,8 @@ export function useAvancarEtapa() {
             const valor = sol.valor_estimado ?? 0
             // Determina nivel/aprovador pela alcada de valor
             const nivel = valor > 100000 ? 4 : valor > 25000 ? 3 : valor > 5000 ? 2 : 1
-            const aprovadorNome = valor > 25000 ? 'Laucidio' : 'Welton'
+            // Decisão da Diretoria 03/ago/2026: aprovação de minuta é sempre do Laucídio.
+            const aprovadorNome = 'Laucidio'
 
             await supabase
               .from('apr_aprovacoes')
@@ -1408,7 +1409,8 @@ export function useReenviarEsclarecimentoContrato() {
 
       const valor = Number(sol?.valor_estimado ?? 0)
       const nivel = valor > 100000 ? 4 : valor > 25000 ? 3 : valor > 5000 ? 2 : 1
-      const aprovadorNome = valor > 25000 ? 'Laucidio' : 'Welton'
+      // Decisão da Diretoria 03/ago/2026: aprovação de minuta é sempre do Laucídio.
+      const aprovadorNome = 'Laucidio'
 
       const obs = resposta?.trim()
         ? `Esclarecimento respondido por ${solicitanteNome}: ${resposta.trim()}`
