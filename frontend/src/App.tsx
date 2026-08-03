@@ -255,6 +255,8 @@ const TiChamados = lazy(() => import('./pages/ti/Chamados'))
 const TiNovoChamado = lazy(() => import('./pages/ti/NovoChamado'))
 const TiChamadoDetalhe = lazy(() => import('./pages/ti/ChamadoDetalhe'))
 const TiQuadro = lazy(() => import('./pages/ti/Quadro'))
+const TiAtencao = lazy(() => import('./pages/ti/Atencao'))
+const TiRecentes = lazy(() => import('./pages/ti/Recentes'))
 const TiAtivos = lazy(() => import('./pages/ti/Ativos'))
 const TiAtivoDetalhe = lazy(() => import('./pages/ti/AtivoDetalhe'))
 const TiTermos = lazy(() => import('./pages/ti/Termos'))
@@ -337,6 +339,8 @@ export default function App() {
               <Route path="/ti/base/:id" element={<Lazy><TiArtigo /></Lazy>} />
               <Route element={<TiStaffRoute />}>
                 <Route path="/ti/quadro" element={<Lazy><TiQuadro /></Lazy>} />
+                <Route path="/ti/atencao" element={<Lazy><TiAtencao /></Lazy>} />
+                <Route path="/ti/recentes" element={<Lazy><TiRecentes /></Lazy>} />
                 <Route path="/ti/respostas" element={<Lazy><TiRespostas /></Lazy>} />
                 <Route path="/ti/ativos" element={<Lazy><TiAtivos /></Lazy>} />
                 <Route path="/ti/ativos/:id" element={<Lazy><TiAtivoDetalhe /></Lazy>} />

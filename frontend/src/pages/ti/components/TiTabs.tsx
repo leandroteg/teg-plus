@@ -5,17 +5,19 @@
 // Chamados → Base de Conhecimento (contagens escopadas pela RLS aos dele).
 import { NavLink } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Inbox, Columns3, MessageSquareText, BookOpen } from 'lucide-react'
+import { Inbox, Columns3, AlertTriangle, History, MessageSquareText, BookOpen } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { getDashboardStats } from '../data/tickets'
 import { useTiAuth } from '../data/auth'
 
-type Accent = 'sky' | 'violet' | 'teal' | 'emerald'
+type Accent = 'sky' | 'violet' | 'amber' | 'rose' | 'teal' | 'emerald'
 
 // Classes literais (JIT do Tailwind não aceita concat dinâmico).
 const ACCENT: Record<Accent, { active: string; idle: string; badgeActive: string }> = {
   sky:     { active: 'bg-sky-500/10 text-sky-700 border-sky-400/40',         idle: 'text-sky-600 hover:bg-slate-50',     badgeActive: 'bg-sky-500/15 text-sky-700' },
   violet:  { active: 'bg-violet-500/10 text-violet-700 border-violet-400/40', idle: 'text-violet-600 hover:bg-slate-50',  badgeActive: 'bg-violet-500/15 text-violet-700' },
+  amber:   { active: 'bg-amber-500/10 text-amber-700 border-amber-400/40',    idle: 'text-amber-600 hover:bg-slate-50',   badgeActive: 'bg-amber-500/15 text-amber-700' },
+  rose:    { active: 'bg-rose-500/10 text-rose-700 border-rose-400/40',       idle: 'text-rose-600 hover:bg-slate-50',    badgeActive: 'bg-rose-500/15 text-rose-700' },
   teal:    { active: 'bg-teal-500/10 text-teal-700 border-teal-400/40',       idle: 'text-teal-600 hover:bg-slate-50',    badgeActive: 'bg-teal-500/15 text-teal-700' },
   emerald: { active: 'bg-emerald-500/10 text-emerald-700 border-emerald-400/40', idle: 'text-emerald-600 hover:bg-slate-50', badgeActive: 'bg-emerald-500/15 text-emerald-700' },
 }
@@ -43,6 +45,8 @@ export function TiTabs() {
   const TABS: Tab[] = [
     { to: '/ti/chamados', end: true, label: 'Chamados', icon: Inbox, accent: 'sky', count: stats?.total },
     { to: '/ti/quadro', label: 'Quadro de Chamados', icon: Columns3, accent: 'violet', count: emAberto },
+    { to: '/ti/atencao', label: 'Precisam de Atenção', icon: AlertTriangle, accent: 'amber' },
+    { to: '/ti/recentes', label: 'Chamados Recentes', icon: History, accent: 'rose' },
     { to: '/ti/respostas', label: 'Respostas Prontas', icon: MessageSquareText, accent: 'teal' },
     { to: '/ti/base', label: 'Base de Conhecimento', icon: BookOpen, accent: 'emerald' },
   ]
