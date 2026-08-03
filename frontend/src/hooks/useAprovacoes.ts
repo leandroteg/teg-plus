@@ -9,6 +9,22 @@ import { useAuth } from '../contexts/AuthContext'
 const TABLE_APR = 'apr_aprovacoes'
 const TABLE_REQ = 'cmp_requisicoes'
 
+// CPs extraordinárias antigas registram anexos apenas como texto nas observações,
+// no formato "Anexos: nome.pdf (https://...) | outro.jpg (https://...)".
+// Extrai esses pares p/ o aprovador conseguir abrir os arquivos no card do lote.
+function parseAnexosDeObservacoes(observacoes?: string | null) {
+  if (!observacoes) return []
+  const linha = observacoes.split('\n').find(l => l.trim().startsWith('Anexos:'))
+  if (!linha) return []
+  const out: Array<{ nome: string; url: string; tipo: string; mime_type: string }> = []
+  const re = /([^|()]+?)\s*\((https?:\/\/[^\s)]+)\)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(linha.slice(linha.indexOf('Anexos:') + 7))) !== null) {
+    out.push({ nome: m[1].trim(), url: m[2], tipo: 'comprovante', mime_type: '' })
+  }
+  return out
+}
+
 // ── IDs fixos (apenas Laucidio segue hardcoded — minutas/pagamentos sao globais) ──
 const ID_LAUCIDIO = '98723949-73fa-4961-b032-3ef599464e2e'
 
@@ -309,10 +325,11 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       const rcMap = new Map<string, Record<string, unknown>>()
       const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
       const docMap = new Map<string, Record<string, unknown>[]>()
+      const loteCpIdsAll: string[] = []
       if (finIds.length > 0) {
         const { data: finData } = await supabase
           .from('fin_contas_pagar')
-          .select('id, fornecedor_nome, valor_original, valor_pago, numero_documento, descricao, data_vencimento, data_emissao, centro_custo, classe_financeira, natureza, forma_pagamento, status')
+          .select('id, fornecedor_nome, valor_original, valor_pago, numero_documento, descricao, data_vencimento, data_emissao, centro_custo, classe_financeira, natureza, forma_pagamento, status, observacoes')
           .in('id', finIds)
         for (const f of finData ?? []) {
           finMap.set(f.id, f)
@@ -349,20 +366,22 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 forma_pagamento,
                 status,
                 requisicao_id,
-                pedido_id
+                pedido_id,
+                observacoes
               )
             `)
             .in('lote_id', loteIds)
 
           // 5b. Buscar dados de requisição para cada CP
           const cpIds = (loteItens ?? [])
-            .map(item => (item.cp as Record<string, unknown> | null)?.id as string)
+            .map(item => (item.cp as unknown as Record<string, unknown> | null)?.id as string)
             .filter(Boolean)
+          loteCpIdsAll.push(...cpIds)
           const reqIds = (loteItens ?? [])
-            .map(item => (item.cp as Record<string, unknown> | null)?.requisicao_id as string)
+            .map(item => (item.cp as unknown as Record<string, unknown> | null)?.requisicao_id as string)
             .filter(Boolean)
           const pedidoIds = (loteItens ?? [])
-            .map(item => (item.cp as Record<string, unknown> | null)?.pedido_id as string)
+            .map(item => (item.cp as unknown as Record<string, unknown> | null)?.pedido_id as string)
             .filter(Boolean)
 
           // Map: requisicao_id -> { numero, descricao, justificativa, solicitante_nome, itens }
@@ -411,27 +430,29 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             }
           }
 
-          // Map: cp_id -> fin_documentos[]
-          if (cpIds.length > 0) {
-            const { data: docsData } = await supabase
-              .from('fin_documentos')
-              .select('entity_id, nome_arquivo, arquivo_url, tipo, mime_type, uploaded_at')
-              .eq('entity_type', 'cp')
-              .in('entity_id', [...new Set(cpIds)])
-            for (const d of docsData ?? []) {
-              const eid = d.entity_id as string
-              const arr = docMap.get(eid) ?? []
-              arr.push(d)
-              docMap.set(eid, arr)
-            }
-          }
-
           for (const item of loteItens ?? []) {
             const loteId = item.lote_id as string | undefined
             if (!loteId) continue
             const current = loteItensMap.get(loteId) ?? []
             current.push(item as Record<string, unknown>)
             loteItensMap.set(loteId, current)
+          }
+        }
+
+        // Map: cp_id -> fin_documentos[] — cobre CPs de lote E CPs individuais em
+        // autorização (ex.: Pagamento Extraordinário, que registra anexos aqui).
+        const docEntityIds = [...new Set([...loteCpIdsAll, ...finIds])]
+        if (docEntityIds.length > 0) {
+          const { data: docsData } = await supabase
+            .from('fin_documentos')
+            .select('entity_id, nome_arquivo, arquivo_url, tipo, mime_type, uploaded_at')
+            .eq('entity_type', 'cp')
+            .in('entity_id', docEntityIds)
+          for (const d of docsData ?? []) {
+            const eid = d.entity_id as string
+            const arr = docMap.get(eid) ?? []
+            arr.push(d)
+            docMap.set(eid, arr)
           }
         }
       }
@@ -635,6 +656,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                       tipo: (d.tipo as string) ?? 'outro',
                       mime_type: (d.mime_type as string) ?? '',
                     })),
+                    // Fallback legado: CPs extraordinárias antigas guardam os anexos só como
+                    // texto nas observações ("Anexos: nome (url) | nome2 (url2)").
+                    ...parseAnexosDeObservacoes(cp?.observacoes as string | undefined),
                   ]
                   return {
                     id: cpId || (item.id as string),
@@ -656,6 +680,15 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 }),
               }
             } else if (fin) {
+              const finAnexos = [
+                ...(docMap.get(a.entidade_id) ?? []).map(d => ({
+                  nome: (d.nome_arquivo as string) ?? '',
+                  url: (d.arquivo_url as string) ?? '',
+                  tipo: (d.tipo as string) ?? 'outro',
+                  mime_type: (d.mime_type as string) ?? '',
+                })),
+                ...parseAnexosDeObservacoes(fin.observacoes as string | undefined),
+              ]
               ;(a as Record<string, unknown>)._pagamento_detalhes = {
                 fornecedor_nome: (fin.fornecedor_nome as string) ?? '',
                 valor_original: (fin.valor_original as number) ?? 0,
@@ -669,6 +702,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 natureza: (fin.natureza as string) ?? '',
                 forma_pagamento: (fin.forma_pagamento as string) ?? '',
                 status_cp: (fin.status as string) ?? '',
+                anexos: finAnexos.length > 0 ? finAnexos : undefined,
               }
             }
           } else if (a.tipo_aprovacao === 'aprovacao_transporte') {

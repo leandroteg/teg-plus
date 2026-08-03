@@ -356,6 +356,20 @@ export function useCriarSolicitacaoExtraordinariaCP() {
         }
         const { data: urlData } = supabase.storage.from('tesouraria-extratos').getPublicUrl(path)
         uploadedArquivos.push({ nome: arquivo.name, url: urlData.publicUrl })
+
+        // Registra também em fin_documentos — é de lá que o AprovAí e demais
+        // telas listam os anexos da CP (o texto em observacoes é só um espelho).
+        await supabase.from('fin_documentos').insert({
+          entity_type: 'cp',
+          entity_id: data.id,
+          tipo: 'comprovante',
+          nome_arquivo: arquivo.name,
+          arquivo_url: urlData.publicUrl,
+          mime_type: arquivo.type || null,
+          tamanho_bytes: arquivo.size || null,
+        }).then(({ error: docErr }) => {
+          if (docErr) console.warn('Aviso: anexo não registrado em fin_documentos:', docErr.message)
+        })
       }
 
       if (dadosBancarios || uploadedArquivos.length > 0 || uploadFalhas.length > 0) {

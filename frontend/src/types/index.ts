@@ -244,6 +244,8 @@ export interface AprovacaoPendente extends Aprovacao {
     natureza: string
     forma_pagamento: string
     status_cp: string
+    /** Anexos da CP individual (fin_documentos + fallback das observações) */
+    anexos?: { nome: string, url: string, tipo: string, mime_type?: string }[]
     itens?: {
       id: string
       fornecedor_nome: string

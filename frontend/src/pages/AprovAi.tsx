@@ -1387,18 +1387,18 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
                           </p>
                         ) : null}
                         {item.anexos && item.anexos.length > 0 && (
-                          <div className="flex gap-1.5 mt-0.5">
+                          <div className="mt-1 space-y-0.5" onClick={e => e.stopPropagation()}>
                             {item.anexos.map((anexo, idx) => (
                               <a
                                 key={idx}
                                 href={anexo.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                onClick={e => e.stopPropagation()}
                                 title={anexo.nome || anexo.tipo}
-                                className="text-sm hover:scale-110 transition-transform"
+                                className="flex items-center gap-1.5 text-[10px] text-indigo-600 hover:text-indigo-800 hover:underline truncate"
                               >
-                                {anexoIcon(anexo.tipo)}
+                                <span className="text-xs">{anexoIcon(anexo.tipo)}</span>
+                                <span className="truncate">{anexo.nome || anexo.tipo}</span>
                               </a>
                             ))}
                           </div>
@@ -1509,6 +1509,25 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
           )}
         </div>
       </div>
+
+      {/* Anexos da CP (NF, boleto, comprovantes) p/ conferência do aprovador */}
+      {detalhes.anexos && detalhes.anexos.length > 0 && (
+        <div className="bg-slate-50 rounded-xl p-3 space-y-1">
+          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Anexos</span>
+          {detalhes.anexos.map((anexo, idx) => (
+            <a
+              key={idx}
+              href={anexo.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-800 hover:underline truncate"
+            >
+              <span>{anexoIcon(anexo.tipo)}</span>
+              <span className="truncate">{anexo.nome || anexo.tipo}</span>
+            </a>
+          ))}
+        </div>
+      )}
 
       {/* Entender esta autorizacao */}
       <button
