@@ -16,6 +16,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 import {
   usePontoResumoMes, usePontoResumoPeriodo, usePontoFechamentos, useFecharMes, useLiberarMes, janelaPadrao,
   usePontoEnvios, useEnviarEspelho, useDescartarEspelho, type PontoEspelhoEnvio,
+  usePontoEnviosResumo, useZipEspelhosAssinados,
 } from '../../../hooks/usePonto'
 import { supabase } from '../../../services/supabase'
 import { intervalToMin, minToHoras, labelMes, ultimosMeses } from '../../../lib/ponto'
@@ -72,6 +73,10 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
     new Map((fechamentos.data ?? []).map(f => [String(f.ano_mes).slice(0, 10), f])), [fechamentos.data])
 
   const envios = usePontoEnvios(anoMes)
+  const enviosResumo = usePontoEnviosResumo()
+  const zipAssinados = useZipEspelhosAssinados()
+  const resumoPorMes = useMemo(() =>
+    new Map((enviosResumo.data ?? []).map(r => [String(r.ano_mes).slice(0, 10), r])), [enviosResumo.data])
   const enviarEspelho = useEnviarEspelho()
   const descartar = useDescartarEspelho()
   // a view ja devolve so o vivo + os descartados; a tela olha o vivo de cada um
@@ -318,6 +323,7 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
                 <tbody>{linhasMes.map(l => {
                   const doMes = l.anoMes === anoMes
                   const fech = fechPorMes.get(l.anoMes)
+                  const env = resumoPorMes.get(l.anoMes)
                   // só depois do mês terminar (regra também aplicada na RPC)
                   const encerrado = l.anoMes < mesCorrente
                   const trabalhando = (fechar.isPending || liberar.isPending)
@@ -341,7 +347,10 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
                           </span>
                         )}
                       </td>
-                      <td className={`${TD} ${sub}`}>0/{l.pessoas}</td>
+                      <td className={`${TD} ${sub}`}
+                        title="Espelhos assinados / enviados para assinatura nesta competência">
+                        {env ? <><b className={env.assinados >= env.enviados ? 'text-emerald-500' : txt}>{env.assinados}</b>/{env.enviados}</> : '—'}
+                      </td>
                       <td className={`${TD} w-px`} onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5 justify-end">
                           <button
@@ -351,9 +360,18 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
                             className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-violet-500/15 text-violet-500 hover:bg-violet-500/25 disabled:opacity-30 whitespace-nowrap">
                             <FileText size={12} /> Relatório
                           </button>
-                          <button disabled title="Disponível quando a assinatura do espelho estiver ligada — hoje não há PDF assinado para empacotar"
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-500/10 text-slate-400 disabled:opacity-60 whitespace-nowrap cursor-not-allowed">
-                            <Package size={12} /> ZIP
+                          <button
+                            onClick={() => zipAssinados.mutate({ anoMes: l.anoMes }, {
+                              onError: e => window.alert(e instanceof Error ? e.message : 'Falha ao gerar o ZIP'),
+                              onSuccess: r => { if (r.falhas) window.alert(`${r.total} PDF(s) no ZIP · ${r.falhas} não puderam ser baixados.`) },
+                            })}
+                            disabled={!env?.assinados || zipAssinados.isPending}
+                            title={env?.assinados
+                              ? `Baixar os ${env.assinados} espelhos assinados desta competência em um ZIP`
+                              : 'Nenhum espelho assinado nesta competência ainda'}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 disabled:opacity-30 whitespace-nowrap">
+                            {zipAssinados.isPending && zipAssinados.variables?.anoMes === l.anoMes
+                              ? <Loader2 size={12} className="animate-spin" /> : <Package size={12} />} ZIP
                           </button>
                           {fech?.status === 'fechado' ? (
                             <button onClick={() => liberar.mutate({ anoMes: l.anoMes, por: quem })} disabled={trabalhando}

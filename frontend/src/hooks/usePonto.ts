@@ -432,3 +432,61 @@ export function useDescartarEspelho() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ponto-envios'] }),
   })
 }
+
+/** Contagem de envios/assinados por competência — alimenta a visão mensal. */
+export function usePontoEnviosResumo() {
+  return useQuery<{ ano_mes: string; enviados: number; assinados: number; obsoletos: number }[]>({
+    queryKey: ['ponto-envios-resumo'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vw_rh_ponto_espelho_resumo').select('*')
+      if (error) { console.error('usePontoEnviosResumo:', error); return [] }
+      return (data ?? []) as { ano_mes: string; enviados: number; assinados: number; obsoletos: number }[]
+    },
+    refetchInterval: 60_000,
+  })
+}
+
+/** Baixa num ZIP só os espelhos ASSINADOS da competência (1 PDF por pessoa). */
+export function useZipEspelhosAssinados() {
+  return useMutation({
+    mutationFn: async (v: { anoMes: string }) => {
+      const { data: envios, error } = await supabase.from('vw_rh_ponto_espelho_envio')
+        .select('colaborador_id, arquivo_assinado_path, assinado_em')
+        .eq('ano_mes', v.anoMes).eq('status', 'assinado')
+      if (error) throw error
+      const linhas = (envios ?? []).filter(e => e.arquivo_assinado_path) as
+        { colaborador_id: string; arquivo_assinado_path: string }[]
+      if (!linhas.length) throw new Error('Nenhum espelho assinado nesta competência.')
+
+      // a view não carrega FK, então o embed não funciona — nomes vêm à parte
+      const { data: colabs } = await supabase.from('rh_colaboradores')
+        .select('id, nome').in('id', linhas.map(l => l.colaborador_id))
+      const nomePor = new Map((colabs ?? []).map(c => [c.id as string, c.nome as string]))
+
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+      const usados = new Set<string>()
+      let falhas = 0
+      await Promise.all(linhas.map(async l => {
+        const { data, error: e } = await supabase.storage.from('rh-admissao-docs').download(l.arquivo_assinado_path)
+        if (e || !data) { falhas++; return }
+        const base = (nomePor.get(l.colaborador_id) ?? l.colaborador_id)
+          .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w\- ]/g, '').trim().replace(/\s+/g, '_')
+        // homônimo não pode sobrescrever o arquivo do outro
+        let nome = `${base}.pdf`; let n = 2
+        while (usados.has(nome)) nome = `${base}_${n++}.pdf`
+        usados.add(nome)
+        zip.file(nome, data)
+      }))
+      if (!usados.size) throw new Error('Não foi possível baixar nenhum PDF assinado.')
+
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `espelhos-assinados-${v.anoMes.slice(0, 7)}.zip`
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      return { total: usados.size, falhas }
+    },
+  })
+}
