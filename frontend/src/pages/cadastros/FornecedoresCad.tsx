@@ -569,7 +569,7 @@ export default function FornecedoresCad({ segmentos, titulo, extra }: Fornecedor
         <MagicModal
           title={editItem.id ? 'Editar Fornecedor' : 'Novo Fornecedor'}
           isNew={!editItem.id}
-          aiEnabled
+          aiEnabled={false}
           showCnpjField
           entityLabel="Fornecedor"
           onClose={closeForm}

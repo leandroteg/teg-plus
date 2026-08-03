@@ -263,7 +263,7 @@ export default function ItemFormModal({ open, initialData, onClose, onSaved, onR
           <div className="rounded-2xl border border-slate-200 p-4 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Classe Financeira</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Natureza Orçamentária Financeira</label>
                 <div className="relative">
                   <input
                     value={classeBusca}

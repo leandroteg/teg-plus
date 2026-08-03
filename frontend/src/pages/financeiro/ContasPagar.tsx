@@ -284,7 +284,7 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
             </div>
           )}
 
-          {/* Classificação: CC, Classe Financeira, Obra */}
+          {/* Classificação: CC, Natureza Orçamentária Financeira, Obra */}
           <div className="space-y-3">
             <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               Classificação (opcional)
@@ -297,7 +297,7 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
                   className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700'}`} />
               </div>
               <div>
-                <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Classe Financeira</label>
+                <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Natureza Orçamentária Financeira</label>
                 <UpperInput value={editClasse} onChange={e => setEditClasse(e.target.value)}
                   placeholder={cp.classe_financeira || 'Ex: Material, Serviço'}
                   className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700'}`} />

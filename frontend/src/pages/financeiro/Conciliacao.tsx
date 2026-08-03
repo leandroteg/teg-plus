@@ -677,7 +677,7 @@ export default function Conciliacao() {
                 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
                 ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
             >
-              <option value="">Classe Financeira</option>
+              <option value="">Natureza Orçamentária Financeira</option>
               {classeSuggestions.map(cl => (
                 <option key={cl} value={cl}>{cl}</option>
               ))}
@@ -718,7 +718,7 @@ export default function Conciliacao() {
             {filtroSemClasse && (
               <span className="inline-flex items-center gap-1 bg-violet-100 text-violet-700 text-[10px] font-semibold
                 rounded-full px-2 py-0.5">
-                Sem Classe Financeira
+                Sem Natureza Orçamentária Financeira
                 <button onClick={() => setFiltroSemClasse(false)}><X size={9} /></button>
               </span>
             )}
@@ -848,7 +848,7 @@ export default function Conciliacao() {
                     )}
                   </div>
 
-                  {/* Classe Financeira */}
+                  {/* Natureza Orçamentária Financeira */}
                   <div className="col-span-2 hidden lg:block">
                     {row.classeFinanceira ? (
                       <span className="text-[10px] text-violet-600 font-medium truncate block">{row.classeFinanceira}</span>
@@ -999,7 +999,7 @@ export default function Conciliacao() {
 
               <AutocompleteField
                 isDark={isDark}
-                label="Classe Financeira"
+                label="Natureza Orçamentária Financeira"
                 icon={Tag}
                 value={batchClasse}
                 onChange={setBatchClasse}

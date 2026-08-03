@@ -576,7 +576,7 @@ function PipelineRail({
 // ══ Export CSV ══════════════════════════════════════════════════
 
 function exportCSV(cps: ContaPagar[], stageName: string) {
-  const headers = ['Fornecedor', 'Valor', 'Vencimento', `Emiss\u00e3o`, 'Documento', 'Centro Custo', 'Classe Financeira', 'Obra', 'Pedido', `Descri\u00e7\u00e3o`, 'Status']
+  const headers = ['Fornecedor', 'Valor', 'Vencimento', `Emiss\u00e3o`, 'Documento', 'Centro Custo', 'Natureza Orçamentária Financeira', 'Obra', 'Pedido', `Descri\u00e7\u00e3o`, 'Status']
   const rows = cps.map(cp => [
     cp.fornecedor_nome,
     cp.valor_original.toFixed(2).replace('.', ','),
@@ -1004,7 +1004,7 @@ function NovaSolicitacaoExtraordinariaModal({
               )}
             </div>
             <div className="relative">
-              <label className={labelCls}>Classe Financeira *</label>
+              <label className={labelCls}>Natureza Orçamentária Financeira *</label>
               <button
                 type="button"
                 onClick={() => {
@@ -1393,7 +1393,7 @@ function NovaPrevisaoPagamentoModal({
             </div>
 
             <div className="relative">
-              <label className={labelCls}>Classe Financeira *</label>
+              <label className={labelCls}>Natureza Orçamentária Financeira *</label>
               <button
                 type="button"
                 onClick={() => {
@@ -2410,7 +2410,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                   value={editClasse}
                   onChange={setEditClasse}
                   placeholder="Buscar classe financeira..."
-                  label="Classe Financeira"
+                  label="Natureza Orçamentária Financeira"
                 />
                 <SearchableSelect
                   options={obraOptions}

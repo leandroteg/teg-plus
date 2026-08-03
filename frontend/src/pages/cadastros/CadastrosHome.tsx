@@ -29,7 +29,7 @@ const SECTIONS = [
     entities: [
       { key: 'grupos',     label: 'Grupos',      icon: Layers,     route: '/cadastros/grupos',      color: 'violet', emoji: '📊' },
       { key: 'categorias', label: 'Categorias',  icon: FolderTree, route: '/cadastros/categorias',  color: 'purple', emoji: '📁' },
-      { key: 'classes',    label: 'Classes Fin.', icon: Tag,        route: '/cadastros/classes',     color: 'amber',  emoji: '📂' },
+      { key: 'classes',    label: 'Nat. Orçamentária', icon: Tag,        route: '/cadastros/classes',     color: 'amber',  emoji: '📂' },
     ],
   },
   {

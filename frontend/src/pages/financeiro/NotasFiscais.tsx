@@ -636,7 +636,7 @@ function UploadModal({ isDark, onClose }: { isDark: boolean; onClose: () => void
               {/* Row: Classe + Origem */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Classe Financeira</label>
+                  <label className={labelCls}>Natureza Orçamentária Financeira</label>
                   <select
                     value={form.classe_id}
                     onChange={e => set('classe_id', e.target.value)}

@@ -131,7 +131,7 @@ const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: s
 // ── Export CSV ────────────────────────────────────────────────────────────────
 
 function exportCSV(crs: ContaReceber[], stageName: string) {
-  const headers = ['Cliente', 'CNPJ', 'Valor', 'Vencimento', 'Emissao', 'NF', 'Centro Custo', 'Classe Financeira', 'Natureza', 'Descricao', 'Status']
+  const headers = ['Cliente', 'CNPJ', 'Valor', 'Vencimento', 'Emissao', 'NF', 'Centro Custo', 'Natureza Orçamentária Financeira', 'Natureza', 'Descricao', 'Status']
   const rows = crs.map(cr => [
     cr.cliente_nome,
     cr.cliente_cnpj || '',

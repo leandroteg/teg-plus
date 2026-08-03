@@ -4,15 +4,26 @@
     {
       "name": "auditoria-html",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "7789", "--directory", "G:/Meu Drive/20_TEG UNIÃO/08 - Relatórios e Painéis"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "7789",
+        "--directory",
+        "G:/Meu Drive/20_TEG UNIÃO/08 - Relatórios e Painéis"
+      ],
       "port": 7789
     },
     {
       "name": "teg-frontend",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js", "run", "dev"],
-      "cwd": "C:/Users/Gabriel/Pessoal/teg-plus/frontend",
-      "port": 5173
+      "runtimeArgs": [
+        "C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "dev"
+      ],
+      "cwd": "C:/teg-plus/frontend",
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }

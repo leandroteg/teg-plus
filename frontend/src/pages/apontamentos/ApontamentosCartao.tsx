@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   CreditCard, Plus, Search, Calendar, Filter,
@@ -16,6 +16,7 @@ import {
   useExcluirApontamentoCartao,
 } from '../../hooks/useCartoes'
 import type { ApontamentoCartao, StatusApontamentoCartao, BandeiraCartao } from '../../types/financeiro'
+import { supabase } from '../../services/supabase'
 import { useCadClasses, useCadCentrosCusto } from '../../hooks/useCadastros'
 import SearchableSelect from '../../components/SearchableSelect'
 import type { SelectOption } from '../../components/SearchableSelect'
@@ -119,8 +120,11 @@ function ApontamentoModal({
       : EMPTY_FORM
   )
   const [error, setError] = useState('')
+  const [comprovante, setComprovante] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const isBusy = criar.isPending || atualizar.isPending
+  const isBusy = criar.isPending || atualizar.isPending || uploading
 
   const inp = `w-full px-3 py-2.5 rounded-xl border text-sm
     focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
@@ -134,6 +138,26 @@ function ApontamentoModal({
     const valor = parseFloat(form.valor.replace(',', '.'))
     if (!valor || valor <= 0) return setError('Valor inválido')
 
+    let comprovante_url: string | undefined
+    let comprovante_nome: string | undefined
+    if (comprovante) {
+      setUploading(true)
+      try {
+        const ext = comprovante.name.split('.').pop()?.toLowerCase() ?? 'pdf'
+        const path = `${form.cartao_id}/${Date.now()}.${ext}`
+        const up = await supabase.storage.from('cartoes-comprovantes')
+          .upload(path, comprovante, { contentType: comprovante.type || undefined })
+        if (up.error) throw up.error
+        const { data: { publicUrl } } = supabase.storage.from('cartoes-comprovantes').getPublicUrl(path)
+        comprovante_url = publicUrl
+        comprovante_nome = comprovante.name
+      } catch {
+        setUploading(false)
+        return setError('Erro ao enviar o comprovante. Tente novamente.')
+      }
+      setUploading(false)
+    }
+
     const payload = {
       cartao_id: form.cartao_id,
       data_lancamento: form.data_lancamento,
@@ -143,6 +167,7 @@ function ApontamentoModal({
       centro_custo: form.centro_custo || undefined,
       classe_financeira: form.classe_financeira || undefined,
       observacoes: form.observacoes || undefined,
+      ...(comprovante_url ? { comprovante_url, comprovante_nome } : {}),
     }
 
     try {
@@ -265,7 +290,7 @@ function ApontamentoModal({
               value={form.classe_financeira}
               onChange={v => setForm(f => ({ ...f, classe_financeira: v }))}
               placeholder="Buscar classe financeira..."
-              label="Classe Financeira"
+              label="Natureza Orçamentária Financeira"
             />
           </div>
 
@@ -281,18 +306,43 @@ function ApontamentoModal({
             />
           </div>
 
-          {/* Comprovante (upload placeholder) */}
+          {/* Comprovante */}
           <div>
             <label className={lbl}>Comprovante</label>
-            <div className={`rounded-xl border-2 border-dashed flex items-center justify-center gap-2 py-4 cursor-pointer
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0] ?? null
+                setComprovante(f)
+                e.target.value = ''
+              }}
+            />
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className={`rounded-xl border-2 border-dashed flex items-center justify-center gap-2 py-4 cursor-pointer
               transition-colors hover:border-emerald-400
+              ${comprovante ? 'border-emerald-400' : ''}
               ${isDark ? 'border-white/[0.08] text-slate-500 hover:text-emerald-400' : 'border-slate-200 text-slate-400 hover:text-emerald-600'}`}>
               <Upload size={16} />
               <span className="text-xs font-medium">
-                {editing?.comprovante_nome ?? 'Clique para anexar comprovante (PDF, JPG, PNG)'}
+                {comprovante?.name ?? editing?.comprovante_nome ?? 'Clique para anexar comprovante (PDF, JPG, PNG)'}
               </span>
+              {comprovante && (
+                <button
+                  onClick={e => { e.stopPropagation(); setComprovante(null) }}
+                  className="text-slate-400 hover:text-red-500"
+                  title="Remover arquivo"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">Upload via integração de armazenamento</p>
+            <p className="text-[10px] text-slate-400 mt-1">
+              {uploading ? 'Enviando comprovante...' : 'PDF, JPG ou PNG · anexado ao salvar'}
+            </p>
           </div>
 
           {error && (
@@ -765,7 +815,7 @@ export default function ApontamentosCartao() {
               )}
               {detalheItem.classe_financeira && (
                 <div>
-                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Classe Financeira</span>
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Natureza Orçamentária Financeira</span>
                   <p className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{detalheItem.classe_financeira}</p>
                 </div>
               )}

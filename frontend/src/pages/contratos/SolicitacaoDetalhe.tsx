@@ -1293,7 +1293,7 @@ export default function SolicitacaoDetalhe() {
                 <InfoItem label="Vigência" value={vigencia} icon={Calendar} />
                 <InfoItem label="Prazo (meses)" value={s.prazo_meses ? `${s.prazo_meses} meses` : undefined} icon={Clock} />
                 <InfoItem label="Centro de Custo" value={s.centro_custo} icon={Briefcase} />
-                <InfoItem label="Classe Financeira" value={s.classe_financeira} icon={Tag} />
+                <InfoItem label="Natureza Orçamentária Financeira" value={s.classe_financeira} icon={Tag} />
                 <InfoItem label="Índice Reajuste" value={s.indice_reajuste} icon={Tag} />
                 <InfoItem label="Data Necessidade" value={s.data_necessidade ? fmtData(s.data_necessidade) : undefined} icon={Calendar} />
                 <InfoItem label="Responsavel" value={s.responsavel_nome} icon={User} />

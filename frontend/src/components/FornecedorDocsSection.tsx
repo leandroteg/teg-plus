@@ -94,9 +94,13 @@ export default function FornecedorDocsSection({ dark = false, fornecedorId, cnpj
     <div className={`rounded-2xl border p-4 ${cardCls}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className={`text-sm font-bold ${text}`}>Documentos</p>
+          <p className={`text-sm font-bold ${text}`}>
+            Documentos{cnpjFornecedor && <span className="text-red-500"> *</span>}
+          </p>
           <p className={`text-xs mt-0.5 ${subtext}`}>
-            Cartão CNPJ, certidões, contrato social. PDF ou imagem, até 15 MB.
+            {cnpjFornecedor
+              ? 'Cartão CNPJ obrigatório para fornecedor com CNPJ. Certidões e contrato social são opcionais. PDF ou imagem, até 15 MB.'
+              : 'Cartão CNPJ, certidões, contrato social. PDF ou imagem, até 15 MB.'}
           </p>
         </div>
         {cnpjFornecedor && (

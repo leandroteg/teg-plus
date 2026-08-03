@@ -1491,7 +1491,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
           )}
           {detalhes.classe_financeira && (
             <div>
-              <span className="text-slate-400">Classe Financeira</span>
+              <span className="text-slate-400">Natureza Orçamentária Financeira</span>
               <p className="font-medium text-slate-700">{detalhes.classe_financeira}</p>
             </div>
           )}

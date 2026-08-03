@@ -478,7 +478,7 @@ export default function ContratoDetalhe() {
           <Field label="Tipo" value={contrato.tipo_contrato === 'receita' ? 'Receita' : 'Despesa'} />
           <Field label="Obra" value={contrato.obra?.nome} />
           <Field label="Centro de Custo" value={contrato.centro_custo} />
-          <Field label="Classe Financeira" value={contrato.classe_financeira} />
+          <Field label="Natureza Orçamentária Financeira" value={contrato.classe_financeira} />
           <Field label="Contraparte" value={contraparte} />
           <Field label="CNPJ" value={contraparteCnpj} mono />
           <Field label="Recorrencia" value={contrato.recorrencia?.replace(/_/g, ' ')} />

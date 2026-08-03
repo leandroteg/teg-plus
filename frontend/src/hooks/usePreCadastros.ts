@@ -32,7 +32,7 @@ const ENTITY_LABELS: Record<string, string> = {
   itens: 'Item',
   colaboradores: 'Colaborador',
   obras: 'Obra',
-  classes_financeiras: 'Classe Financeira',
+  classes_financeiras: 'Natureza Orçamentária Financeira',
   centros_custo: 'Centro de Custo',
   grupos_financeiros: 'Grupo Financeiro',
   categorias_financeiras: 'Categoria Financeira',

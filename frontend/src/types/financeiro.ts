@@ -75,6 +75,8 @@ export interface ContaPagar {
   solicitacao_logistica_id?: string
   fornecedor_id?: string
   fornecedor_nome: string
+  /** Empresa do grupo (sys_empresas). NULL em CPs antigas/avulsas — mig 193 herda do pedido via trigger. */
+  empresa_id?: string | null
   origem?: OrigemCP
   valor_original: number
   valor_pago: number

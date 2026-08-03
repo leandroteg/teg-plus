@@ -44,3 +44,8 @@ wf_*.json
 fix_melhorar_n8n.py
 *.json
 .vercel
+
+# env backups e credenciais locais (mudanca notebook)
+frontend/.env.local.homolog
+frontend/.env.local.prodbak
+tmp_credenciais_*

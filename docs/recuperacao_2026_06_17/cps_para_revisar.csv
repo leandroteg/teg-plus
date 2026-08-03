@@ -1,0 +1,72 @@
+restaurar;classificacao_auto;valor;vencimento;fornecedor;descricao;status;origem;criado;entity_id
+;real;4543542,99;14/03/2026;Pagamento Extraordinário;dfgdgfd;conciliado;manual;14/03/2026;738c3653-4dcd-42d0-abdd-749963aef4d6
+SIM;real;155555;13/04/2026;VORTEX TREINAMENTOS LTDA;Resma de papel A4 para escritorio;aprovado_pgto;compras;14/03/2026;8ade2a15-7ae6-4f06-b291-c7779858a9dd
+SIM;real;45000;30/03/2026;EMPREITEIRA BRASIL;Obra civil - Parcela 1/6;aprovado_pgto;compras;16/03/2026;ec8ae9d8-95a5-4dd9-823a-3fc0b38cd597
+SIM;real;30000;23/03/2026;VORTEX TREINAMENTOS LTDA;Consultoria - Parcela 1/10;aprovado_pgto;compras;14/03/2026;cd1226ed-5531-4341-9219-d773efb6cba7
+SIM;real;30000;23/06/2026;VORTEX TREINAMENTOS LTDA;Consultoria - Parcela 4/10;previsto;compras;14/03/2026;f64262dc-0903-4d66-b2d1-8af0ff003b62
+SIM;real;30000;23/07/2026;VORTEX TREINAMENTOS LTDA;Consultoria - Parcela 5/10;previsto;compras;14/03/2026;daf6da7c-3190-4d90-8173-908e9c29fd58
+SIM;real;30000;23/08/2026;VORTEX TREINAMENTOS LTDA;Consultoria - Parcela 6/10;previsto;compras;14/03/2026;7e2c6dcf-e085-40ef-ad0d-1df061c68fc8
+SIM;real;30000;23/09/2026;VORTEX TREINAMENTOS LTDA;Consultoria - Parcela 7/10;previsto;compras;14/03/2026;f7140940-3105-4396-8f09-3c3db8612e68
+SIM;real;30000;23/10/2026;VORTEX TREINAMENTOS LTDA;Consultoria - Parcela 8/10;previsto;compras;14/03/2026;caeffac7-f8fd-437d-8785-274207c6af84
+SIM;real;30000;23/11/2026;VORTEX TREINAMENTOS LTDA;Consultoria - Parcela 9/10;previsto;compras;14/03/2026;1d2db49f-7877-46cb-aded-b017b6d365b3
+SIM;real;25000;02/04/2026;MERCEDES-BENZ DO BRASIL LTDA.;MERCEDEZ CAMINHAO ATEGO 2730 6X4;previsto;compras;23/03/2026;23891853-95f7-45cf-bbc5-36978d6f33ae
+SIM;real;12000;01/04/2026;A GERADORA ALUGUEL DE MAQUINAS S.A.;LOCAÇÃO DE GERADORES - Parcela 1/10;previsto;compras;27/03/2026;aca5f272-6ed0-4f18-9115-39f984dd4909
+SIM;real;12000;01/05/2026;A GERADORA ALUGUEL DE MAQUINAS S.A.;LOCAÇÃO DE GERADORES - Parcela 2/10;previsto;compras;27/03/2026;67cc36e2-38cd-4a29-8d16-5adeae027740
+SIM;real;12000;01/07/2026;A GERADORA ALUGUEL DE MAQUINAS S.A.;LOCAÇÃO DE GERADORES - Parcela 4/10;previsto;compras;27/03/2026;d1ea9927-9817-428b-a947-c2695826d8b9
+SIM;real;12000;01/10/2026;A GERADORA ALUGUEL DE MAQUINAS S.A.;LOCAÇÃO DE GERADORES - Parcela 7/10;previsto;compras;27/03/2026;f7208896-3a20-4a65-a771-87487af8d125
+SIM;real;12000;01/12/2026;A GERADORA ALUGUEL DE MAQUINAS S.A.;LOCAÇÃO DE GERADORES - Parcela 9/10;previsto;compras;27/03/2026;ca834c38-3b9f-4efa-aaef-9d7bf143afb4
+SIM;real;12000;01/01/2027;A GERADORA ALUGUEL DE MAQUINAS S.A.;LOCAÇÃO DE GERADORES - Parcela 10/10;previsto;compras;27/03/2026;97ef05f4-58c2-49c0-9a1f-7f0c832091ff
+SIM;real;9999,98;23/03/2026;VORTEX TREINAMENTOS LTDA;Pagamento antecipado para garantir preço do serivço;em_lote;manual;23/03/2026;e4cfd56e-4613-4ea0-aaf9-e2a42d6bc7c8
+SIM;real;8333,34;18/06/2026;CABR CABOS;CABO DE ATERRAMENTO COBRE - 90 dias;pago;compras;17/03/2026;4974905a-ed34-4907-a3a8-086fa2939adf
+SIM;real;8333,33;19/04/2026;CABR CABOS;CABO DE ATERRAMENTO COBRE - 30 dias;pago;compras;17/03/2026;6b70cb28-9d28-4eb9-afa8-711fa4e8f210
+SIM;real;8333,33;19/05/2026;CABR CABOS;CABO DE ATERRAMENTO COBRE - 60 dias;pago;compras;17/03/2026;ed2c2d52-05a8-438e-b972-27bf6a52767a
+SIM;teste_suspeito;5160;02/07/2026;ALIANCA EQUIPAMENTOS;(sem descrição - PC-202606-00003);previsto;compras;02/06/2026;27c9ba21-2d9f-4db2-b5e0-f51273b6f97a
+SIM;real;3200;24/03/2026;KABUM S.A.;Impressora - Revisar manualmente;em_pagamento;compras;18/03/2026;37318379-5316-4e41-8346-ddb65c1725ec
+;real;2920;05/06/2026;LUX AUTO CENTER ARAXA LTDA;Pedido PC-202605-00001 - FIAT FIORINO RTA6F87;conciliado;compras;07/05/2026;99a91324-12dd-4b4d-a2f8-fed59a8f2e29
+;omie_standby;2500;21/04/2026;Fornecedor Omie #4346756313;(sem desc - integração Omie standby);em_pagamento;omie;17/03/2026;bb818ae7-18d9-4079-aa25-59b7c8657f5e
+;omie_standby;2500;21/05/2026;Fornecedor Omie #4346756313;(sem desc);em_pagamento;omie;17/03/2026;12674ecc-c487-460a-80d2-235233eee030
+;omie_standby;2500;21/07/2026;Fornecedor Omie #4346756313;(sem desc);em_pagamento;omie;17/03/2026;b1b44819-143a-4aa8-b2f6-c8387a8e1e74
+;omie_standby;2500;18/09/2026;Fornecedor Omie #4346756313;(sem desc);em_pagamento;omie;17/03/2026;cb11bb21-8333-49d4-90e4-526941860750
+;omie_standby;2500;18/01/2027;Fornecedor Omie #4346756313;(sem desc);em_pagamento;omie;17/03/2026;2f2fb32b-8829-4096-bad8-31dc267d9e85
+;omie_standby;2500;18/02/2027;Fornecedor Omie #4346756313;(sem desc);em_pagamento;omie;17/03/2026;a97d2048-a609-48d7-b33b-30f1e1ff5b05
+;omie_standby;2500;20/03/2027;Fornecedor Omie #4346756313;(sem desc);em_pagamento;omie;17/03/2026;551d3ad8-bdb5-483c-81c2-3ff405db8ed9
+SIM;real;2150;27/03/2026;MAGAZINE LUIZA S/A;Notebook - Revisar manualmente;em_pagamento;compras;18/03/2026;daf4f6ed-2307-4769-875f-69a7d797eab7
+SIM;real;2150;27/04/2026;MAGAZINE LUIZA S/A;Notebook - 2a parcela;aprovado_pgto;compras;18/03/2026;cc1c8a4a-2745-434b-a2bd-2351b594dedd
+SIM;real;2000;26/04/2026;ESCADA SUDESTE INDUSTRIA LTDA;ESCADA;cancelado;compras;16/03/2026;096be928-b2b4-4b1b-9f36-6f7907d73178
+SIM;real;2000;26/04/2026;FERRAMENTAS PROFISSIONAIS E EPI;CAPACETE MSA + OCULOS - 30 dias;aprovado_pgto;compras;17/03/2026;c93043b6-6a97-41d9-adc0-ab9f1bed218f
+SIM;teste;2000;12/04/2026;EPI-MASTER;bbb;em_pagamento;compras;13/03/2026;ab29a698-965a-43a3-bd9c-6ef41d05fe1a
+SIM;real;1999,99;19/03/2026;ze epi;BARRA ROSCADA + FORMAO ACO;previsto;compras;19/03/2026;d2aaf8e4-62ae-4ca0-986b-b7475b41f15d
+;real;1500;13/04/2026;TransBrasil;Frete LOG-2026-0010 Campo Grande Frutal;conciliado;logistica;12/03/2026;60cce894-8b21-4cd6-b3d5-22f3714ad545
+;real;1500;07/05/2026;F & F Refeições;Refeição equipe - 2a parcela;conciliado;compras;20/03/2026;90e17484-80b1-498a-af2d-69829736e721
+SIM;real;1500;10/07/2026;Maria Oliveira Santos;Locacao imovel IMV-003 - iptu TESTE_147;previsto;locacao;17/06/2026;a770d6bb-40bf-451c-a5a4-de8ebbefc8af
+;real;1350;23/03/2026;DELL COMPUTADORES;Notebook;conciliado;compras;23/03/2026;ae348386-8512-4fe2-8355-587abe655a6e
+SIM;teste;1234,56;10/07/2026;CLAUDIONOR;Fatura CLAUDIONOR - 2026-06;previsto;cartao_fatura;17/06/2026;9e9ef0df-8c02-4849-b8fa-be5bebcc08f3
+SIM;real;1000;30/04/2026;EIP SERVICOS ILUMINACAO;CAPACETE MSA + LUVA - 2a parcela;em_lote;compras;16/03/2026;4e05664a-8cb3-4607-88d6-a9f30130325d
+SIM;real;700;25/07/2026;ESTRELA PECAS;Pedido PC-202606-00005 - 1a parcela;aprovado_pgto;compras;15/06/2026;81f9f5be-ada5-4d7d-9e33-8c0531187969
+SIM;real;700;25/08/2026;ESTRELA PECAS;Pedido PC-202606-00005 - 2a parcela;confirmado;compras;15/06/2026;2e314409-67a9-421e-aed9-c24d91e7dd65
+;omie_standby;654,37;13/02/2026;Fornecedor Omie #4346756310;(sem desc);em_pagamento;omie;17/03/2026;057a9b18-ee1f-4947-96ac-e2db8fefe287
+SIM;real;600;12/04/2026;EPI-MASTER;2 capacetes;aprovado_pgto;compras;13/03/2026;1989a913-b479-4132-b1ab-f175c95880d9
+SIM;real;462;15/04/2026;OLD SECURITY;CAPACETE MSA + LUVA VAQUETA;em_pagamento;compras;16/03/2026;b63018a7-b0e4-445d-bc79-83be758775a0
+;real;356;10/04/2026;VAN MASTER SUPRIMENTOS;Caneta;conciliado;compras;11/03/2026;2921c941-6eb0-48ef-ac3b-6d110badd223
+SIM;real;350;19/03/2026;G-MONITOR;"MONITOR 24""""";em_pagamento;compras;19/03/2026;76f797bd-7a1c-492b-8c81-49d8ece8430a
+;real;300;27/03/2026;DESCONTO MAGAZINE;"MONITOR 21""""";conciliado;compras;27/03/2026;2bad4140-ceb9-43ea-a59f-907067bd3175
+;teste;299;10/04/2026;MESA VIVA GASTRONOMIA;teste 1234;conciliado;compras;11/03/2026;68b17d6a-0878-4935-bac0-b7075ba5c227
+;teste;249;17/06/2026;TEG UNIAO LOCACAO;Pedido PC-202606-00004 - TESTE;conciliado;compras;10/06/2026;f0b59d1b-7345-4f3d-af94-c1b5a73d1b45
+;omie_standby;230;10/04/2026;Fornecedor Omie #4346918695;(sem desc);em_pagamento;omie;17/03/2026;dd577f1d-59f0-4b4c-9667-3511f3103f9f
+SIM;real;230;10/04/2026;ESTEFANI LEANDRO DA COSTA;Capacete Branco para Obra EPI;em_pagamento;compras;11/03/2026;ad6553eb-287e-4ea9-a92d-e8016ecd6500
+SIM;teste;150;13/04/2026;TESTE-CODEX-20260314204200;TESTE-CODEX fluxo compras/financeiro/estoque;pago;compras;14/03/2026;f6c5f597-6ec5-458d-adf0-0b079e39cb52
+;teste;150;13/04/2026;TESTE-CODEX-20260314204535;TESTE-CODEX fluxo;pago;compras;14/03/2026;04a64289-e82c-4af2-b011-c0c859d74df1
+;teste;150;13/04/2026;TESTE-CODEX-20260314205116;TESTE-CODEX fluxo;conciliado;compras;14/03/2026;3b861b80-a455-4f01-840e-243da082d2e9
+;teste;150;13/04/2026;TESTE-CODEX-20260314210434;TESTE-CODEX fluxo;conciliado;compras;14/03/2026;a9c04068-857c-4e4b-ad77-9ff6219d5f1b
+;real;130;27/03/2026;COBARA AUTO PECAS;TESTSE;conciliado;compras;27/03/2026;99d01705-ca40-40c0-bb67-cedaecb9b5d0
+;teste_suspeito;129;02/07/2026;JPB COMERCIAL;(sem descrição - PC-202606-00002);previsto;compras;02/06/2026;53c7a357-e582-4667-8f03-44ac375019dd
+;omie_standby;116,47;30/03/2026;Fornecedor Omie #4346756312;(sem desc);em_pagamento;omie;17/03/2026;7af69e9d-116b-44e3-8915-3716b7f248b4
+;teste;100;11/04/2026;Motoboy Delivery;Teste;conciliado;compras;12/03/2026;35ee95b3-9203-4af6-97f3-92669801b6ac
+;teste_suspeito;71,9;02/07/2026;LEMEN - MATERIAIS;(sem descrição - PC-202606-00001);previsto;compras;02/06/2026;9a56a51b-bbbf-43ba-8b02-6540243fd616
+;real;30;27/03/2026;AUTO ELETRICA TABAPUA;ADAPTADOR USB - RJ45;conciliado;compras;27/03/2026;56e6bf15-4de7-4489-a677-d7c3bbccf02e
+;real;28;20/03/2026;DISTRIBUIDORA LOPES;MARTELO TIPO UNHA;conciliado;compras;20/03/2026;b16c874d-c2a5-4bf2-bb09-8205d0b5f2e1
+;real;27;20/03/2026;ALIMENTUDE;GARRAFA TERMICA 1.8L;conciliado;compras;20/03/2026;63d2e735-8f88-4b43-a258-e8df38117e76
+;real;20;17/03/2026;ARCO-IRIS;SABAO EM PO 05KG;conciliado;compras;17/03/2026;0155d6d4-e5dd-4b5a-b01c-6851dc5e84fd
+;real;15;19/03/2026;TINTAVEL;"TRINCHA PARA PINTURA 4""""";conciliado;compras;19/03/2026;caabd57c-973a-4564-ba0c-1b71466814ab
+;real;10;19/03/2026;ART LATEX;LUVA LATEX;conciliado;compras;19/03/2026;87894765-479d-4d69-a81e-ab79da4c9718
+;real;10;27/03/2026;PEDRA SABAO;SABAO EM PEDRA;conciliado;compras;27/03/2026;3734799d-500b-4915-a9b4-029cb374fd31

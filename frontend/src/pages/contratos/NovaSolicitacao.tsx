@@ -292,6 +292,24 @@ export default function NovaSolicitacao({ selfService = false }: { selfService?:
   const [cnpjLoading, setCnpjLoading] = useState(false)
   const [cnpjStatus, setCnpjStatus] = useState<{ ok: boolean; msg: string } | null>(null)
   const cnpjLastRef = useRef('')
+  // Último valor preenchido automaticamente pelo CNPJ, por campo. Serve p/
+  // sobrescrever ao trocar de CNPJ e limpar ao apagar — sem apagar o que o
+  // usuário editou/digitou à mão.
+  const autofillRef = useRef<Record<string, string>>({})
+
+  const limparAutofill = useCallback(() => {
+    const af = autofillRef.current
+    const clearIf = (key: string, setter: (u: (prev: string) => string) => void) =>
+      setter(prev => (af[key] && prev === af[key] ? '' : prev))
+    clearIf('nome', setContraparteNome)
+    clearIf('telefone', setContraparteTelefone)
+    clearIf('email', setContraparteEmail)
+    clearIf('endereco', setContraparteEndereco)
+    clearIf('repNome', setContraparteRepNome)
+    clearIf('repCpf', setContraparteRepCpf)
+    clearIf('repCargo', setContraparteRepCargo)
+    autofillRef.current = {}
+  }, [])
 
   // Auto-fill solicitante when perfil loads
   useEffect(() => {
@@ -330,29 +348,30 @@ export default function NovaSolicitacao({ selfService = false }: { selfService?:
         setCnpjStatus({ ok: false, msg: result.message || 'CNPJ não encontrado' })
       } else {
         setCnpjStatus({ ok: true, msg: result.situacao || 'Ativa' })
-        // Auto-fill fields (only if empty)
-        if (!contraparteNome.trim()) {
-          setContraparteNome(result.nome_fantasia || result.razao_social)
+        // Preenche sobrescrevendo o CNPJ anterior, mas preserva edição manual:
+        // só escreve se o campo está vazio ou ainda tem o valor autofillado antes.
+        const setAuto = (campo: string, atual: string, novo: string, setter: (v: string) => void) => {
+          if (!novo) return
+          const prev = autofillRef.current[campo] ?? ''
+          if (!atual.trim() || atual === prev) {
+            setter(novo)
+            autofillRef.current[campo] = novo
+          }
         }
-        if (!contraparteTelefone.trim() && result.telefone) {
-          setContraparteTelefone(result.telefone)
-        }
-        if (!contraparteEmail.trim() && result.email) {
-          setContraparteEmail(result.email)
-        }
-        // Auto-fill endereço
-        if (!contraparteEndereco.trim() && result.endereco) {
+        setAuto('nome', contraparteNome, result.nome_fantasia || result.razao_social, setContraparteNome)
+        setAuto('telefone', contraparteTelefone, result.telefone, setContraparteTelefone)
+        setAuto('email', contraparteEmail, result.email, setContraparteEmail)
+        if (result.endereco) {
           const e = result.endereco
           const parts = [e.logradouro, e.numero, e.complemento, e.bairro].filter(Boolean).join(', ')
           const cidadeUf = [e.cidade, e.uf].filter(Boolean).join('/')
           const cepStr = e.cep ? `CEP ${e.cep.replace(/^(\d{5})(\d{3})$/, '$1-$2')}` : ''
-          setContraparteEndereco([parts, cidadeUf, cepStr].filter(Boolean).join(' - '))
+          setAuto('endereco', contraparteEndereco, [parts, cidadeUf, cepStr].filter(Boolean).join(' - '), setContraparteEndereco)
         }
-        // Auto-fill representante legal
-        if (!contraparteRepNome.trim() && result.representante_nome) {
-          setContraparteRepNome(result.representante_nome)
-          if (result.representante_cpf) setContraparteRepCpf(result.representante_cpf)
-          setContraparteRepCargo(result.representante_cargo || 'Socio Administrador')
+        if (result.representante_nome) {
+          setAuto('repNome', contraparteRepNome, result.representante_nome, setContraparteRepNome)
+          setAuto('repCpf', contraparteRepCpf, result.representante_cpf || '', setContraparteRepCpf)
+          setAuto('repCargo', contraparteRepCargo, result.representante_cargo || 'Socio Administrador', setContraparteRepCargo)
         }
       }
     } catch {
@@ -360,7 +379,7 @@ export default function NovaSolicitacao({ selfService = false }: { selfService?:
     } finally {
       setCnpjLoading(false)
     }
-  }, [contraparteNome, contraparteTelefone, contraparteEmail, contraparteEndereco, contraparteRepNome])
+  }, [contraparteNome, contraparteTelefone, contraparteEmail, contraparteEndereco, contraparteRepNome, contraparteRepCpf, contraparteRepCargo])
 
   const handleDocChange = useCallback((raw: string) => {
     const digits = raw.replace(/\D/g, '')
@@ -380,8 +399,9 @@ export default function NovaSolicitacao({ selfService = false }: { selfService?:
     } else {
       setCnpjStatus(null)
       cnpjLastRef.current = ''
+      limparAutofill()
     }
-  }, [tipoPessoa, handleCnpjLookup])
+  }, [tipoPessoa, handleCnpjLookup, limparAutofill])
 
   const handleTipoPessoaChange = useCallback((tp: TipoPessoa) => {
     if (tp === tipoPessoa) return
@@ -390,13 +410,15 @@ export default function NovaSolicitacao({ selfService = false }: { selfService?:
     setContraparteCnpj('')
     setCnpjStatus(null)
     cnpjLastRef.current = ''
+    // Limpa os campos que vieram do CNPJ (preserva o que foi digitado à mão)
+    limparAutofill()
     // Clear CNPJ-only representante fields so hidden values aren't submitted for PF
     if (tp === 'fisica') {
       setContraparteRepNome('')
       setContraparteRepCpf('')
       setContraparteRepCargo('')
     }
-  }, [tipoPessoa])
+  }, [tipoPessoa, limparAutofill])
 
   // ── Validation ───────────────────────────────────────────────────────────
 
@@ -1050,7 +1072,7 @@ export default function NovaSolicitacao({ selfService = false }: { selfService?:
               />
             </div>
             <div>
-              <label className={labelClass}>Classe Financeira</label>
+              <label className={labelClass}>Natureza Orçamentária Financeira</label>
               <SearchableSelect
                 options={classesOptions}
                 value={classeFinanceira}

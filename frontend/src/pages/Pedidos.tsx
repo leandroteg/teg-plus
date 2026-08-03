@@ -555,7 +555,7 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
       <div class="field"><div class="label">Previsao de Entrega</div><div class="value">${fmtDate(pedido.data_prevista_entrega)}</div></div>
       ${pedido.nf_numero ? `<div class="field"><div class="label">NF</div><div class="value">${esc(pedido.nf_numero)}</div></div>` : ''}
       ${pedido.centro_custo ? `<div class="field"><div class="label">Centro de Custo</div><div class="value">${esc(pedido.centro_custo)}</div></div>` : ''}
-      ${pedido.classe_financeira ? `<div class="field"><div class="label">Classe Financeira</div><div class="value">${esc(pedido.classe_financeira)}</div></div>` : ''}
+      ${pedido.classe_financeira ? `<div class="field"><div class="label">Natureza Orçamentária Financeira</div><div class="value">${esc(pedido.classe_financeira)}</div></div>` : ''}
     </div>
     ${pedido.observacoes ? `<div class="field" style="margin-top:4px"><div class="label">Observacoes</div><div class="value" style="font-size:11px;font-weight:400">${esc(pedido.observacoes)}</div></div>` : ''}
   </div>

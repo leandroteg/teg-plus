@@ -77,7 +77,7 @@ export default function ClassesFinanceiras() {
       await salvar.mutateAsync(editItem)
       closeForm()
     } catch (err: any) {
-      alert(err?.message || 'Erro ao salvar classe')
+      alert(err?.message || 'Erro ao salvar natureza')
     }
   }
 
@@ -85,13 +85,13 @@ export default function ClassesFinanceiras() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Classes Financeiras</h1>
+          <h1 className="text-xl font-extrabold text-slate-800">Naturezas Orçamentárias Financeiras</h1>
           <p className="text-xs text-slate-400 mt-0.5">{filtrados.length} item(s)</p>
         </div>
         <button onClick={openNew}
           className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white
             text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
-          <Plus size={15} /> Nova Classe
+          <Plus size={15} /> Nova Natureza
         </button>
       </div>
 
@@ -122,8 +122,8 @@ export default function ClassesFinanceiras() {
       ) : filtrados.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
           <Tag size={40} className="text-slate-200 mx-auto mb-3" />
-          <p className="text-slate-500 font-semibold">Nenhuma classe encontrada</p>
-          <p className="text-slate-400 text-sm mt-1">Cadastre a primeira classe financeira</p>
+          <p className="text-slate-500 font-semibold">Nenhuma natureza encontrada</p>
+          <p className="text-slate-400 text-sm mt-1">Cadastre a primeira natureza orçamentária</p>
         </div>
       ) : viewMode === 'table' ? (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -225,7 +225,7 @@ export default function ClassesFinanceiras() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-lg font-extrabold text-slate-800">
-                {editItem.id ? 'Editar Classe' : 'Nova Classe'}
+                {editItem.id ? 'Editar Natureza' : 'Nova Natureza'}
               </h2>
               <button onClick={closeForm} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
                 <X size={16} />
@@ -247,7 +247,7 @@ export default function ClassesFinanceiras() {
               </div>
               <SmartTextField table="fin_classes_financeiras" column="descricao"
                 value={editItem.descricao ?? ''} onChange={v => setEditItem({ ...editItem, descricao: v })}
-                label="Descricao" placeholder="Nome da classe financeira" required />
+                label="Descricao" placeholder="Nome da natureza orçamentária" required />
               <SearchableSelect
                 options={(categorias ?? []).map(cat => ({ value: cat.id, label: cat.descricao, code: cat.codigo }))}
                 value={editItem.categoria_id ?? ''}

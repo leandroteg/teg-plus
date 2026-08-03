@@ -756,7 +756,7 @@ export default function EmitirPedidoModal({
                           {item.classe_financeira_codigo || 'Sem classe'}
                         </p>
                         <p className="text-[10px] text-slate-400 truncate max-w-[180px]">
-                          {item.classe_financeira_descricao || 'Classe financeira nao definida no item'}
+                          {item.classe_financeira_descricao || 'Natureza orcamentaria nao definida no item'}
                         </p>
                       </div>
                     </div>

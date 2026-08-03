@@ -390,9 +390,9 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
             </select>
           </div>
 
-          {/* Classe Financeira */}
+          {/* Natureza Orçamentária Financeira */}
           <div>
-            <label className="text-xs font-bold text-slate-600">Classe Financeira</label>
+            <label className="text-xs font-bold text-slate-600">Natureza Orçamentária Financeira</label>
             <div className="relative mt-1">
               <input
                 value={classeId ? `${classeSel?.codigo} - ${classeSel?.descricao}` : classeBusca}

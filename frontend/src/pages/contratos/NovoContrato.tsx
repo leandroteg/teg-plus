@@ -327,7 +327,7 @@ export default function NovoContrato() {
             />
           </div>
           <div>
-            <label className={labelClass}>Classe Financeira</label>
+            <label className={labelClass}>Natureza Orçamentária Financeira</label>
             <SearchableSelect
               options={classesOptions}
               value={classeFinanceira}
