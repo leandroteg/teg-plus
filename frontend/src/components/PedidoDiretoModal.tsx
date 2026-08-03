@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { X, PlusCircle, Trash2, Loader2, AlertTriangle, ShoppingCart, Search, UserPlus, CheckCircle2, Landmark } from 'lucide-react'
-import { useEmitirPedidoDireto } from '../hooks/usePedidos'
+import { useEmitirPedidoDireto, useEditarPedidoDireto } from '../hooks/usePedidos'
 import { useCadFornecedores, useCadClasses, useSalvarFornecedor } from '../hooks/useCadastros'
 import { useLookupObras, useLookupEmpresas } from '../hooks/useLookups'
 import { useCartoesCredito } from '../hooks/useCartoes'
@@ -44,11 +44,15 @@ interface Props {
   open: boolean
   onClose: () => void
   onSuccess?: (numeroPedido: string) => void
+  /** Modo edição: pedido extraordinário já emitido. Todos os campos editáveis, exceto fornecedor. */
+  pedido?: any
 }
 
-export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
+export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: Props) {
   const { perfil } = useAuth()
   const emitir = useEmitirPedidoDireto()
+  const editar = useEditarPedidoDireto()
+  const editMode = !!pedido
 
   const { data: fornecedores = [] } = useCadFornecedores()
   const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
@@ -96,12 +100,50 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
   }, [empresas])
 
   useEffect(() => {
-    if (open) setEmpresaId(empresaMatrizId)
-  }, [open, empresaMatrizId])
+    if (open && !editMode) setEmpresaId(empresaMatrizId)
+  }, [open, editMode, empresaMatrizId])
+
+  // Modo edição: preenche o form com os dados do pedido emitido
+  useEffect(() => {
+    if (!open || !pedido) return
+    setFornecedorNome(pedido.fornecedor_nome ?? '')
+    setFornecedorId(pedido.fornecedor_id ?? '')
+    setEmpresaId(pedido.empresa_id ?? '')
+    setClasseId(pedido.classe_financeira_id ?? '')
+    setCondicaoPagamento(pedido.condicao_pagamento ?? '')
+    setDataPrevistaEntrega(pedido.data_prevista_entrega ?? '')
+    setValorDesconto(Number(pedido.valor_desconto ?? 0))
+    setJustificativa(pedido.justificativa_sem_cotacao ?? '')
+    setObservacoes(pedido.observacoes ?? '')
+    setItens(pedido.itens_direto?.length ? pedido.itens_direto.map((i: any) => ({ ...i })) : [emptyItem()])
+    // Forma de pagamento/cartão vivem na parcela do Contas a Pagar
+    supabase
+      .from('fin_contas_pagar')
+      .select('forma_pagamento, cartao_id')
+      .eq('pedido_id', pedido.id)
+      .in('status', ['previsto', 'confirmado'])
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        setFormaPagamento((data?.forma_pagamento as FormaPagamentoPedido) ?? '')
+        setCartaoId(data?.cartao_id ?? '')
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pedido?.id])
+
+  // Modo edição: resolve a obra a partir do centro de custo gravado no pedido
+  useEffect(() => {
+    if (!open || !pedido?.centro_custo_id || obras.length === 0) return
+    const o = obras.find((x: any) => x.centro_custo_id === pedido.centro_custo_id)
+    if (o) setObraId(o.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pedido?.id, obras])
 
   if (!open) return null
 
   const classesMatches = classes.filter(c => {
+    if ((c as any).ativo === false) return false
     const t = classeBusca.toLowerCase()
     return !t || `${c.codigo} ${c.descricao}`.toLowerCase().includes(t)
   })
@@ -221,6 +263,34 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
 
     const itensFiltrados = itens.filter(i => i.descricao.trim())
 
+    if (editMode && pedido) {
+      try {
+        await editar.mutateAsync({
+          pedidoId: pedido.id,
+          valorTotal: total,
+          itens: itensFiltrados.map(i => ({ ...i, descricao: toUpperNorm(i.descricao) })),
+          obraNome: obraSel?.nome,
+          centroCusto: obraSel?.centro_custo_codigo || undefined,
+          centroCustoId: obraSel?.centro_custo_id || undefined,
+          classeFinanceira: classeSel ? `${classeSel.codigo} - ${classeSel.descricao}` : undefined,
+          classeFinanceiraId: classeId || undefined,
+          condicaoPagamento: condicaoPagamento || undefined,
+          dataPrevistaEntrega: dataPrevistaEntrega || undefined,
+          justificativaSemCotacao: toUpperNorm(justificativa),
+          observacoes: observacoes ? toUpperNorm(observacoes) : undefined,
+          empresaId: empresaId || undefined,
+          formaPagamento: formaPagamento || undefined,
+          cartaoId: formaPagamento === 'cartao' ? cartaoId || undefined : undefined,
+          valorDesconto: valorDesconto || undefined,
+        })
+        onSuccess?.(pedido.numero_pedido)
+        onClose()
+      } catch (e) {
+        setErro((e as Error).message || 'Erro ao salvar alterações.')
+      }
+      return
+    }
+
     try {
       // Completou dados bancários/PIX de fornecedor que não tinha → salva no cadastro
       if (fornecedorId && bankingIncomplete && bankingProvided) {
@@ -274,8 +344,8 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
               <ShoppingCart size={16} className="text-orange-600" />
             </div>
             <div>
-              <h2 className="text-sm font-extrabold text-slate-800">Pedido Direto</h2>
-              <p className="text-[11px] text-slate-400">Sem Requisição nem Cotação</p>
+              <h2 className="text-sm font-extrabold text-slate-800">{editMode ? `Editar ${pedido?.numero_pedido ?? 'Pedido Direto'}` : 'Pedido Direto'}</h2>
+              <p className="text-[11px] text-slate-400">{editMode ? 'Todos os campos editáveis, exceto o fornecedor' : 'Sem Requisição nem Cotação'}</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
@@ -296,7 +366,17 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-600">Fornecedor *</label>
 
-            {fornecedorId && fornecedorSel ? (
+            {editMode ? (
+              <div className="flex items-center justify-between gap-2 border border-slate-200 bg-slate-50 rounded-xl px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-700 truncate flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="shrink-0 text-slate-400" />
+                    {fornecedorSel?.nome_fantasia || fornecedorSel?.razao_social || fornecedorNome}
+                  </p>
+                  <p className="text-[11px] text-slate-400 ml-5">Fornecedor não pode ser alterado — cancele o pedido se precisar trocar.</p>
+                </div>
+              </div>
+            ) : fornecedorId && fornecedorSel ? (
               <div className="flex items-center justify-between gap-2 border border-emerald-200 bg-emerald-50 rounded-xl px-3 py-2">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-emerald-800 truncate flex items-center gap-1.5">
@@ -412,7 +492,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
               </div>
             )}
 
-            {!fornecedorId && !showNovoFornecedor && fornecedorNome.trim() && (
+            {!editMode && !fornecedorId && !showNovoFornecedor && fornecedorNome.trim() && (
               <p className="text-[11px] text-slate-400">
                 Sem cadastro selecionado — o pedido sairá com o nome digitado: <strong>{fornecedorNome}</strong>
               </p>
@@ -761,12 +841,12 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={emitir.isPending}
+            disabled={emitir.isPending || editar.isPending}
             className="flex-[2] bg-orange-500 hover:bg-orange-600 text-white rounded-xl py-2.5 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg shadow-orange-500/20 transition-colors"
           >
-            {emitir.isPending
-              ? <><Loader2 size={15} className="animate-spin" /> Emitindo...</>
-              : <><ShoppingCart size={15} /> Emitir Pedido Direto</>}
+            {(emitir.isPending || editar.isPending)
+              ? <><Loader2 size={15} className="animate-spin" /> {editMode ? 'Salvando...' : 'Emitindo...'}</>
+              : <><ShoppingCart size={15} /> {editMode ? 'Salvar Alterações' : 'Emitir Pedido Direto'}</>}
           </button>
         </div>
       </div>

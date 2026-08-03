@@ -8,7 +8,7 @@ import {
   ClipboardList, ShieldCheck, BoxIcon, ArchiveIcon,
   Building2, Link2, RefreshCw, UserPlus,
   Tag, Briefcase, Hash, Calendar, Receipt, CheckCircle2, ChevronDown, ChevronUp,
-  ShoppingCart,
+  ShoppingCart, Pencil,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import jsPDF from 'jspdf'
@@ -21,6 +21,7 @@ import {
   useAtualizarPedido,
   useLiberarPagamento,
   useEmitirPedido,
+  useDesfazerRecebimento,
   type ImpostoPayload,
 } from '../hooks/usePedidos'
 import { useCadFornecedores } from '../hooks/useCadastros'
@@ -43,6 +44,7 @@ import FornecedorCadastroModal from '../components/FornecedorCadastroModal'
 import PedidoImpostosSection from '../components/PedidoImpostosSection'
 import { AnexoReferencia } from '../components/AnexoReferencia'
 import CancelarPedidoControl from '../components/CancelarPedidoControl'
+import PedidoDiretoModal from '../components/PedidoDiretoModal'
 import { validarDocFornecedorPedido, fmtCnpj, type ValidacaoDocFornecedor } from '../utils/validarDocFornecedor'
 import type { Cotacao, Pedido } from '../types'
 import type { Fornecedor } from '../types/financeiro'
@@ -1923,6 +1925,7 @@ function DetailModal({
   const [fornecedorVinculado, setFornecedorVinculado] = useState<Fornecedor | null>(null)
   const [emitError, setEmitError] = useState<string | null>(null)
   const [showAvisoSemNF, setShowAvisoSemNF] = useState(false)
+  const [showEditarDireto, setShowEditarDireto] = useState(false)
   // Aviso (nao bloqueante) ao confirmar recebimento sem NF anexada na secao Documentos
   const { data: anexosPedido } = useAnexosPedido(pedido.id)
   const temNFAnexada = (anexosPedido ?? []).some(a => a.tipo === 'nota_fiscal')
@@ -1976,6 +1979,29 @@ function DetailModal({
   const diasVenc       = dataVenc ? Math.floor((new Date(dataVenc + 'T00:00:00').getTime() - new Date().setHours(0,0,0,0)) / 86_400_000) : null
   // Liberar pagamento apos recebimento confirmado. NF/Boleto/Doc fica como pendencia (badge) se nao anexado.
   const podeLiberar    = entregue && !statusPgto
+
+  // Voltar etapa: desfaz o recebimento (Entregue/Parcial -> Emitido) p/ correcao.
+  // Admin/comprador, motivo obrigatorio; bloqueado se pagamento ja liberado/pago.
+  const desfazerRecebimento = useDesfazerRecebimento()
+  const [showDesfazer, setShowDesfazer] = useState(false)
+  const [motivoDesfazer, setMotivoDesfazer] = useState('')
+  const [desfazerMsg, setDesfazerMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const podeDesfazerReceb = (entregue || parcial)
+    && !statusPgto
+    && (isAdmin || Boolean((perfil as any)?.comprador))
+  const handleDesfazerRecebimento = async () => {
+    if (!motivoDesfazer.trim()) { setDesfazerMsg({ type: 'error', msg: 'Informe o motivo da correção.' }); return }
+    setDesfazerMsg(null)
+    try {
+      const r = await desfazerRecebimento.mutateAsync({ pedidoId: pedido.id, motivo: motivoDesfazer.trim() })
+      setDesfazerMsg({ type: 'success', msg: `Recebimento desfeito — pedido voltou para Emitido (${r?.estornos_estoque ?? 0} estorno(s) de estoque).` })
+      setMotivoDesfazer('')
+      setShowDesfazer(false)
+    } catch (e: any) {
+      setDesfazerMsg({ type: 'error', msg: e?.message ?? 'Erro ao desfazer o recebimento.' })
+    }
+  }
+
   const { data: fornecedorResolvido, isLoading: isLoadingFornecedorResolvido, refetch: refetchFornecedorResolvido } = useFornecedorCotacaoResolver(
     pending ? pedido.source_cotacao?.id : undefined,
   )
@@ -2546,11 +2572,90 @@ function DetailModal({
             {isPago && (
               <div className="flex items-center gap-2 text-emerald-500 text-xs font-semibold"><CheckCircle size={14} /> Pagamento confirmado {pagoEm ? `em ${fmtData(pagoEm)}` : ''}</div>
             )}
+            {pedido.sem_cotacao && (pedido as any).itens_direto && pedido.status === 'emitido' && (
+              <button
+                onClick={() => setShowEditarDireto(true)}
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all ${dark ? 'bg-orange-500/10 text-orange-300 border-orange-500/30 hover:bg-orange-500/20' : 'bg-orange-50 text-orange-700 border-orange-300 hover:bg-orange-500 hover:text-white'}`}
+              >
+                <Pencil size={16} /> Editar Pedido
+              </button>
+            )}
+            {/* Voltar etapa: desfazer recebimento p/ correcao (Entregue/Parcial -> Emitido) */}
+            {podeDesfazerReceb && (
+              <div className="space-y-2">
+                {!showDesfazer ? (
+                  <button
+                    onClick={() => { setShowDesfazer(true); setDesfazerMsg(null) }}
+                    className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${
+                      dark ? 'border-amber-500/40 text-amber-300 hover:bg-amber-500/10' : 'border-amber-300 text-amber-700 hover:bg-amber-50'
+                    }`}
+                  >
+                    <RefreshCw size={13} /> Voltar etapa — desfazer recebimento
+                  </button>
+                ) : (
+                  <div className={`rounded-xl border-2 p-3 space-y-2 ${dark ? 'border-amber-500/40 bg-amber-500/5' : 'border-amber-300 bg-amber-50'}`}>
+                    <p className={`text-[11px] font-bold ${dark ? 'text-amber-300' : 'text-amber-700'}`}>
+                      Desfazer recebimento — o pedido volta para "Emitido"
+                    </p>
+                    <p className={`text-[11px] ${dark ? 'text-amber-200/80' : 'text-amber-700/90'}`}>
+                      As entradas de estoque serão estornadas e os itens patrimoniais gerados serão removidos.
+                      Os documentos anexados permanecem. Depois é só registrar o recebimento correto.
+                    </p>
+                    <textarea
+                      value={motivoDesfazer}
+                      onChange={e => setMotivoDesfazer(e.target.value)}
+                      rows={2}
+                      placeholder="Motivo da correção (obrigatório)..."
+                      className={`w-full text-xs border rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 ${
+                        dark ? 'bg-white/[0.05] border-white/10 text-white placeholder:text-slate-500' : 'bg-white border-amber-200 placeholder:text-amber-300'
+                      }`}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleDesfazerRecebimento}
+                        disabled={desfazerRecebimento.isPending}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-colors disabled:opacity-50"
+                      >
+                        {desfazerRecebimento.isPending
+                          ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          : <RefreshCw size={13} />}
+                        Confirmar retorno
+                      </button>
+                      <button
+                        onClick={() => { setShowDesfazer(false); setDesfazerMsg(null) }}
+                        className={`px-3 py-2 rounded-lg text-xs font-semibold ${dark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-500 hover:bg-white'}`}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {desfazerMsg && (
+                  <p className={`text-xs rounded-lg px-3 py-2 border ${
+                    desfazerMsg.type === 'success'
+                      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                      : 'text-red-600 bg-red-50 border-red-200'
+                  }`}>
+                    {desfazerMsg.msg}
+                  </p>
+                )}
+              </div>
+            )}
             {!pending && (
               <CancelarPedidoControl pedidoId={pedido.id} status={pedido.status} dark={dark} onDone={() => onClose()} />
             )}
           </div>
         </div>
+
+        {showEditarDireto && (
+          <PedidoDiretoModal
+            key={pedido.id}
+            open={showEditarDireto}
+            pedido={pedido}
+            onClose={() => setShowEditarDireto(false)}
+            onSuccess={() => setShowEditarDireto(false)}
+          />
+        )}
 
         {pending && pedido.requisicao_id && (
           <EmitirPedidoModal

@@ -126,6 +126,32 @@ export function useLiberarPagamento() {
   })
 }
 
+// ── Desfazer recebimento: pedido Entregue/Parcial volta a Emitido (RPC) ──────
+// Estorna entradas de estoque, remove patrimoniais do recebimento e apaga os
+// registros de recebimento. Admin/comprador, motivo obrigatorio.
+export function useDesfazerRecebimento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ pedidoId, motivo }: { pedidoId: string; motivo: string }) => {
+      const { data, error } = await supabase.rpc('cmp_pedido_desfazer_recebimento', {
+        p_pedido_id: pedidoId,
+        p_motivo: motivo,
+      })
+      if (error) throw new Error(error.message)
+      return data as { recebimentos_removidos: number; estornos_estoque: number; patrimoniais_removidos: number }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
+      qc.invalidateQueries({ queryKey: ['recebimentos'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['est-movimentacoes'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos'] })
+      qc.invalidateQueries({ queryKey: ['pat-imobilizados'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
 export function useRegistrarPagamento() {
   const qc = useQueryClient()
   return useMutation({
@@ -761,6 +787,152 @@ export function useEmitirPedidoDireto() {
       }))
 
       const existingIds = (existingCPs ?? []).map((cp: any) => cp.id)
+      const idsToUpdate = existingIds.slice(0, cpPayloads.length)
+      const payloadsToInsert = cpPayloads.slice(idsToUpdate.length)
+      const idsToDelete = existingIds.slice(cpPayloads.length)
+
+      for (let index = 0; index < idsToUpdate.length; index += 1) {
+        const { error: updateCPError } = await supabase
+          .from('fin_contas_pagar')
+          .update(cpPayloads[index])
+          .eq('id', idsToUpdate[index])
+        if (updateCPError) throw new Error(`Erro ao ajustar parcelas do contas a pagar: ${updateCPError.message}`)
+      }
+      if (payloadsToInsert.length > 0) {
+        const { error: insertCPError } = await supabase
+          .from('fin_contas_pagar')
+          .insert(payloadsToInsert)
+        if (insertCPError) throw new Error(`Erro ao criar parcelas do contas a pagar: ${insertCPError.message}`)
+      }
+      if (idsToDelete.length > 0) {
+        const { error: deleteCPError } = await supabase
+          .from('fin_contas_pagar')
+          .delete()
+          .in('id', idsToDelete)
+        if (deleteCPError) throw new Error(`Erro ao limpar parcelas antigas do contas a pagar: ${deleteCPError.message}`)
+      }
+
+      return pedido
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+export interface PedidoDiretoEdicaoPayload {
+  pedidoId: string
+  valorTotal: number
+  itens: Array<{ descricao: string; quantidade: number; unidade: string; valor_unitario: number }>
+  obraNome?: string
+  centroCusto?: string
+  centroCustoId?: string
+  classeFinanceira?: string
+  classeFinanceiraId?: string
+  condicaoPagamento?: string
+  dataPrevistaEntrega?: string
+  justificativaSemCotacao?: string
+  observacoes?: string
+  empresaId?: string
+  formaPagamento?: string
+  cartaoId?: string
+  valorDesconto?: number
+}
+
+/**
+ * Edita um Pedido Extraordinário (Pedido Direto) já emitido. Todos os campos
+ * podem mudar EXCETO o fornecedor (fica o do pedido). As parcelas em aberto
+ * (previsto/confirmado) do Contas a Pagar são regravadas conforme a nova
+ * condição de pagamento; se alguma parcela já entrou em lote/pagamento, a
+ * edição é bloqueada.
+ */
+export function useEditarPedidoDireto() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (payload: PedidoDiretoEdicaoPayload) => {
+      const now = new Date()
+
+      const { data: pedido, error: pedErr } = await supabase
+        .from('cmp_pedidos')
+        .select('id, numero_pedido, status, fornecedor_id, fornecedor_nome, itens_direto')
+        .eq('id', payload.pedidoId)
+        .single()
+      if (pedErr) throw new Error(pedErr.message)
+      if (!pedido.itens_direto) throw new Error('Somente Pedido Extraordinário (sem RC) pode ser editado por aqui.')
+      if (pedido.status !== 'emitido') throw new Error('Pedido já entregue ou cancelado não pode mais ser editado.')
+
+      const { data: cps, error: cpErr } = await supabase
+        .from('fin_contas_pagar')
+        .select('id, status')
+        .eq('pedido_id', payload.pedidoId)
+        .order('created_at', { ascending: true })
+      if (cpErr) throw new Error(cpErr.message)
+      const emProcesso = (cps ?? []).filter((cp: any) => !['previsto', 'confirmado', 'cancelado'].includes(cp.status))
+      if (emProcesso.length > 0) {
+        throw new Error('Uma parcela deste pedido já está em lote/pagamento — ajuste pelo Financeiro.')
+      }
+
+      const parcelasResolvidas = gerarPreviaParcelas(
+        payload.valorTotal,
+        payload.condicaoPagamento || '',
+        payload.dataPrevistaEntrega || now.toISOString().split('T')[0],
+      )
+
+      const { error: updErr } = await supabase
+        .from('cmp_pedidos')
+        .update({
+          valor_total: payload.valorTotal,
+          data_prevista_entrega: payload.dataPrevistaEntrega || null,
+          condicao_pagamento: payload.condicaoPagamento || null,
+          centro_custo: payload.centroCusto || null,
+          centro_custo_id: payload.centroCustoId || null,
+          classe_financeira: payload.classeFinanceira || null,
+          classe_financeira_id: payload.classeFinanceiraId || null,
+          empresa_id: payload.empresaId || null,
+          observacoes: payload.observacoes || null,
+          valor_desconto: payload.valorDesconto || 0,
+          parcelas_preview: parcelasResolvidas,
+          ...(payload.justificativaSemCotacao ? { justificativa_sem_cotacao: payload.justificativaSemCotacao } : {}),
+          itens_direto: payload.itens.length > 0 ? payload.itens : null,
+        })
+        .eq('id', payload.pedidoId)
+      if (updErr) throw new Error(updErr.message)
+
+      const parcelasDoPedido = parcelasResolvidas.length > 0
+        ? parcelasResolvidas
+        : [{
+            numero: 1,
+            valor: payload.valorTotal,
+            data_vencimento: payload.dataPrevistaEntrega || now.toISOString().split('T')[0],
+            descricao: payload.condicaoPagamento || undefined,
+          }]
+
+      const cpPayloads = parcelasDoPedido.map((parcela: any, index: number) => ({
+        pedido_id: pedido.id,
+        fornecedor_id: pedido.fornecedor_id || null,
+        fornecedor_nome: pedido.fornecedor_nome,
+        valor_original: Math.round(Number(parcela.valor || 0) * 100) / 100,
+        valor_pago: 0,
+        data_vencimento: parcela.data_vencimento,
+        data_vencimento_orig: parcela.data_vencimento,
+        status: parcela.status_inicial === 'confirmado' ? 'confirmado' : 'previsto',
+        centro_custo: payload.centroCusto || null,
+        classe_financeira: payload.classeFinanceira || null,
+        empresa_id: payload.empresaId || null,
+        descricao: `Pedido Direto ${pedido.numero_pedido}${parcelasDoPedido.length > 1 ? ` — Parcela ${parcela.numero || index + 1}/${parcelasDoPedido.length}` : ''}`,
+        natureza: 'material',
+        forma_pagamento: payload.formaPagamento || null,
+        cartao_id: payload.formaPagamento === 'cartao' ? payload.cartaoId || null : null,
+        observacoes: payload.condicaoPagamento ? `Condição: ${payload.condicaoPagamento}` : null,
+      }))
+
+      // Reescreve só as parcelas em aberto; canceladas ficam como estão.
+      const existingIds = (cps ?? [])
+        .filter((cp: any) => ['previsto', 'confirmado'].includes(cp.status))
+        .map((cp: any) => cp.id)
       const idsToUpdate = existingIds.slice(0, cpPayloads.length)
       const payloadsToInsert = cpPayloads.slice(idsToUpdate.length)
       const idsToDelete = existingIds.slice(cpPayloads.length)
