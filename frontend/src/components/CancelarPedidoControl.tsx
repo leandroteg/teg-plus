@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Ban, Loader2, AlertTriangle } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
-import { useCancelarPedido, podeCancelarPedido, pedidoEhCancelavel } from '../hooks/useCancelarPedido'
+import { useCancelarPedido, pedidoEhCancelavel } from '../hooks/useCancelarPedido'
 
 interface Props {
   pedidoId: string
@@ -14,18 +13,17 @@ interface Props {
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : 'Erro inesperado')
 
 /**
- * Botão "Cancelar Pedido" — visível só para quem tem pode_cancelar_pedido
- * (supervisor de Compras) e apenas em estágio cancelável (emitido/confirmado/em_entrega).
+ * Botão "Cancelar Pedido" — visível para todos os usuários, apenas em estágio
+ * cancelável (emitido/confirmado/em_entrega).
  * Cancela o pedido e cascateia o cancelamento dos lançamentos financeiros (CP) não pagos.
  */
 export default function CancelarPedidoControl({ pedidoId, status, dark = false, onDone }: Props) {
-  const { perfil } = useAuth()
   const cancelar = useCancelarPedido()
   const [aberto, setAberto] = useState(false)
   const [justificativa, setJustificativa] = useState('')
   const [erro, setErro] = useState<string | null>(null)
 
-  if (!podeCancelarPedido(perfil) || !pedidoEhCancelavel(status)) return null
+  if (!pedidoEhCancelavel(status)) return null
 
   async function handleConfirmar() {
     setErro(null)

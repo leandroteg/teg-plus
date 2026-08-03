@@ -1,14 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 
-// Cancelamento de PEDIDO de compra (backend: migration 196 — cmp_cancelar_pedido).
-// Cancela o pedido e cascateia o cancelamento dos CP não-liquidados do pedido.
+// Cancelamento de PEDIDO de compra (backend: migrations 196 + 202 — cmp_cancelar_pedido).
+// Liberado para todos os usuários (mig 202); as travas que ficam são de estágio,
+// justificativa e CP já paga. Cascateia o cancelamento dos CP não-liquidados do pedido.
 
 export const PEDIDO_STATUS_CANCELAVEIS = ['emitido', 'confirmado', 'em_entrega']
-
-export function podeCancelarPedido(perfil?: { pode_cancelar_pedido?: boolean } | null): boolean {
-  return perfil?.pode_cancelar_pedido === true
-}
 
 export function pedidoEhCancelavel(status?: string): boolean {
   return !!status && PEDIDO_STATUS_CANCELAVEIS.includes(status)
