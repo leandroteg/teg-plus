@@ -10,10 +10,14 @@
 // Não há etapa de aprovação: retificação já chega aprovada do Secullum.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react'
-import { Search, Users, BarChart3, FileText, Package, Loader2, Lock, LockOpen, ArrowUpDown, Check, X } from 'lucide-react'
+import { Search, Users, BarChart3, FileText, Package, Loader2, Lock, LockOpen, ArrowUpDown, Check, X, Send, Download, Ban } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAuth } from '../../../contexts/AuthContext'
-import { usePontoResumoMes, usePontoResumoPeriodo, usePontoFechamentos, useFecharMes, useLiberarMes, janelaPadrao } from '../../../hooks/usePonto'
+import {
+  usePontoResumoMes, usePontoResumoPeriodo, usePontoFechamentos, useFecharMes, useLiberarMes, janelaPadrao,
+  usePontoEnvios, useEnviarEspelho, useDescartarEspelho, type PontoEspelhoEnvio,
+} from '../../../hooks/usePonto'
+import { supabase } from '../../../services/supabase'
 import { intervalToMin, minToHoras, labelMes, ultimosMeses } from '../../../lib/ponto'
 import PontoReportModal, { type PontoReportAlvo } from './PontoReportModal'
 
@@ -49,6 +53,8 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
   const [baseFil, setBaseFil] = useState('')
   const [verSemMov, setVerSemMov] = useState(false)
   const [fecharModal, setFecharModal] = useState<{ ini: string; fim: string } | null>(null)
+  const [envioModal, setEnvioModal] = useState(false)
+  const [envioProg, setEnvioProg] = useState<{ feitos: number; total: number; erros: string[] } | null>(null)
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [espelho, setEspelho] = useState<PontoReportAlvo | null>(null)
@@ -64,6 +70,16 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
   const liberar = useLiberarMes()
   const fechPorMes = useMemo(() =>
     new Map((fechamentos.data ?? []).map(f => [String(f.ano_mes).slice(0, 10), f])), [fechamentos.data])
+
+  const envios = usePontoEnvios(anoMes)
+  const enviarEspelho = useEnviarEspelho()
+  const descartar = useDescartarEspelho()
+  // a view ja devolve so o vivo + os descartados; a tela olha o vivo de cada um
+  const envioPorColab = useMemo(() => {
+    const m = new Map<string, PontoEspelhoEnvio>()
+    for (const e of (envios.data ?? [])) if (e.status !== 'obsoleto') m.set(e.colaborador_id, e)
+    return m
+  }, [envios.data])
 
   const resumo = usePontoResumoMes(anoMes)
   // janela dos últimos 12 meses só quando a visão mensal está aberta
@@ -143,6 +159,10 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
   const isoHoje = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`
   // o que libera o fechamento é o FIM DA JANELA da folha (25), não a virada do mês
   const mesEncerrado = janelaPadrao(anoMes).fim < isoHoje
+
+  const fechado = fechAtual?.status === 'fechado'
+  // reenvio nao duplica: quem ja tem espelho vivo sai da fila do lote
+  const pendentesEnvio = escolhidos.filter(p => !envioPorColab.has(p.id))
 
   const abrirConsolidado = (mes: string, quem: { id: string; nome: string }[], recorte?: string) =>
     setEspelho({ tipo: 'consolidado', spec: { ano_mes: mes, recorte, colaboradores: quem } })
@@ -224,6 +244,17 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
             <Lock size={13} /> Fechar ponto
           </button>
         )}
+        {vista === 'pessoa' && (
+          <button onClick={() => setEnvioModal(true)} disabled={!fechado || !pendentesEnvio.length}
+            title={!fechado
+              ? 'Feche o ponto da competência antes de pedir assinatura'
+              : pendentesEnvio.length
+                ? `Enviar o espelho para ${pendentesEnvio.length} colaborador(es) assinarem no Portal TEG`
+                : 'Todos os selecionados já receberam o espelho'}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-30 whitespace-nowrap">
+            <Send size={13} /> Enviar p/ assinatura ({pendentesEnvio.length})
+          </button>
+        )}
         <div className="flex items-center gap-1">
           {vistaBtn('pessoa', Users, 'Por pessoa')}
           {vistaBtn('consolidado', BarChart3, 'Consolidado por mês')}
@@ -257,8 +288,16 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
                     <td className={`${TD} hidden sm:table-cell ${sub}`}>{p.hh > 0 ? minToHoras(p.hh) : '—'}</td>
                     <td className={`${TD} font-semibold ${p.ex > 0 ? 'text-orange-500' : sub}`}>{p.ex > 0 ? minToHoras(p.ex) : '—'}</td>
                     <td className={`${TD} hidden sm:table-cell ${p.falta > 0 ? 'text-rose-500 font-semibold' : sub}`}>{p.falta > 0 ? minToHoras(p.falta) : '—'}</td>
-                    <td className={TD}><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'}`}>não enviado</span></td>
-                    <td className={`${TD} w-px`}><span className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-500 whitespace-nowrap"><FileText size={13} /> Espelho</span></td>
+                    <td className={TD}><ChipAssinatura e={envioPorColab.get(p.id)} /></td>
+                    <td className={`${TD} w-px`} onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-500 whitespace-nowrap cursor-pointer"
+                          onClick={() => setEspelho({ tipo: 'colaborador', row: { colaborador_id: p.id, colaborador_nome: p.nome, ano_mes: anoMes } })}>
+                          <FileText size={13} /> Espelho
+                        </span>
+                        <AcoesAssinatura e={envioPorColab.get(p.id)} />
+                      </div>
+                    </td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -343,8 +382,152 @@ export default function PontoConsolidacao({ anoMes, onAnoMes, bases }: {
       {espelho && <PontoReportModal alvo={espelho} onClose={() => setEspelho(null)} />}
       {resumoMes && <ModalResumoMes mes={resumoMes} onClose={() => setResumoMes(null)} />}
       {fecharModal && <ModalFechar />}
+      {envioModal && <ModalEnvio />}
     </div>
   )
+
+  // ── assinatura: estado e ações por colaborador ────────────────────────────
+  function ChipAssinatura({ e }: { e?: PontoEspelhoEnvio }) {
+    const cls = 'text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase whitespace-nowrap'
+    if (!e) return <span className={`${cls} ${isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'}`}>não enviado</span>
+    if (e.status === 'assinado') return (
+      <span className={`${cls} bg-emerald-500/15 text-emerald-500`}
+        title={`Assinado em ${e.assinado_em ? new Date(e.assinado_em).toLocaleString('pt-BR') : '—'}${e.auth_metodo ? ` · ${e.auth_metodo}` : ''}`}>
+        assinado
+      </span>
+    )
+    return (
+      <span className={`${cls} bg-sky-500/15 text-sky-500`}
+        title={`Enviado em ${new Date(e.enviado_em).toLocaleString('pt-BR')} — aguardando o colaborador assinar no Portal`}>
+        enviado
+      </span>
+    )
+  }
+
+  async function baixarAssinado(e: PontoEspelhoEnvio) {
+    const path = e.arquivo_assinado_path ?? e.arquivo_path
+    if (!path) return
+    const win = window.open('', '_blank')
+    try {
+      const { data } = await supabase.storage.from('rh-admissao-docs').createSignedUrl(path, 3600)
+      if (data?.signedUrl && win) win.location.href = data.signedUrl
+      else if (data?.signedUrl) window.location.href = data.signedUrl
+      else win?.close()
+    } catch { win?.close() }
+  }
+
+  function AcoesAssinatura({ e }: { e?: PontoEspelhoEnvio }) {
+    if (!e) return null
+    const btn = 'inline-flex items-center justify-center w-6 h-6 rounded-lg transition-colors'
+    return (
+      <>
+        {e.status === 'assinado' && (
+          <button onClick={() => baixarAssinado(e)} title="Baixar o PDF assinado"
+            className={`${btn} text-emerald-500 hover:bg-emerald-500/15`}><Download size={13} /></button>
+        )}
+        <button disabled={descartar.isPending}
+          onClick={() => {
+            const aviso = e.status === 'assinado'
+              ? 'Este espelho JÁ FOI ASSINADO. O documento assinado continua guardado, mas sai de circulação e um novo poderá ser enviado. Continuar?'
+              : 'Cancelar a missão de assinatura deste colaborador e liberar um novo envio?'
+            if (window.confirm(aviso)) descartar.mutate({ id: e.id, por: quem })
+          }}
+          title="Marcar como obsoleto (não apaga o assinado)"
+          className={`${btn} ${isDark ? 'text-slate-500 hover:bg-white/10' : 'text-slate-400 hover:bg-slate-100'}`}>
+          <Ban size={13} />
+        </button>
+      </>
+    )
+  }
+
+  // ── envio em lote ─────────────────────────────────────────────────────────
+  // Um colaborador por chamada, de 3 em 3: cada espelho é um Chromium na VPS.
+  // Serial demoraria demais e tudo de uma vez derruba o render — o progresso
+  // fica visível e um erro isolado não interrompe a fila.
+  async function dispararEnvio() {
+    const fila = [...pendentesEnvio]
+    const j = fecharModal ?? janelaPadrao(anoMes)
+    setEnvioProg({ feitos: 0, total: fila.length, erros: [] })
+    let i = 0
+    const trabalhador = async () => {
+      for (;;) {
+        const idx = i++
+        if (idx >= fila.length) return
+        const p = fila[idx]
+        try {
+          await enviarEspelho.mutateAsync({
+            colaboradorId: p.id, colaboradorNome: p.nome, anoMes, por: quem, ini: j.ini, fim: j.fim,
+          })
+          setEnvioProg(s => s && { ...s, feitos: s.feitos + 1 })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'erro'
+          setEnvioProg(s => s && { ...s, feitos: s.feitos + 1, erros: [...s.erros, `${p.nome}: ${msg}`] })
+        }
+      }
+    }
+    await Promise.all([trabalhador(), trabalhador(), trabalhador()])
+  }
+
+  function ModalEnvio() {
+    const rodando = !!envioProg && envioProg.feitos < envioProg.total
+    const fim = !!envioProg && envioProg.feitos >= envioProg.total
+    const fechar_ = () => { if (!rodando) { setEnvioModal(false); setEnvioProg(null) } }
+    return (
+      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={fechar_}>
+        <div onClick={ev => ev.stopPropagation()}
+          className={`w-full max-w-md rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`}>
+          <div className={`flex items-center justify-between px-4 py-3 border-b ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+            <div className={`text-sm font-bold ${txt}`}>Enviar para assinatura — {capMes(anoMes)}</div>
+            <button onClick={fechar_} disabled={rodando} className={sub}><X size={16} /></button>
+          </div>
+          <div className="px-4 py-4 space-y-3">
+            {!envioProg ? (
+              <>
+                <p className={`text-[11px] leading-relaxed ${sub}`}>
+                  Cada colaborador recebe uma missão no Portal TEG com o seu espelho do mês
+                  e assina eletronicamente. O PDF assinado volta para a pasta dele.
+                </p>
+                <div className={`rounded-xl px-3 py-2 text-xs ${isDark ? 'bg-white/[0.04] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>
+                  <b className={txt}>{pendentesEnvio.length}</b> colaborador(es) na fila
+                  {escolhidos.length !== pendentesEnvio.length && (
+                    <span className={sub}> · {escolhidos.length - pendentesEnvio.length} já enviado(s)</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={`text-xs ${txt}`}>
+                  {rodando ? 'Gerando e enviando…' : 'Envio concluído.'} <b>{envioProg.feitos}</b>/{envioProg.total}
+                </div>
+                <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/10' : 'bg-slate-100'}`}>
+                  <div className="h-full bg-sky-500 transition-all"
+                    style={{ width: `${Math.round((envioProg.feitos / Math.max(1, envioProg.total)) * 100)}%` }} />
+                </div>
+                {!!envioProg.erros.length && (
+                  <div className="max-h-32 overflow-y-auto text-[11px] text-rose-500 space-y-0.5">
+                    {envioProg.erros.map((m, k) => <div key={k}>{m}</div>)}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <div className={`flex items-center justify-end gap-2 px-4 py-3 border-t ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+            <button onClick={fechar_} disabled={rodando}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-30 ${isDark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-100'}`}>
+              {fim ? 'Fechar' : 'Cancelar'}
+            </button>
+            {!fim && (
+              <button disabled={rodando || !pendentesEnvio.length} onClick={dispararEnvio}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-40">
+                {rodando ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                Enviar {pendentesEnvio.length}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // ── janela do fechamento ──────────────────────────────────────────────────
   // A competência da folha não é o mês civil: vai do dia 26 do mês anterior ao

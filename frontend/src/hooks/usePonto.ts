@@ -353,3 +353,82 @@ export function useLiberarMes() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ponto-fechamentos'] }),
   })
 }
+
+// ── Espelho para assinatura no Portal TEG ────────────────────────────────────
+// Fechar e enviar são passos separados de propósito: o fechamento congela os
+// números, o envio pede a assinatura em cima deles. A RPC recusa envio de
+// competência aberta, então a ordem não depende só da tela.
+export interface PontoEspelhoEnvio {
+  id: string
+  colaborador_id: string
+  ano_mes: string
+  periodo_ini: string | null; periodo_fim: string | null
+  documento_id: string
+  missao_id: string | null
+  arquivo_path: string | null
+  status: 'enviado' | 'assinado' | 'obsoleto'
+  enviado_em: string; enviado_por: string | null
+  assinado_em: string | null; auth_metodo: string | null
+  arquivo_assinado_path: string | null
+  titulo: string | null
+  obsoleto_em: string | null; obsoleto_por: string | null
+}
+
+export function usePontoEnvios(anoMes: string) {
+  return useQuery<PontoEspelhoEnvio[]>({
+    queryKey: ['ponto-envios', anoMes],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vw_rh_ponto_espelho_envio')
+        .select('*').eq('ano_mes', anoMes).order('enviado_em', { ascending: false })
+      if (error) { console.error('usePontoEnvios:', error); return [] }
+      return (data ?? []) as PontoEspelhoEnvio[]
+    },
+    enabled: !!anoMes,
+    // o colaborador pode assinar a qualquer momento — a tela acompanha sozinha
+    refetchInterval: 30_000,
+  })
+}
+
+/** Envia UM espelho: gera o HTML da tela, a edge renderiza o PDF e cria a missão. */
+export function useEnviarEspelho() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: {
+      colaboradorId: string; colaboradorNome: string; anoMes: string
+      por?: string; ini?: string; fim?: string
+    }) => {
+      const { buildPontoReportHtml } = await import('../utils/ponto-report-html')
+      const html = await buildPontoReportHtml({
+        colaborador_id: v.colaboradorId, colaborador_nome: v.colaboradorNome, ano_mes: v.anoMes,
+      })
+      const j = janelaPadrao(v.anoMes)
+      const { data, error } = await supabase.functions.invoke('ponto-espelho-assinatura', {
+        body: {
+          colaborador_id: v.colaboradorId, ano_mes: v.anoMes, html,
+          periodo_ini: v.ini ?? j.ini, periodo_fim: v.fim ?? j.fim, por: v.por ?? null,
+        },
+      })
+      if (error) throw error
+      const r = data as { ok?: boolean; erro?: string }
+      // a edge devolve erro de negócio no CORPO (competência aberta, colaborador
+      // sem CPF) — sem esta checagem o envio falharia calado
+      if (!r?.ok) throw new Error(r?.erro || 'Falha ao enviar para assinatura')
+      return r as { ok: true; documento_id?: string; missao_id?: string; ja_enviado?: boolean }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ponto-envios'] }),
+  })
+}
+
+/** Descarta o envio: o PDF assinado continua no bucket, mas sai de circulação. */
+export function useDescartarEspelho() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { id: string; por?: string }) => {
+      const { data, error } = await supabase.rpc('rh_ponto_espelho_descartar', { p_id: v.id, p_por: v.por ?? null })
+      if (error) throw error
+      const r = data as { ok?: boolean; erro?: string }
+      if (!r?.ok) throw new Error(r?.erro || 'Falha ao descartar')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ponto-envios'] }),
+  })
+}
