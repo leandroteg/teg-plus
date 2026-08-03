@@ -23,6 +23,32 @@ relacionado: ["[[00 - TEG+ INDEX]]", "[[17 - Roadmap]]", "[[15 - Deploy e GitHub
 
 ---
 
+## [2026-08-03] — QSMA: EPC vira cadastro, OS por tipo de risco + normalização de cargos
+
+### Added
+- **Cadastro de EPC** — `qsma_epcs` (30 itens) + `qsma_matriz_epc`, exposto como **segunda visão da Matriz de EPI** (toggle EPI | EPC). Célula binária, colunas coloridas por categoria (engenharia / administrativa / sinalização / procedimento). Os 30 itens saíram das **OS assinadas do OneDrive** — nenhum inventado. Ver [[55 - Módulo QSMA — EPI, EPC e Ordem de Serviço]].
+- **Matriz de EPC preenchida** — 34 cargos, 661 marcações, derivadas de `qsma_matriz_risco` por gatilhos (universal / elétrico / ergonômico / queda / máquina / trânsito). Conferido contra a OS assinada do Montador: **29 de 30 bateram**.
+- **`public.rh_cargo_normalizado(text)`** — regra canônica de nome de cargo. Decisões tiradas do **holerite**: `APRENDIZ`, `TECNICO EM SEGURANCA DO TRABALHO` (sem nível), `MOTORISTA OPERADOR DE GUINDAUTO`.
+- **Histórico Escolar** na missão de documentos da admissão (`rh_admissao_enviar_missao_docs` + `DOCS_MISSAO_ADMISSAO`). Vale só para novas missões; a RPC é idempotente.
+
+### Changed
+- **OS agrupa os riscos por tipo** — Físico → Químico → Biológico → Ergonômico → Acidente, no PDF e no modal. A classificação já existia em `qsma_riscos.grupo` e não estava sendo lida; a tabela saía achatada. O tipo virou campo editável por linha.
+- **Cargos normalizados** — 82 → **51 cargos distintos** no quadro ativo. 20 pessoas corrigidas + 960 linhas de `rh_ponto_dia` (30 pessoas) que carregavam grafia antiga. Todas conferidas antes: nenhuma era promoção.
+- **`GUINDALTO` → `GUINDAUTO`** eliminado do banco (52 linhas de ponto). ⚠️ O erro **persiste no holerite** — é cadastro do sistema de folha da contabilidade, fora do nosso alcance.
+
+### Fixed
+- **Ícone verde da Ficha de EPI não abria o assinado** — `evidenciaUrl` lia `qsma-evidencias`; os assinados vivem em `rh-admissao-docs`. Criado `docAssinadoUrl()`.
+- **OS legadas sumiram da Integração** — a célula nova ignorava `rh_admissao_treinamentos`. Quem tem o documento antigo anexado volta a aparecer como resolvido.
+- **PostgREST cortando em 1000 linhas sem erro** — `useTreinamentos` e `useEpiEntregas` paginam com `.range()`. Eram 615 OS e 2.891 entregas invisíveis.
+- **Rodapé do PDF colidia com o carimbo da assinatura** — removido; assinatura centralizada (ficha de EPI e OS).
+
+### Conhecido / pendente
+- **`SERVENTE` (113 ativos) sem nenhum risco na matriz** — a OS não emite para o maior cargo da empresa. Também sem risco: Encarregado de Montagem LD, Mestre Civil, Técnico em Segurança do Trabalho, Topógrafo, Supervisor de Obras, Engenheiro Eletricista.
+- **`LAERCIO` × `LAECIO` BRUNO SILVA DO NASCIMENTO** — provável pessoa duplicada (mesmo cargo, admissões com 7 dias de diferença). Mexe em ponto e folha.
+- Salvar o documento assinado no OneDrive ao finalizar a integração (worker SuperTEG).
+
+---
+
 ## [2026-06-26] — Controladoria: NIBO, Plano Orçamentário, Acompanhamento + Portal TEG
 
 ### Added

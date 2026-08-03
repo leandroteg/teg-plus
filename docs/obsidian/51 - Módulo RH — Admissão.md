@@ -5,7 +5,7 @@ modulo: rh-admissao
 status: ativo
 tags: [rh, admissao, onboarding, geset, liberacao, portal, seculum, esteira]
 criado: 2026-07-21
-atualizado: 2026-07-21
+atualizado: 2026-08-03
 relacionado: ["[[PILAR - RH]]", "[[52 - Módulo RH — Colaboradores]]", "[[53 - Módulo DP — Ponto]]", "[[33 - Módulo SSMA]]", "[[03 - Páginas e Rotas]]", "[[10 - n8n Workflows]]"]
 ---
 
@@ -131,6 +131,28 @@ Prefixo: `rh_admissao_` (11 tabelas). A tabela-pai é `rh_admissoes`.
 | `rh_admissao_ctps_dispara_parecer` | Gatilho: ao salvar CTPS, dispara o parecer CTPS × Matriz CEMIG (SuperTEG/Gemini) |
 | `rh_admissao_parecer_salvar` | Grava o parecer de qualificação |
 | `rh_admissao_enviar_missao_docs` / `rh_admissao_doc_anexar` / `rh_admissao_docs_recebidos` | Missões de documentação no Portal + anexação |
+
+### Documentos da missão (etapa 4)
+
+Uma missão do Portal por documento, criada por `rh_admissao_enviar_missao_docs`:
+
+| doc_tipo | título | |
+|---|---|---|
+| `ctps` | Enviar CTPS (Carteira de Trabalho) | obrigatório |
+| `rg` | Enviar RG (Identidade) | obrigatório |
+| `cpf` | Enviar CPF | obrigatório |
+| `titulo_eleitor` | Enviar Título de Eleitor | obrigatório |
+| `comprovante` | Enviar Comprovante de Endereço | obrigatório |
+| `certidao` | Enviar Certidão de Nascimento ou Casamento | obrigatório |
+| **`historico_escolar`** | **Enviar Histórico Escolar** | **obrigatório** (2026-08-03) |
+| `reservista` | Enviar Reservista (se aplicável) | opcional |
+| `declaracao_etnia` | Declaração étnico-racial | obrigatório, `form: 'etnia'` (gera PDF na hora) |
+
+> ⚠️ **A lista vive em DOIS lugares que precisam andar juntos:** a RPC `rh_admissao_enviar_missao_docs` (VALUES) e `DOCS_MISSAO_ADMISSAO` em `types/rh.ts`, que desenha o checklist da tela. Um novo documento também deve entrar em `TIPOS_ANEXO_ADMISSAO`, senão o arquivo recebido cai em "Outro documento".
+
+> ℹ️ **A RPC é idempotente** — só cria missão que ainda não existe. Reenviar para um candidato em andamento acrescenta apenas o documento novo, sem duplicar os demais. Quem já estava no fluxo **não fica travado**; simplesmente não recebe o item novo até o RH reenviar.
+
+> ℹ️ **O Portal TEG não precisa de mudança** para um doc novo: `PortalMissoes.tsx` renderiza qualquer missão de categoria `documentacao` que tenha `metadata.doc_tipo`. Não há lista fixa nem check constraint no tipo.
 | `rh_admissao_aso_agendar` | Agenda/atualiza o ASO |
 | `rh_admissao_reg_enviar_assinatura` / `_anexo` | Envia documentos do Registro para assinatura no Portal |
 | `rh_admissao_finalizar_registro` | Conclui o Registro (matrícula/contrato) |

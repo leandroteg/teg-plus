@@ -23,6 +23,7 @@ relacionado: ["[[00 - TEG+ INDEX]]", "[[51 - Módulo RH — Admissão]]", "[[52 
 | **DP — Ponto** | ✅ Ativo | [[53 - Módulo DP — Ponto]] | Espelho do Secullum, HHt, extras, retificações |
 | **DP — Folha** | ✅ Ativo | — | Apuração → verificação → fechamento → pagamento |
 | **Treinamentos (matriz)** | ✅ Ativo | [[54 - Módulo QSMA — Matriz de Treinamentos]] | Matriz por cargo (QSMA), certificados do DOC GESET |
+| **EPI, EPC e OS** | ✅ Ativo | [[55 - Módulo QSMA — EPI, EPC e Ordem de Serviço]] | Matrizes de EPI/EPC por cargo, Ficha de EPI assinada no Portal, Ordem de Serviço (NR-01) |
 | **Cultura / Endomarketing** | ✅ Ativo | [[25 - Mural de Recados]] | Mural, engajamento |
 | **R&S** | ⬜ Inativo | — | Recrutamento e seleção (futuro) |
 | **Performance** | ⬜ Inativo | — | Avaliações, metas, feedbacks (futuro) |
@@ -64,6 +65,7 @@ flowchart LR
 - [[51 - Módulo RH — Admissão]]
 - [[52 - Módulo RH — Colaboradores]]
 - [[53 - Módulo DP — Ponto]]
+- [[55 - Módulo QSMA — EPI, EPC e Ordem de Serviço]]
 - [[33 - Módulo SSMA]] — Treinamentos, SST, Meio Ambiente
 - [[PILAR - Projetos]] — Colaboradores alocados nas obras
 - [[50 - Fluxos Inter-Módulos]]

@@ -11,11 +11,17 @@ relacionado: ["[[PILAR - Projetos]]", "[[32 - Módulo Obras]]", "[[17 - Roadmap]
 
 # Módulo SSMA — Segurança, Saúde e Meio Ambiente
 
-> Módulo planejado para gestão de segurança do trabalho, saúde ocupacional e meio ambiente nas obras da TEG. Atualmente implementado como stub informativo com roadmap de desenvolvimento Q2-Q4 2026.
+> ⚠️ **DOCUMENTO DESATUALIZADO (revisado em 2026-08-03).** Este doc descreve o SSMA como stub informativo em `/ssma` com tabelas `ssm_*` planejadas. **Nada disso é o estado atual:** o módulo foi implementado como **QSMA** em `/qsma`, com 13+ tabelas `qsma_*` já em produção. As tabelas `ssm_*` descritas abaixo **nunca existiram**.
+>
+> Para o que existe de verdade, ver:
+> - [[54 - Módulo QSMA — Matriz de Treinamentos]] — matriz de treinamentos NR e certificados
+> - [[55 - Módulo QSMA — EPI, EPC e Ordem de Serviço]] — matrizes de EPI/EPC, Ficha de EPI e OS (NR-01)
+>
+> O texto abaixo fica como registro do plano original de Q2-Q4 2026.
 
 ---
 
-## Estado Atual (2026-03-12)
+## Estado Original Planejado (2026-03-12) — histórico
 
 O módulo SSMA está presente no sistema como uma **tela informativa** (`/ssma`) que exibe:
 - Lista de funcionalidades planejadas com descrição

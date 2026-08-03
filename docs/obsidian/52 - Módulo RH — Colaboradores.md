@@ -5,7 +5,7 @@ modulo: rh-colaboradores
 status: ativo
 tags: [rh, headcount, colaboradores, cadastro, centro-custo, departamento, ficha, onedrive]
 criado: 2026-07-21
-atualizado: 2026-07-21
+atualizado: 2026-08-03
 relacionado: ["[[PILAR - RH]]", "[[51 - Módulo RH — Admissão]]", "[[53 - Módulo DP — Ponto]]", "[[33 - Módulo SSMA]]", "[[03 - Páginas e Rotas]]"]
 ---
 
@@ -81,6 +81,14 @@ Tabela central: **`rh_colaboradores`**.
 - Flags: `tem_processo_trabalhista`
 
 **Tabelas satélite:** `rh_dependentes`, `rh_documentos`, `rh_movimentacoes`, `rh_desligamentos`.
+
+> ⚠️ **Cargo é TEXTO LIVRE — não existe cadastro de cargos.** E as matrizes do QSMA casam com ele **por texto exato**, então grafia divergente faz a linha existir numa matriz e sumir na outra. A regra canônica vive em **`public.rh_cargo_normalizado(text)`** (2026-08-03): tira acento, sobe para maiúscula e **preserva o nível no fim** (I..V, NIVEL X, JR/PL/SR).
+>
+> **As decisões de nomenclatura vieram do HOLERITE**, que é o nome contratual — não da grafia mais frequente: `APRENDIZ` (não "Jovem/Menor Aprendiz"), `TECNICO EM SEGURANCA DO TRABALHO` (sem nível), `MOTORISTA OPERADOR DE GUINDAUTO` (mantém o "MOTORISTA"), `SERVENTE` absorve "Servente de Obras", `MOTORISTA DE CAMINHAO` absorve "Motorista". `OPERADOR DE MAQUINAS` / `PESADAS` / `DE CONSTRUCAO CIVIL` seguem **separados** (habilitação e NR diferentes).
+>
+> Ao mexer em cargo: rodar tudo pela função e atualizar as 4 matrizes QSMA + `rh_colaboradores` + `rh_admissao_candidatos` + `rh_ponto_dia`. **Mesclar antes de renomear** (as matrizes têm unique `(cargo, item)` e as duas grafias podem coexistir; vence `obrigatorio`). **NÃO tocar** em `rh_movimentacoes`, `qsma_os_seguranca` e `rh_admissao_pareceres` — guardam o cargo da época. A função **não roda sozinha**: a admissão continua gravando texto livre.
+
+> ⚠️ **Analisar sempre com `ativo = true`.** São 827 cadastros para **349 ativos** — 478 desligados inflam qualquer diagnóstico de cargo (82 → 51 cargos distintos).
 
 > ⚠️ **Matrícula:** única; **PJ não tem matrícula**. A matrícula canônica é o "REGISTRO DE EMPREGADO Nº" da Ficha de Empregado (Domínio) — não inventar sequência.
 
