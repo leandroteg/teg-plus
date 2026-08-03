@@ -5,6 +5,7 @@ import { config } from './config.js'
 import { log, err } from './log.js'
 import * as db from './db.js'
 import { sendWhatsApp, getBase64FromMediaMessage } from './evolution.js'
+import { aiEnabled, forwardToAI } from './ai.js'
 
 // ─── Anti-spam (portado) ─────────────────────────────────────────────────────
 const SPAM_STRONG = [/cassino/i, /apostas?/i, /\bbet\b/i, /b[oô]nus de boas[-\s]vindas/i, /pix premiad/i, /ganhe\s+r\$/i, /promo[çc][aã]o rel[aâ]mpago/i]
@@ -203,6 +204,16 @@ async function processMessage({ raw, digits, name, body, mediaInfo, msgId, efeit
     if (msgId) await db.vincularMensagemAoChamado(msgId, ticket.id)
     log(`+coment CH-${ticket.numero} (${digits})`)
     return
+  }
+
+  // Conversa NOVA (sem chamado aberto): com o agente IA ligado, ele assume.
+  // Ficam no fluxo clássico: mídia (só é salva quando há chamado — nada se
+  // perde) e mini-fluxo de setor já iniciado (termina o que começou, mesmo
+  // que a IA tenha voltado ao ar no meio).
+  if (aiEnabled() && !media && body && !pendingSector.has(digits)) {
+    const assumiu = await forwardToAI({ digits, name, conhecido: !!known, texto: body, msgId })
+    if (assumiu) { log(`→ agente IA (${digits})`); return }
+    err('agente IA indisponível — seguindo fluxo clássico:', digits)
   }
 
   // contato novo → pergunta o setor antes de abrir

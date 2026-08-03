@@ -75,6 +75,16 @@ export async function limparMensagensAntigas(dias = 30) {
 }
 
 // ─── Chamados ────────────────────────────────────────────────────────────────
+// Resumo de um chamado por número, em QUALQUER status (tool do agente IA).
+// Inclui campos de titularidade — o /ai/status-chamado valida e NÃO os expõe.
+export async function getChamadoResumo(numero) {
+  const { data, error } = await supabase.from('ti_chamados')
+    .select('numero, titulo, status, prioridade, created_at, solicitante_id, contato_externo')
+    .eq('numero', numero).maybeSingle()
+  if (error) throw error
+  return data ?? null
+}
+
 export async function findTicketByNumero(numero) {
   const { data, error } = await supabase.from('ti_chamados').select('id, numero, status').eq('numero', numero).maybeSingle()
   if (error) throw error

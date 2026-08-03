@@ -22,13 +22,16 @@ async function api(method, path, body) {
 }
 
 // ─── Envio ───────────────────────────────────────────────────────────────────
+// Retorna true/false — o /ai/responder usa o retorno p/ acionar o retry do n8n;
+// os demais chamadores ignoram (mesmo comportamento de antes).
 export async function sendWhatsApp({ to, text }) {
   let digits = onlyDigits(to)
-  if (!digits) return
+  if (!digits) return false
   if (!digits.startsWith('55') && (digits.length === 10 || digits.length === 11)) digits = '55' + digits
   try {
     await api('POST', `/message/sendText/${config.evolutionInstance}`, { number: digits, text })
-  } catch (e) { err('sendWhatsApp', e.message) }
+    return true
+  } catch (e) { err('sendWhatsApp', e.message); return false }
 }
 
 // ─── Estado/ciclo de vida da instância ───────────────────────────────────────

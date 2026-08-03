@@ -7,6 +7,7 @@ import { log, err } from './log.js'
 import * as db from './db.js'
 import * as evo from './evolution.js'
 import { handleMessagesUpsert } from './inbound.js'
+import { aiEnabled, aiRouter } from './ai.js'
 
 // Estado local espelhado em ti_whatsapp (o painel do TEG+ lê de lá).
 let local = { status: 'disconnected', numero: null }
@@ -92,6 +93,9 @@ app.post(['/webhook', '/webhook/:ev'], async (req, res) => {
   }
 })
 
+// Tools do agente IA (n8n) — só ativas com N8N_WEBHOOK_URL + AI_SHARED_TOKEN.
+app.use('/ai', aiRouter())
+
 // Payload acima do limite: responde 200 p/ a Evolution NÃO reentregar um evento
 // que nunca vai caber (a mídia ainda é recuperável pelo fallback REST em outro evento).
 app.use((e, _req, res, next) => {
@@ -162,6 +166,7 @@ async function loopLimpeza() {
 async function main() {
   log('TEG+ WhatsApp bridge iniciando…')
   log('Supabase:', config.supabaseUrl, '| Evolution:', config.evolutionUrl, '| instância:', config.evolutionInstance)
+  log('agente IA (n8n):', aiEnabled() ? `LIGADO → ${config.n8nWebhookUrl}` : 'desligado (fluxo clássico)')
   try { log('conta externa:', await db.getExternoPerfilId()) } catch (e) { err(e.message) }
 
   await reconcile()

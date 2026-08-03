@@ -46,6 +46,7 @@ fix_melhorar_n8n.py
 # exceções à regra *.json acima — sem elas o build do bridge no Easypanel falha
 !whatsapp-bridge/package.json
 !whatsapp-bridge/package-lock.json
+!whatsapp-bridge/n8n/*.json
 .vercel
 
 # env backups e credenciais locais (mudanca notebook)
