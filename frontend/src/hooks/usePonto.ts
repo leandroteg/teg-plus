@@ -490,3 +490,35 @@ export function useZipEspelhosAssinados() {
     },
   })
 }
+
+// ── Resumo por INTERVALO de datas (competência da folha: 26 → 25) ────────────
+// A view mensal agrega por mês civil e não consegue cortar no dia 25; a RPC faz
+// a MESMA agregação sobre um intervalo livre. Confere com a view quando o
+// intervalo é o mês inteiro.
+export function usePontoResumoIntervalo(ini: string, fim: string) {
+  return useQuery<PontoResumoMes[]>({
+    queryKey: ['ponto-resumo-intervalo', ini, fim],
+    enabled: !!ini && !!fim && ini <= fim,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('rh_ponto_resumo_intervalo', { p_ini: ini, p_fim: fim })
+      if (error) { console.error('usePontoResumoIntervalo:', error); return [] }
+      return (data ?? []) as PontoResumoMes[]
+    },
+  })
+}
+
+/** Horas extras dia a dia dentro do intervalo (mesma view, recorte por data). */
+export function usePontoHorasExtrasIntervalo(ini: string, fim: string) {
+  return useQuery<HoraExtraItem[]>({
+    queryKey: ['ponto-he-intervalo', ini, fim],
+    enabled: !!ini && !!fim && ini <= fim,
+    queryFn: async () => {
+      try {
+        return await paginar<HoraExtraItem>((from, to) => supabase
+          .from('vw_rh_ponto_hora_extra').select('*')
+          .gte('data', ini).lte('data', fim)
+          .order('data', { ascending: false }).order('secullum_func_id').range(from, to))
+      } catch (e) { console.error('usePontoHorasExtrasIntervalo:', e); return [] }
+    },
+  })
+}

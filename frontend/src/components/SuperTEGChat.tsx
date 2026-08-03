@@ -229,7 +229,7 @@ export default function SuperTEGChat() {
                   SuperTEG
                 </h3>
                 <p className="text-slate-400 text-[11px] leading-tight mt-0.5">
-                  Assistente IA
+                  Atendimento
                 </p>
               </div>
             </div>

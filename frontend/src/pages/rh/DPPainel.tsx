@@ -11,7 +11,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
-import { usePontoResumoPeriodo, usePontoHorasExtrasPeriodo, usePontoColabAtivos } from '../../hooks/usePonto'
+import { usePontoResumoIntervalo, usePontoHorasExtrasIntervalo, usePontoColabAtivos, janelaPadrao } from '../../hooks/usePonto'
 import { intervalToMin } from '../../lib/ponto'
 import { SpotlightMetric, MiniInfoCard } from '../../components/rh/DPPainelCards'
 import DPFolhaPainel from './DPFolhaPainel'
@@ -22,32 +22,14 @@ const fmtPct = (p: number) => `${p < 10 ? p.toFixed(1) : Math.round(p)}%`
 // banco de horas (não paga hora extra) — hoje só Escritório Central
 const ehBanco = (nome?: string | null) => /escrit[óo]rio\s*central/i.test(nome ?? '')
 
-function ymHoje() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-const MESES_OPT: Array<[string, string]> = [
-  ['01', 'Jan'], ['02', 'Fev'], ['03', 'Mar'], ['04', 'Abr'], ['05', 'Mai'], ['06', 'Jun'],
-  ['07', 'Jul'], ['08', 'Ago'], ['09', 'Set'], ['10', 'Out'], ['11', 'Nov'], ['12', 'Dez'],
-]
-function PeriodoSelect({ value, onChange, isDark }: { value: string; onChange: (v: string) => void; isDark: boolean }) {
-  const [y, m] = value.split('-')
-  const anoAtual = new Date().getFullYear()
-  const anos: number[] = []
-  for (let a = 2021; a <= anoAtual; a++) anos.push(a)
-  const cls = `appearance-none rounded-lg pl-2 pr-2 py-1 border text-xs font-semibold cursor-pointer ${
+function DataSelect({ value, onChange, isDark, label }: {
+  value: string; onChange: (v: string) => void; isDark: boolean; label: string
+}) {
+  const cls = `rounded-lg px-2 py-1 border text-xs font-semibold cursor-pointer ${
     isDark ? 'bg-white/[0.06] border-white/[0.1] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
   }`
-  return (
-    <span className="inline-flex items-center gap-1">
-      <select value={m} onChange={e => onChange(`${y}-${e.target.value}`)} className={cls} aria-label="Mês">
-        {MESES_OPT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-      </select>
-      <select value={y} onChange={e => onChange(`${e.target.value}-${m}`)} className={cls} aria-label="Ano">
-        {anos.map(a => <option key={a} value={a}>{a}</option>)}
-      </select>
-    </span>
-  )
+  return <input type="date" value={value} onChange={e => onChange(e.target.value)}
+    className={cls} aria-label={label} title={label} />
 }
 
 export default function DPPainel() {
@@ -56,11 +38,17 @@ export default function DPPainel() {
   const cardClass = isDark ? 'bg-[#111827] border border-white/[0.06]' : 'bg-white border border-slate-200'
 
   const [view, setView] = useState<'ponto' | 'folha'>('ponto')
-  const [de, setDe] = useState(ymHoje())
-  const [ate, setAte] = useState(ymHoje())
+  // abre na COMPETENCIA DA FOLHA (26 do mes anterior ao 25), nao no mes civil:
+  // e a janela que o DP fecha, paga e manda assinar
+  const padrao = () => {
+    const d = new Date()
+    return janelaPadrao(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`)
+  }
+  const [de, setDe] = useState(() => padrao().ini)
+  const [ate, setAte] = useState(() => padrao().fim)
 
-  const { data: resumo = [], isLoading } = usePontoResumoPeriodo(de, ate)
-  const { data: he = [] } = usePontoHorasExtrasPeriodo(de, ate)
+  const { data: resumo = [], isLoading } = usePontoResumoIntervalo(de, ate)
+  const { data: he = [] } = usePontoHorasExtrasIntervalo(de, ate)
   const { data: ativos } = usePontoColabAtivos()
   const pico = ativos?.pico ?? 0
   const headcount = ativos?.headcount ?? 0
@@ -139,9 +127,9 @@ export default function DPPainel() {
         {view === 'ponto' && (
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
-              <PeriodoSelect value={de} onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
+              <DataSelect value={de} label="Data inicial" onChange={v => { setDe(v); if (v > ate) setAte(v) }} isDark={isDark} />
               <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>→</span>
-              <PeriodoSelect value={ate} onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
+              <DataSelect value={ate} label="Data final" onChange={v => { setAte(v); if (v < de) setDe(v) }} isDark={isDark} />
             </div>
             <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold ${isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
               {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />} Secullum conectado

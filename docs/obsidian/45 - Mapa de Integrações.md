@@ -5,7 +5,7 @@ status: ativo
 tags: [integracoes, n8n, whatsapp, ai, cnpj, cobli, veloe, docusign, seculum]
 criado: 2026-04-08
 atualizado: 2026-04-09
-relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]", "[[10 - n8n Workflows]]", "[[19 - Integração Omie]]", "[[38 - Mapa de APIs]]", "[[49 - SuperTEG AI Agent]]"]
+relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]", "[[10 - n8n Workflows]]", "[[19 - Integração Omie]]", "[[38 - Mapa de APIs]]", "[[49 - SuperTEG Atendimento]]"]
 ---
 
 # 🔗 Mapa de Integrações — TEG+ ERP
@@ -137,7 +137,7 @@ Aprovador clica "Aprovar" → Webhook → n8n → Supabase (registra decisão)
 | SuperTEG Chat | Claude | Pergunta em linguagem natural | Resposta contextualizada + ações |
 | Cadastro AI | GPT-4 | Dados parciais | Dados enriquecidos (CNPJ, endereço) |
 
-Ver [[49 - SuperTEG AI Agent]] para documentação completa do agente.
+Ver [[49 - SuperTEG Atendimento]] para documentação completa do agente.
 
 ---
 
@@ -282,5 +282,5 @@ Ver [[19 - Integração Omie]] para mapeamento de campos (preparatório).
 - [[19 - Integração Omie]] — Mapeamento Omie (preparatório)
 - [[38 - Mapa de APIs]] — Todos os endpoints e payloads
 - [[43 - Runbook de Incidentes]] — O que fazer quando falha
-- [[49 - SuperTEG AI Agent]] — Agente AI conversacional
+- [[49 - SuperTEG Atendimento]] — Agente AI conversacional
 - [[50 - Fluxos Inter-Módulos]] — Como os módulos se conectam

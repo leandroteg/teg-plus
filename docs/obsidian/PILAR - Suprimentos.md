@@ -60,7 +60,7 @@ flowchart LR
 ## Integrações
 
 - [[45 - Mapa de Integrações]] — Cobli (telemetria), Veloe (combustível), Consulta Placa
-- [[49 - SuperTEG AI Agent]] — Parse de cotações via chat
+- [[49 - SuperTEG Atendimento]] — Parse de cotações via chat
 - [[50 - Fluxos Inter-Módulos]] — Compras→Financeiro, Logística→Estoque
 
 ---
