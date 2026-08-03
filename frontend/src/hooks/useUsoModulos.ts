@@ -1,14 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
-import type { ModuloDetalhePayload, UsoInsights, UsoModulosPayload, UsoPorUsuarioPeriodoPayload } from '../types/usoModulos'
+import type { ModuloDetalhePayload, UsoModulosPayload, UsoPorUsuarioPeriodoPayload } from '../types/usoModulos'
 
 export type PeriodoDias = 7 | 30 | 90
 
-export function useUsoModulos(dias: PeriodoDias) {
+// excluirAdmins: quando true, as RPCs descartam acessos/ações dos perfis
+// 'administrador' e os tiram da base de usuários (denominador da adoção).
+export function useUsoModulos(dias: PeriodoDias, excluirAdmins = false) {
   return useQuery({
-    queryKey: ['uso-modulos', dias],
+    queryKey: ['uso-modulos', dias, excluirAdmins],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_admin_uso_modulos', { p_dias: dias })
+      const { data, error } = await supabase.rpc('get_admin_uso_modulos', {
+        p_dias: dias,
+        p_excluir_admins: excluirAdmins,
+      })
       if (error) throw error
       return data as UsoModulosPayload
     },
@@ -18,13 +23,14 @@ export function useUsoModulos(dias: PeriodoDias) {
 
 // Tabela "Uso por usuário" com período independente do filtro geral da página
 // (inicio/fim em 'YYYY-MM-DD', interpretados no fuso America/Sao_Paulo)
-export function useUsoPorUsuario(inicio: string, fim: string) {
+export function useUsoPorUsuario(inicio: string, fim: string, excluirAdmins = false) {
   return useQuery({
-    queryKey: ['uso-por-usuario', inicio, fim],
+    queryKey: ['uso-por-usuario', inicio, fim, excluirAdmins],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_admin_uso_por_usuario', {
         p_inicio: inicio,
         p_fim: fim,
+        p_excluir_admins: excluirAdmins,
       })
       if (error) throw error
       return data as UsoPorUsuarioPeriodoPayload
@@ -33,14 +39,15 @@ export function useUsoPorUsuario(inicio: string, fim: string) {
   })
 }
 
-export function useUsoModuloDetalhe(modulo: string | null, dias: PeriodoDias) {
+export function useUsoModuloDetalhe(modulo: string | null, dias: PeriodoDias, excluirAdmins = false) {
   return useQuery({
-    queryKey: ['uso-modulo-detalhe', modulo, dias],
+    queryKey: ['uso-modulo-detalhe', modulo, dias, excluirAdmins],
     enabled: Boolean(modulo),
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_admin_uso_modulo_detalhe', {
         p_modulo: modulo,
         p_dias: dias,
+        p_excluir_admins: excluirAdmins,
       })
       if (error) throw error
       return data as ModuloDetalhePayload
@@ -61,56 +68,6 @@ export function useUsoMetas() {
       return out
     },
     staleTime: 60_000,
-  })
-}
-
-// Última análise de IA em cache para o período (sys_uso_insights, RLS admin).
-// pollMs: quando uma análise assíncrona (SuperTEG) está em andamento, o painel
-// passa um intervalo para revalidar até o callback gravar o resultado.
-export function useUltimaAnalise(dias: PeriodoDias, pollMs: number | false = false) {
-  return useQuery({
-    queryKey: ['uso-insights', dias],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sys_uso_insights')
-        .select('payload, modelo, created_at')
-        .eq('periodo_dias', dias)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      if (error) throw error
-      return data
-        ? { analise: data.payload as UsoInsights, modelo: data.modelo as string | null, gerado_em: data.created_at as string }
-        : null
-    },
-    staleTime: 60_000,
-    refetchInterval: pollMs,
-  })
-}
-
-export interface GerarAnaliseResposta {
-  ok: boolean
-  sincrono?: boolean
-  processando?: boolean
-  run_id?: string
-  analise?: UsoInsights
-  gerado_em?: string
-}
-
-// Solicita uma nova análise ao SuperTEG (Claude na VPS) via edge function/n8n.
-// Resposta pode ser síncrona ({ analise }) ou assíncrona ({ processando: true }).
-export function useGerarAnalise() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (dias: PeriodoDias) => {
-      const { data, error } = await supabase.functions.invoke('uso-modulos-insights', {
-        body: { dias },
-      })
-      if (error) throw error
-      if (!data?.ok) throw new Error(data?.motivo ?? 'Falha ao solicitar a análise.')
-      return data as GerarAnaliseResposta
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['uso-insights'] }),
   })
 }
 
