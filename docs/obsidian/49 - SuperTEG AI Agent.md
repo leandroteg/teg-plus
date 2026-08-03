@@ -4,6 +4,7 @@ type: dev-guide
 status: ativo
 tags: [superteg, ai, agente, chat, nlp, parse, claude, n8n]
 criado: 2026-04-09
+atualizado: 2026-08-03
 relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]", "[[10 - n8n Workflows]]", "[[26 - Upload Inteligente Cotacao]]", "[[38 - Mapa de APIs]]", "[[45 - Mapa de Integrações]]", "[[50 - Fluxos Inter-Módulos]]"]
 ---
 
@@ -22,7 +23,7 @@ flowchart LR
     HOOK -->|POST| N8N[n8n Webhook\n/superteg/chat]
     HOOK -->|POST| PARSE[n8n Webhook\n/compras/parse-cotacao]
     HOOK -->|upload| STORAGE[Supabase Storage\ncotacoes-docs]
-    N8N --> AI[Claude / GPT-4]
+    N8N --> AI[Google Gemini Flash]
     AI --> N8N
     N8N -->|resposta + ações| HOOK
     HOOK -->|navigate / toast| FE[Frontend\nNavegação]
@@ -183,9 +184,52 @@ O componente `NovaRequisicao.tsx` consome o prefill automaticamente:
 |----------|-------|
 | Webhook URL | `VITE_N8N_WEBHOOK_URL` + `/superteg/chat` |
 | Storage bucket | `cotacoes-docs` |
-| Modelo principal | Claude (via n8n) |
+| Workflow n8n | `KJUlWGP1ItQkUQOB` — "TEG+ \| SuperTEG AI Agent" (ativo) |
+| Modelo principal | Google Gemini Flash (via n8n) |
 | Modelo de parse | Gemini 2.5 Flash (via n8n) |
 | Max histórico | 20 mensagens por sessão |
+
+---
+
+## ⚠️ Onde vive o mapa de navegação
+
+> **O mapa de módulos/telas NÃO está no repositório.** Ele é o campo `parameters.options.systemMessage` do nó **"SuperTEG Agent"** dentro do workflow n8n `KJUlWGP1ItQkUQOB`, seção **§NAVEGAÇÃO — Mapa de Módulos**. Editar o código do TEG+ não muda nada aqui.
+
+O agente **não chama ferramenta para navegar**: responde com link markdown `[Label](/rota)` e o frontend intercepta e navega. As regras R1–R10 classificam a intenção (NAVEGAÇÃO / CADASTRO / FEEDBACK / CONSULTA / KPI).
+
+### Como atualizar
+
+1. `GET /api/v1/workflows/KJUlWGP1ItQkUQOB` (header `X-N8N-API-KEY`) — **guardar o systemMessage atual como backup**, não há histórico de versões.
+2. Extrair os rótulos e rotas **reais** dos `src/components/*Layout.tsx` — nunca chutar.
+3. Editar o `systemMessage` do nó "SuperTEG Agent".
+4. Validar: toda rota citada tem que existir em `App.tsx` (comparar as duas listas).
+5. `PUT` de volta com **body mínimo**: `{name, nodes, connections, settings}`.
+
+> ⚠️ **`settings` só aceita chaves do schema público** (`executionOrder`, `timezone`, `saveExecution*`, `executionTimeout`, `errorWorkflow`). Mandar o objeto inteiro de volta dá **HTTP 400**.
+
+> ⚠️ **Vale na hora.** O workflow está ativo; a próxima pergunta de qualquer usuário já usa o texto novo. Não há homologação nem rollback automático.
+
+### Armadilhas do prompt
+
+- **"melhoria" sozinho = FEEDBACK**, mas **"melhoria contínua" = NAVEGAÇÃO** (`/sgi/melhoria`). Distinguir pelo verbo: ir/abrir/ver → navegação.
+- **"alocação" é ambíguo**: Frotas (`/frotas/frota`) × Obras (`/obras/equipe`, `/obras/alocacao-recursos`). O prompt manda **perguntar** quando não der para saber.
+- **EGP tem 4 telas de topo** (Painel, Iniciação, Gestão de Projetos, Encerramento). `Controle` está **oculto** no `EGPLayout`; cronograma/EAP/medições são sub-abas de `/egp/planejamento`.
+
+### Revisão de 2026-08-03
+
+Auditoria do mapa contra o `App.tsx` (180 rotas reais × 106 citadas):
+
+| Problema | Correção |
+|---|---|
+| `/ti/novo`, `/ti/meus`, `/ti/fila` — **3 rotas mortas**, links quebrados | Menu real de TI: `/ti`, `/ti/chamados`, `/ti/chamados/novo`, `/ti/ativos`, `/ti/base`, `/ti/termos` |
+| Frotas com o rótulo antigo **"Frota & Máquinas"** e ordem errada | Menu real: Painel \| Operação \| Manutenção \| **Alocação** (`/frotas/frota`) |
+| `/obras/gestao` ausente (é o 2º item do menu de Obras) | Acrescentado, com as 4 abas na descrição |
+| Monitoramento e AprovaAí **fora do mapa** | Acrescentados |
+| QSMA descrito sem OS, matriz de EPC e Ficha de EPI | Descrição atualizada |
+
+`systemMessage`: 11.200 → 12.458 chars. **Validado: as 114 rotas citadas existem em `App.tsx`.**
+
+Falsos positivos da auditoria — `/apontamentos`, `/egp/tap`, `/egp/reunioes`, `/egp/indicadores` são **redirects**, não telas; não entram no mapa.
 
 ---
 
