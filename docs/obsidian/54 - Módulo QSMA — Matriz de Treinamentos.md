@@ -6,7 +6,7 @@ status: ativo
 tags: [qsma, sst, treinamentos, nr, matriz, certificados, geset, doc-geset]
 criado: 2026-07-21
 atualizado: 2026-07-21
-relacionado: ["[[33 - Módulo SSMA]]", "[[52 - Módulo RH — Colaboradores]]", "[[51 - Módulo RH — Admissão]]", "[[PILAR - RH]]"]
+relacionado: ["[[33 - Módulo SSMA]]", "[[55 - Módulo QSMA — EPI, EPC e Ordem de Serviço]]", "[[52 - Módulo RH — Colaboradores]]", "[[51 - Módulo RH — Admissão]]", "[[PILAR - RH]]"]
 ---
 
 # Módulo QSMA — Matriz de Treinamentos
@@ -97,6 +97,7 @@ Na esteira de admissão, os treinamentos ficam em **`rh_admissao_treinamentos`**
 ## Links Relacionados
 
 - [[33 - Módulo SSMA]] — Módulo QSMA (SST, MA, inspeções) — pai deste sub-módulo
+- [[55 - Módulo QSMA — EPI, EPC e Ordem de Serviço]] — as outras matrizes por cargo (EPI, EPC) e a OS
 - [[52 - Módulo RH — Colaboradores]] — Ficha Treinamentos & Saúde
 - [[51 - Módulo RH — Admissão]] — Treinamentos na integração
 - [[PILAR - RH]] — Pilar RH

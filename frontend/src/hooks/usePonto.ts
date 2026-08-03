@@ -304,6 +304,8 @@ export interface PontoFechamento {
   fechado_por: string | null; fechado_em: string | null
   liberado_por: string | null; liberado_em: string | null; liberado_motivo: string | null
   colaboradores: number | null; hh_min: number | null; extras_min: number | null; faltas_min: number | null
+  /** intervalo REAL que foi fechado (competência da folha, 26→25) */
+  periodo_ini: string | null; periodo_fim: string | null
 }
 
 export function usePontoFechamentos() {
@@ -317,11 +319,24 @@ export function usePontoFechamentos() {
   })
 }
 
+/** janela padrão da folha: 26 do mês anterior → 25 da competência */
+export function janelaPadrao(anoMes: string) {
+  const [y, m] = anoMes.slice(0, 7).split('-').map(Number)
+  const ini = new Date(y, m - 2, 26)
+  const fim = new Date(y, m - 1, 25)
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return { ini: iso(ini), fim: iso(fim) }
+}
+
 export function useFecharMes() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (v: { anoMes: string; por: string }) => {
-      const { error } = await supabase.rpc('rh_ponto_fechar_mes', { p_ano_mes: v.anoMes, p_por: v.por })
+    // o intervalo vai explícito: a competência da folha é 26→25, não o mês civil
+    mutationFn: async (v: { anoMes: string; por: string; ini?: string; fim?: string }) => {
+      const j = janelaPadrao(v.anoMes)
+      const { error } = await supabase.rpc('rh_ponto_fechar_mes', {
+        p_ano_mes: v.anoMes, p_por: v.por, p_ini: v.ini ?? j.ini, p_fim: v.fim ?? j.fim,
+      })
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ponto-fechamentos'] }),
@@ -336,5 +351,142 @@ export function useLiberarMes() {
       if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ponto-fechamentos'] }),
+  })
+}
+
+// ── Espelho para assinatura no Portal TEG ────────────────────────────────────
+// Fechar e enviar são passos separados de propósito: o fechamento congela os
+// números, o envio pede a assinatura em cima deles. A RPC recusa envio de
+// competência aberta, então a ordem não depende só da tela.
+export interface PontoEspelhoEnvio {
+  id: string
+  colaborador_id: string
+  ano_mes: string
+  periodo_ini: string | null; periodo_fim: string | null
+  documento_id: string
+  missao_id: string | null
+  arquivo_path: string | null
+  status: 'enviado' | 'assinado' | 'obsoleto'
+  enviado_em: string; enviado_por: string | null
+  assinado_em: string | null; auth_metodo: string | null
+  arquivo_assinado_path: string | null
+  titulo: string | null
+  obsoleto_em: string | null; obsoleto_por: string | null
+}
+
+export function usePontoEnvios(anoMes: string) {
+  return useQuery<PontoEspelhoEnvio[]>({
+    queryKey: ['ponto-envios', anoMes],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vw_rh_ponto_espelho_envio')
+        .select('*').eq('ano_mes', anoMes).order('enviado_em', { ascending: false })
+      if (error) { console.error('usePontoEnvios:', error); return [] }
+      return (data ?? []) as PontoEspelhoEnvio[]
+    },
+    enabled: !!anoMes,
+    // o colaborador pode assinar a qualquer momento — a tela acompanha sozinha
+    refetchInterval: 30_000,
+  })
+}
+
+/** Envia UM espelho: gera o HTML da tela, a edge renderiza o PDF e cria a missão. */
+export function useEnviarEspelho() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: {
+      colaboradorId: string; colaboradorNome: string; anoMes: string
+      por?: string; ini?: string; fim?: string
+    }) => {
+      const { buildPontoReportHtml } = await import('../utils/ponto-report-html')
+      const html = await buildPontoReportHtml({
+        colaborador_id: v.colaboradorId, colaborador_nome: v.colaboradorNome, ano_mes: v.anoMes,
+      })
+      const j = janelaPadrao(v.anoMes)
+      const { data, error } = await supabase.functions.invoke('ponto-espelho-assinatura', {
+        body: {
+          colaborador_id: v.colaboradorId, ano_mes: v.anoMes, html,
+          periodo_ini: v.ini ?? j.ini, periodo_fim: v.fim ?? j.fim, por: v.por ?? null,
+        },
+      })
+      if (error) throw error
+      const r = data as { ok?: boolean; erro?: string }
+      // a edge devolve erro de negócio no CORPO (competência aberta, colaborador
+      // sem CPF) — sem esta checagem o envio falharia calado
+      if (!r?.ok) throw new Error(r?.erro || 'Falha ao enviar para assinatura')
+      return r as { ok: true; documento_id?: string; missao_id?: string; ja_enviado?: boolean }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ponto-envios'] }),
+  })
+}
+
+/** Descarta o envio: o PDF assinado continua no bucket, mas sai de circulação. */
+export function useDescartarEspelho() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (v: { id: string; por?: string }) => {
+      const { data, error } = await supabase.rpc('rh_ponto_espelho_descartar', { p_id: v.id, p_por: v.por ?? null })
+      if (error) throw error
+      const r = data as { ok?: boolean; erro?: string }
+      if (!r?.ok) throw new Error(r?.erro || 'Falha ao descartar')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ponto-envios'] }),
+  })
+}
+
+/** Contagem de envios/assinados por competência — alimenta a visão mensal. */
+export function usePontoEnviosResumo() {
+  return useQuery<{ ano_mes: string; enviados: number; assinados: number; obsoletos: number }[]>({
+    queryKey: ['ponto-envios-resumo'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vw_rh_ponto_espelho_resumo').select('*')
+      if (error) { console.error('usePontoEnviosResumo:', error); return [] }
+      return (data ?? []) as { ano_mes: string; enviados: number; assinados: number; obsoletos: number }[]
+    },
+    refetchInterval: 60_000,
+  })
+}
+
+/** Baixa num ZIP só os espelhos ASSINADOS da competência (1 PDF por pessoa). */
+export function useZipEspelhosAssinados() {
+  return useMutation({
+    mutationFn: async (v: { anoMes: string }) => {
+      const { data: envios, error } = await supabase.from('vw_rh_ponto_espelho_envio')
+        .select('colaborador_id, arquivo_assinado_path, assinado_em')
+        .eq('ano_mes', v.anoMes).eq('status', 'assinado')
+      if (error) throw error
+      const linhas = (envios ?? []).filter(e => e.arquivo_assinado_path) as
+        { colaborador_id: string; arquivo_assinado_path: string }[]
+      if (!linhas.length) throw new Error('Nenhum espelho assinado nesta competência.')
+
+      // a view não carrega FK, então o embed não funciona — nomes vêm à parte
+      const { data: colabs } = await supabase.from('rh_colaboradores')
+        .select('id, nome').in('id', linhas.map(l => l.colaborador_id))
+      const nomePor = new Map((colabs ?? []).map(c => [c.id as string, c.nome as string]))
+
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+      const usados = new Set<string>()
+      let falhas = 0
+      await Promise.all(linhas.map(async l => {
+        const { data, error: e } = await supabase.storage.from('rh-admissao-docs').download(l.arquivo_assinado_path)
+        if (e || !data) { falhas++; return }
+        const base = (nomePor.get(l.colaborador_id) ?? l.colaborador_id)
+          .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w\- ]/g, '').trim().replace(/\s+/g, '_')
+        // homônimo não pode sobrescrever o arquivo do outro
+        let nome = `${base}.pdf`; let n = 2
+        while (usados.has(nome)) nome = `${base}_${n++}.pdf`
+        usados.add(nome)
+        zip.file(nome, data)
+      }))
+      if (!usados.size) throw new Error('Não foi possível baixar nenhum PDF assinado.')
+
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `espelhos-assinados-${v.anoMes.slice(0, 7)}.zip`
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      return { total: usados.size, falhas }
+    },
   })
 }

@@ -256,6 +256,7 @@ export const TIPOS_ANEXO_ADMISSAO = [
   { value: 'titulo_eleitor', label: 'Título de Eleitor', obrigatorio: false },
   { value: 'comprovante', label: 'Comprovante de Endereço', obrigatorio: false },
   { value: 'certidao', label: 'Certidão Nasc./Casamento', obrigatorio: false },
+  { value: 'historico_escolar', label: 'Histórico Escolar', obrigatorio: false },
   { value: 'reservista', label: 'Reservista', obrigatorio: false },
   { value: 'aso', label: 'Exame Admissional (ASO)', obrigatorio: false },
   { value: 'declaracao_etnia', label: 'Declaração de Etnia', obrigatorio: false },
@@ -274,6 +275,7 @@ export const DOCS_MISSAO_ADMISSAO = [
   { value: 'titulo_eleitor', label: 'Título de Eleitor', opcional: false },
   { value: 'comprovante', label: 'Comprovante de Endereço', opcional: false },
   { value: 'certidao', label: 'Certidão Nasc./Casamento', opcional: false },
+  { value: 'historico_escolar', label: 'Histórico Escolar', opcional: false },
   { value: 'reservista', label: 'Reservista', opcional: true },
 ]
 

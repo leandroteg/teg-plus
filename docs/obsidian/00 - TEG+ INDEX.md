@@ -231,7 +231,7 @@ atualizado: 2026-04-10
 |--------|--------|-----|
 | EGP (PMO) | ✅ 85% | [[31 - Módulo PMO-EGP]] |
 | Obras | ✅ 80% | [[32 - Módulo Obras]] |
-| SSMA | 🔴 0% nao iniciado | [[33 - Módulo SSMA]] |
+| QSMA (ex-SSMA) | ✅ Ativo | [[54 - Módulo QSMA — Matriz de Treinamentos]] · [[55 - Módulo QSMA — EPI, EPC e Ordem de Serviço]] |
 
 #### 🟣 Governança (1 modulo)
 
@@ -243,11 +243,12 @@ atualizado: 2026-04-10
 
 | Modulo | Status | Doc |
 |--------|--------|-----|
-| Headcount | ✅ Ativo | *(admissao, colaboradores, movimentacoes, desligamento)* |
+| Admissão | ✅ Ativo | [[51 - Módulo RH — Admissão]] |
+| Headcount / Colaboradores | ✅ Ativo | [[52 - Módulo RH — Colaboradores]] |
+| DP — Ponto | ✅ Ativo | [[53 - Módulo DP — Ponto]] |
 | Cultura | ✅ Ativo | [[25 - Mural de Recados]] |
 | R&S (Recrutamento) | ⬜ Inativo | *(planejado Q2-Q3 2026)* |
 | Performance | ⬜ Inativo | *(planejado Q2-Q3 2026)* |
-| DP (Dept. Pessoal) | ⬜ Inativo | *(planejado — integracao Seculum)* |
 
 #### ⬜ Planejados
 
