@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { autoPreencherImpostosNF } from '../utils/lerImpostosNF'
-import { gerarNomeAmigavelAnexo } from '../utils/nomeAmigavelAnexo'
+import { gerarNomeAmigavelAnexo, nomeBoletoRefNF, numeroDoNomeNF } from '../utils/nomeAmigavelAnexo'
 
 export interface PedidoAnexo {
   id: string
@@ -127,10 +127,25 @@ export function useUploadAnexo() {
       try {
         const { data: ped } = await supabase
           .from('cmp_pedidos')
-          .select('fornecedor_nome')
+          .select('fornecedor_nome, nf_numero')
           .eq('id', pedidoId)
           .maybeSingle()
-        nomeExibicao = await gerarNomeAmigavelAnexo(file, tipo, ped?.fornecedor_nome)
+
+        // Boleto herda o número da NF já anexada ao pedido ("Boleto ref NFe 14968").
+        let nfRef: string | null = null
+        if (tipo === 'boleto') {
+          const { data: nfs } = await supabase
+            .from('cmp_pedidos_anexos')
+            .select('nome_arquivo')
+            .eq('pedido_id', pedidoId)
+            .eq('tipo', 'nota_fiscal')
+            .order('uploaded_at', { ascending: false })
+            .limit(1)
+          nfRef = numeroDoNomeNF(nfs?.[0]?.nome_arquivo)
+            ?? (ped?.nf_numero ? String(ped.nf_numero) : null)
+        }
+
+        nomeExibicao = await gerarNomeAmigavelAnexo(file, tipo, ped?.fornecedor_nome, nfRef)
       } catch { /* mantém file.name */ }
 
       // 4. Save record to cmp_pedidos_anexos
@@ -156,6 +171,27 @@ export function useUploadAnexo() {
       //    esforço) e pré-preencher a seção Impostos. Best-effort, nunca bloqueia.
       if (tipo === 'nota_fiscal') {
         try { await autoPreencherImpostosNF(pedidoId, file) } catch { /* noop */ }
+
+        // Boleto anexado ANTES da NF fica sem referência — batiza agora.
+        try {
+          const numeroNF = numeroDoNomeNF(nomeExibicao)
+          if (numeroNF) {
+            const { data: ped } = await supabase
+              .from('cmp_pedidos').select('fornecedor_nome').eq('id', pedidoId).maybeSingle()
+            const { data: boletos } = await supabase
+              .from('cmp_pedidos_anexos')
+              .select('id, nome_arquivo')
+              .eq('pedido_id', pedidoId)
+              .eq('tipo', 'boleto')
+            for (const b of boletos ?? []) {
+              if (numeroDoNomeNF(b.nome_arquivo)) continue
+              await supabase
+                .from('cmp_pedidos_anexos')
+                .update({ nome_arquivo: nomeBoletoRefNF(numeroNF, ped?.fornecedor_nome, b.nome_arquivo) })
+                .eq('id', b.id)
+            }
+          }
+        } catch { /* noop */ }
       }
 
       return registro as PedidoAnexo

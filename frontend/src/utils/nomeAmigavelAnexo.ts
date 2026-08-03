@@ -21,6 +21,24 @@ export interface DadosChaveNFe {
   cnpjEmitente: string
 }
 
+/**
+ * NFS-e nacional: chave de 50 dígitos —
+ * IBGE(7) amb(1) tpInsc(1) CNPJ/CPF(14) nNFSe(13) AAMM(4) cNFSe+DV(10).
+ */
+export function dadosChaveNfse(texto: string): { numero: string } | null {
+  const runs = texto.match(/\d[\d .-]{45,100}\d/g) ?? []
+  for (const run of runs) {
+    const d = soDigitos(run)
+    if (d.length === 50) {
+      const numero = String(Number(d.slice(23, 36)))
+      if (numero !== '0' && numero !== 'NaN') return { numero }
+    }
+  }
+  // Fallback pelo rótulo do DANFSe
+  const m = texto.match(/N[úu]mero da NFS-?e\s*:?\s*(\d+)/i)
+  return m ? { numero: String(Number(m[1])) } : null
+}
+
 /** Extrai a chave de acesso (44 dígitos) de um texto, tolerando espaços/pontos. */
 export function extrairChaveNFe(texto: string): string | null {
   const runs = texto.match(/\d[\d .-]{40,90}\d/g) ?? []
@@ -97,6 +115,16 @@ function dadosDoXml(texto: string): { numero: string; serie: string; modelo: str
   }
 }
 
+/** Nome do boleto referenciando a NF ("Boleto ref NFe 14968 - FORNECEDOR.pdf"). */
+export function nomeBoletoRefNF(numeroNF: string, fornecedorNome?: string | null, nomeOriginal = 'boleto.pdf'): string {
+  const forn = fornecedorCurto(fornecedorNome)
+  return `Boleto ref NFe ${numeroNF}${forn ? ` - ${forn}` : ''}${extensaoDe(nomeOriginal)}`
+}
+
+/** Número da NF a partir de um nome já formatado ("NFe 14968 - X.pdf" → "14968"). */
+export const numeroDoNomeNF = (nome?: string | null): string | null =>
+  nome?.match(/NF[SC]?e\s+(\d+)/i)?.[1] ?? null
+
 /**
  * Gera o nome de exibição do anexo. O arquivo no Storage não muda — só o
  * `nome_arquivo` gravado em cmp_pedidos_anexos.
@@ -105,17 +133,25 @@ export async function gerarNomeAmigavelAnexo(
   file: File,
   tipo: string,
   fornecedorNome?: string | null,
+  /** Número da NF já anexada ao pedido — usado para batizar o boleto. */
+  nfReferencia?: string | null,
 ): Promise<string> {
   const ext = extensaoDe(file.name)
   const forn = fornecedorCurto(fornecedorNome)
   const sufixoForn = forn ? ` - ${forn}` : ''
 
   if (tipo === 'nota_fiscal') {
-    // 1) chave no próprio nome do arquivo (caso mais comum do DANFE)
+    // 1) chave no próprio nome do arquivo (caso mais comum do DANFE/DANFSe)
     let dados = dadosDaChave(extrairChaveNFe(file.name) ?? '')
     let numero = dados?.numero
     let serie = dados?.serie
     let modelo = dados?.modelo
+    let servico = false
+
+    if (!numero) {
+      const nfse = dadosChaveNfse(file.name)
+      if (nfse) { numero = nfse.numero; servico = true }
+    }
 
     // 2) conteúdo do arquivo (XML tem nNF/serie explícitos; PDF tem a chave)
     if (!numero) {
@@ -126,20 +162,37 @@ export async function gerarNomeAmigavelAnexo(
           numero = xml.numero; serie = xml.serie; modelo = xml.modelo
         } else {
           dados = dadosDaChave(extrairChaveNFe(texto) ?? '')
-          numero = dados?.numero; serie = dados?.serie; modelo = dados?.modelo
+          if (dados) {
+            numero = dados.numero; serie = dados.serie; modelo = dados.modelo
+          } else {
+            const nfse = dadosChaveNfse(texto)
+            if (nfse) { numero = nfse.numero; servico = true }
+          }
         }
       } catch { /* segue com o nome original */ }
     }
 
     if (numero) {
-      const rotulo = modelo === '65' ? 'NFCe' : 'NFe'
-      const parteSerie = serie && serie !== '1' ? ` serie ${serie}` : ''
+      const rotulo = servico ? 'NFSe' : modelo === '65' ? 'NFCe' : 'NFe'
+      const parteSerie = !servico && serie && serie !== '1' ? ` serie ${serie}` : ''
       return `${rotulo} ${numero}${parteSerie}${sufixoForn}${ext}`
     }
     return file.name
   }
 
-  if (tipo === 'boleto' && forn) return `Boleto${sufixoForn}${ext}`
+  if (tipo === 'boleto') {
+    // NF de referência: a que já está anexada ao pedido; senão, a chave impressa
+    // no próprio boleto (alguns bancos trazem a chave da NF-e no documento).
+    let nf = nfReferencia?.trim() || null
+    if (!nf) {
+      try {
+        const texto = await textoDoArquivo(file)
+        nf = dadosDaChave(extrairChaveNFe(texto) ?? '')?.numero ?? dadosChaveNfse(texto)?.numero ?? null
+      } catch { /* segue sem referência */ }
+    }
+    if (nf) return `Boleto ref NFe ${nf}${sufixoForn}${ext}`
+    if (forn) return `Boleto${sufixoForn}${ext}`
+  }
 
   return file.name
 }
