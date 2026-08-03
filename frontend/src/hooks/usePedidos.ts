@@ -620,6 +620,8 @@ export interface PedidoDiretoPayload {
   observacoes?: string
   compradorId?: string
   empresaId?: string
+  formaPagamento?: string
+  cartaoId?: string
 }
 
 export function useEmitirPedidoDireto() {
@@ -703,10 +705,78 @@ export function useEmitirPedidoDireto() {
 
       if (error) throw new Error(error.message)
 
+      // A CP deste pedido nasce por trigger no banco (criar_cp_ao_emitir_pedido),
+      // que assume vencimento +30d e lê centro de custo/classe da REQUISIÇÃO —
+      // inexistente no pedido direto. Sobrescreve aqui com as parcelas da
+      // condição de pagamento e os dados informados no modal (classe, CC,
+      // empresa, forma de pagamento/cartão).
+      const { data: existingCPs, error: cpFetchError } = await supabase
+        .from('fin_contas_pagar')
+        .select('id')
+        .eq('pedido_id', pedido.id)
+        .order('created_at', { ascending: true })
+      if (cpFetchError) throw new Error(`Erro ao localizar contas a pagar do pedido: ${cpFetchError.message}`)
+
+      const parcelasDoPedido = parcelasResolvidas.length > 0
+        ? parcelasResolvidas
+        : [{
+            numero: 1,
+            valor: payload.valorTotal,
+            data_vencimento: payload.dataPrevistaEntrega || now.toISOString().split('T')[0],
+            descricao: payload.condicaoPagamento || undefined,
+          }]
+
+      const cpPayloads = parcelasDoPedido.map((parcela: any, index: number) => ({
+        pedido_id: pedido.id,
+        fornecedor_id: payload.fornecedorId || null,
+        fornecedor_nome: payload.fornecedorNome,
+        valor_original: Math.round(Number(parcela.valor || 0) * 100) / 100,
+        valor_pago: 0,
+        data_emissao: now.toISOString().split('T')[0],
+        data_vencimento: parcela.data_vencimento,
+        data_vencimento_orig: parcela.data_vencimento,
+        status: parcela.status_inicial === 'confirmado' ? 'confirmado' : 'previsto',
+        centro_custo: payload.centroCusto || null,
+        classe_financeira: payload.classeFinanceira || null,
+        empresa_id: payload.empresaId || null,
+        descricao: `Pedido Direto ${numeroPedido}${parcelasDoPedido.length > 1 ? ` — Parcela ${parcela.numero || index + 1}/${parcelasDoPedido.length}` : ''}`,
+        natureza: 'material',
+        forma_pagamento: payload.formaPagamento || null,
+        cartao_id: payload.formaPagamento === 'cartao' ? payload.cartaoId || null : null,
+        observacoes: payload.condicaoPagamento ? `Condição: ${payload.condicaoPagamento}` : null,
+      }))
+
+      const existingIds = (existingCPs ?? []).map((cp: any) => cp.id)
+      const idsToUpdate = existingIds.slice(0, cpPayloads.length)
+      const payloadsToInsert = cpPayloads.slice(idsToUpdate.length)
+      const idsToDelete = existingIds.slice(cpPayloads.length)
+
+      for (let index = 0; index < idsToUpdate.length; index += 1) {
+        const { error: updateCPError } = await supabase
+          .from('fin_contas_pagar')
+          .update(cpPayloads[index])
+          .eq('id', idsToUpdate[index])
+        if (updateCPError) throw new Error(`Erro ao ajustar parcelas do contas a pagar: ${updateCPError.message}`)
+      }
+      if (payloadsToInsert.length > 0) {
+        const { error: insertCPError } = await supabase
+          .from('fin_contas_pagar')
+          .insert(payloadsToInsert)
+        if (insertCPError) throw new Error(`Erro ao criar parcelas do contas a pagar: ${insertCPError.message}`)
+      }
+      if (idsToDelete.length > 0) {
+        const { error: deleteCPError } = await supabase
+          .from('fin_contas_pagar')
+          .delete()
+          .in('id', idsToDelete)
+        if (deleteCPError) throw new Error(`Erro ao limpar parcelas antigas do contas a pagar: ${deleteCPError.message}`)
+      }
+
       return pedido
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pedidos'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })

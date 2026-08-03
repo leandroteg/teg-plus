@@ -1,11 +1,21 @@
 import { useState, useMemo, useEffect } from 'react'
-import { X, PlusCircle, Trash2, Loader2, AlertTriangle, ShoppingCart, Search, UserPlus, CheckCircle2 } from 'lucide-react'
+import { X, PlusCircle, Trash2, Loader2, AlertTriangle, ShoppingCart, Search, UserPlus, CheckCircle2, Landmark } from 'lucide-react'
 import { useEmitirPedidoDireto } from '../hooks/usePedidos'
 import { useCadFornecedores, useCadClasses, useSalvarFornecedor } from '../hooks/useCadastros'
 import { useLookupObras, useLookupEmpresas } from '../hooks/useLookups'
+import { useCartoesCredito } from '../hooks/useCartoes'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../services/supabase'
 import NumericInput from './NumericInput'
 import { toUpperNorm } from './UpperInput'
+
+type FormaPagamentoPedido = 'pix' | 'cartao' | 'boleto' | 'transferencia'
+const FORMA_PAGAMENTO_OPTIONS: Array<{ value: FormaPagamentoPedido; label: string }> = [
+  { value: 'pix', label: 'Pix' },
+  { value: 'cartao', label: 'Cartão' },
+  { value: 'boleto', label: 'Boleto' },
+  { value: 'transferencia', label: 'Transferência' },
+]
 
 const soDigitos = (s: string) => s.replace(/\D/g, '')
 
@@ -46,6 +56,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
   const empresas = useLookupEmpresas()
 
   const salvarFornecedor = useSalvarFornecedor()
+  const { data: cartoes = [] } = useCartoesCredito()
 
   const [fornecedorNome, setFornecedorNome] = useState('')
   const [fornecedorId, setFornecedorId] = useState('')
@@ -59,6 +70,18 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
   const [classeBusca, setClasseBusca] = useState('')
   const [classeDropdown, setClasseDropdown] = useState(false)
   const [condicaoPagamento, setCondicaoPagamento] = useState('')
+  const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoPedido | ''>('')
+  const [cartaoId, setCartaoId] = useState('')
+  // Dados bancários/PIX do fornecedor — preenchidos aqui quando o cadastro não
+  // tem, e salvos de volta em cmp_fornecedores no submit (mesmo fluxo do
+  // EmitirPedidoModal). Boleto/cartão dispensam dados bancários.
+  const [bancoBoleto, setBancoBoleto] = useState(false)
+  const [bancoCartao, setBancoCartao] = useState(false)
+  const [bancoPix, setBancoPix] = useState('')
+  const [bancoPixTipo, setBancoPixTipo] = useState('')
+  const [bancoBancoNome, setBancoBancoNome] = useState('')
+  const [bancoAgencia, setBancoAgencia] = useState('')
+  const [bancoConta, setBancoConta] = useState('')
   const [dataPrevistaEntrega, setDataPrevistaEntrega] = useState('')
   const [justificativa, setJustificativa] = useState('')
   const [observacoes, setObservacoes] = useState('')
@@ -107,20 +130,42 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
     .slice(0, 10)
 
   const fornecedorSel = fornecedores.find(f => f.id === fornecedorId)
+  const fSel = fornecedorSel as any
+  // Cadastro sem nenhum meio de recebimento conhecido → oferece completar aqui
+  const bankingIncomplete = !!fornecedorSel && !fSel?.boleto && !fSel?.cartao && !fSel?.pix_chave && (!fSel?.banco_nome || !fSel?.conta)
+  const bankingProvided = bancoBoleto || bancoCartao || bancoPix.trim() !== '' || (bancoBancoNome.trim() !== '' && bancoConta.trim() !== '')
 
   function selecionarFornecedor(id: string) {
-    const f = fornecedores.find(x => x.id === id)
+    const f = fornecedores.find(x => x.id === id) as any
     setFornecedorId(id)
     setFornecedorNome(f ? (f.nome_fantasia || f.razao_social || '') : '')
     setFornecedorBusca('')
     setFornecedorDropdown(false)
     setShowNovoFornecedor(false)
+    // Infere o meio de pagamento pelo cadastro e semeia os dados bancários
+    setFormaPagamento(f?.cartao ? 'cartao' : f?.boleto ? 'boleto' : f?.pix_chave ? 'pix' : (f?.banco_nome && f?.conta) ? 'transferencia' : '')
+    setBancoBoleto(Boolean(f?.boleto))
+    setBancoCartao(Boolean(f?.cartao))
+    setBancoPix(f?.pix_chave ?? '')
+    setBancoPixTipo(f?.pix_tipo ?? '')
+    setBancoBancoNome(f?.banco_nome ?? '')
+    setBancoAgencia(f?.agencia ?? '')
+    setBancoConta(f?.conta ?? '')
   }
 
   function limparFornecedor() {
     setFornecedorId('')
     setFornecedorNome('')
     setFornecedorBusca('')
+    setFormaPagamento('')
+    setCartaoId('')
+    setBancoBoleto(false)
+    setBancoCartao(false)
+    setBancoPix('')
+    setBancoPixTipo('')
+    setBancoBancoNome('')
+    setBancoAgencia('')
+    setBancoConta('')
   }
 
   function abrirNovoFornecedor() {
@@ -170,10 +215,22 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
     if (!fornecedorNome.trim()) return setErro('Informe o fornecedor.')
     if (itens.every(i => !i.descricao.trim())) return setErro('Adicione ao menos 1 item com descrição.')
     if (!justificativa.trim()) return setErro('Informe a justificativa para dispensar Requisição/Cotação.')
+    if (formaPagamento === 'cartao' && !cartaoId) return setErro('Selecione qual cartão corporativo será usado.')
 
     const itensFiltrados = itens.filter(i => i.descricao.trim())
 
     try {
+      // Completou dados bancários/PIX de fornecedor que não tinha → salva no cadastro
+      if (fornecedorId && bankingIncomplete && bankingProvided) {
+        await supabase.from('cmp_fornecedores').update({
+          boleto: bancoBoleto,
+          cartao: bancoCartao,
+          ...(bancoPix.trim() ? { pix_chave: bancoPix.trim(), pix_tipo: bancoPixTipo || null } : {}),
+          ...(bancoBancoNome.trim() ? { banco_nome: bancoBancoNome.trim() } : {}),
+          ...(bancoAgencia.trim() ? { agencia: bancoAgencia.trim() } : {}),
+          ...(bancoConta.trim() ? { conta: bancoConta.trim() } : {}),
+        }).eq('id', fornecedorId)
+      }
       const result = await emitir.mutateAsync({
         fornecedorNome: toUpperNorm(fornecedorNome),
         fornecedorId: fornecedorId || undefined,
@@ -194,6 +251,8 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
         observacoes: observacoes ? toUpperNorm(observacoes) : undefined,
         compradorId: perfil?.id,
         empresaId: empresaId || undefined,
+        formaPagamento: formaPagamento || undefined,
+        cartaoId: formaPagamento === 'cartao' ? cartaoId || undefined : undefined,
       })
       onSuccess?.(result.numero_pedido)
       onClose()
@@ -447,6 +506,125 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess }: Props) {
               />
             </div>
           </div>
+
+          {/* Meio de pagamento */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-slate-600">Meio de Pagamento</label>
+              <select
+                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-orange-300 outline-none"
+                value={formaPagamento}
+                onChange={e => setFormaPagamento(e.target.value as FormaPagamentoPedido | '')}
+              >
+                <option value="">Selecionar...</option>
+                {FORMA_PAGAMENTO_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            {formaPagamento === 'cartao' && (
+              <div>
+                <label className="text-xs font-bold text-slate-600">Qual Cartão</label>
+                <select
+                  className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-orange-300 outline-none"
+                  value={cartaoId}
+                  onChange={e => setCartaoId(e.target.value)}
+                >
+                  <option value="">Selecionar cartão...</option>
+                  {cartoes.map(c => (
+                    <option key={c.id} value={c.id}>{c.nome}{c.ultimos4 ? ` • ${c.ultimos4}` : ''}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Dados de pagamento do fornecedor (do cadastro) */}
+          {fornecedorSel && !bankingIncomplete && (
+            <div className="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
+              <Landmark size={14} className="text-slate-400 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                {[
+                  fSel?.pix_chave ? `PIX: ${fSel.pix_chave}${fSel?.pix_tipo ? ` (${fSel.pix_tipo})` : ''}` : null,
+                  fSel?.banco_nome ? `Banco: ${fSel.banco_nome}${fSel?.agencia ? ` • Ag. ${fSel.agencia}` : ''}${fSel?.conta ? ` • Conta ${fSel.conta}` : ''}` : null,
+                  fSel?.boleto ? 'Aceita boleto' : null,
+                  fSel?.cartao ? 'Aceita cartão' : null,
+                ].filter(Boolean).join(' · ')}
+              </p>
+            </div>
+          )}
+
+          {/* Cadastro sem dados de pagamento → completar aqui (salva no fornecedor) */}
+          {bankingIncomplete && (
+            <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 space-y-2.5">
+              <div className="flex items-start gap-2">
+                <Landmark size={14} className="text-violet-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-violet-700">Dados de pagamento do fornecedor incompletos</p>
+                  <p className="text-[11px] text-violet-500">Informe PIX, dados bancários ou marque boleto/cartão — será salvo no cadastro.</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
+                  <input type="checkbox" checked={bancoBoleto}
+                    onChange={e => { setBancoBoleto(e.target.checked); if (e.target.checked) setBancoCartao(false) }}
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                  Boleto
+                </label>
+                <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
+                  <input type="checkbox" checked={bancoCartao}
+                    onChange={e => { setBancoCartao(e.target.checked); if (e.target.checked) setBancoBoleto(false) }}
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                  Cartão
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  className={`w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm uppercase bg-white focus:ring-2 focus:ring-violet-300 outline-none ${bancoBoleto || bancoCartao ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                  placeholder="Chave PIX"
+                  disabled={bancoBoleto || bancoCartao}
+                  value={bancoPix}
+                  onChange={e => setBancoPix(e.target.value.toUpperCase())}
+                />
+                <select
+                  className={`w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:ring-2 focus:ring-violet-300 outline-none ${bancoBoleto || bancoCartao ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                  disabled={bancoBoleto || bancoCartao}
+                  value={bancoPixTipo}
+                  onChange={e => setBancoPixTipo(e.target.value)}
+                >
+                  <option value="">Tipo da chave...</option>
+                  <option value="cpf">CPF</option>
+                  <option value="cnpj">CNPJ</option>
+                  <option value="email">E-mail</option>
+                  <option value="telefone">Telefone</option>
+                  <option value="aleatoria">Chave aleatória</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  className={`w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm uppercase bg-white focus:ring-2 focus:ring-violet-300 outline-none ${bancoBoleto || bancoCartao ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                  placeholder="Banco"
+                  disabled={bancoBoleto || bancoCartao}
+                  value={bancoBancoNome}
+                  onChange={e => setBancoBancoNome(e.target.value.toUpperCase())}
+                />
+                <input
+                  className={`w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:ring-2 focus:ring-violet-300 outline-none ${bancoBoleto || bancoCartao ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                  placeholder="Agência"
+                  disabled={bancoBoleto || bancoCartao}
+                  value={bancoAgencia}
+                  onChange={e => setBancoAgencia(e.target.value)}
+                />
+                <input
+                  className={`w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:ring-2 focus:ring-violet-300 outline-none ${bancoBoleto || bancoCartao ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                  placeholder="Conta"
+                  disabled={bancoBoleto || bancoCartao}
+                  value={bancoConta}
+                  onChange={e => setBancoConta(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Itens */}
           <div>
