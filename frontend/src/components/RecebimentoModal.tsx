@@ -13,6 +13,7 @@ import {
   useCriarRecebimento,
   useRecebimentosPedido,
 } from '../hooks/useRecebimento'
+import { useCadClasses } from '../hooks/useCadastros'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -30,14 +31,20 @@ function derivarDestinoPadrao(
 
 /**
  * Pedido Direto não tem vínculo de catálogo — usamos a classe financeira do
- * pedido (plano de contas) para decidir o destino padrão:
- *   01.* = produto  → Estoque
- *   02.* = serviço  → não gera estoque (Nenhum)
- * Sem classe definida também não gera estoque (mais seguro que criar entrada
- * indevida). O recebedor sempre pode trocar o destino por item.
+ * pedido para decidir o destino padrão via flag `gera_estoque` do plano RM
+ * (mig 200). Sem classe definida não gera estoque (mais seguro que criar
+ * entrada indevida). Códigos legados CLS-* caem na regra antiga de prefixo
+ * (01.* = produto). O recebedor sempre pode trocar o destino por item.
  */
-function derivarDestinoDireto(classeFinanceira?: string | null): TipoDestino {
-  const raiz = (classeFinanceira ?? '').replace(/^CLS-/i, '').slice(0, 2)
+function derivarDestinoDireto(
+  classeFinanceira: string | null | undefined,
+  geraEstoquePorCodigo: Map<string, boolean>,
+): TipoDestino {
+  const cod = (classeFinanceira ?? '').trim()
+  if (!cod) return 'nenhum'
+  const flag = geraEstoquePorCodigo.get(cod)
+  if (flag !== undefined) return flag ? 'consumo' : 'nenhum'
+  const raiz = cod.replace(/^CLS-/i, '').slice(0, 2)
   return raiz === '01' ? 'consumo' : 'nenhum'
 }
 
@@ -59,7 +66,16 @@ export default function RecebimentoModal({
   const { data: itensRC, isLoading: loadingItens } = useItensRequisicao(pedido.requisicao_id)
   const { data: bases, isLoading: loadingBases }   = useBases()
   const { data: recebimentosAnteriores, isLoading: loadingRecebs } = useRecebimentosPedido(pedido.id)
+  const { data: classesFin, isLoading: loadingClasses } = useCadClasses()
   const criarRecebimento = useCriarRecebimento()
+
+  const geraEstoquePorCodigo = useMemo(() => {
+    const map = new Map<string, boolean>()
+    for (const c of (classesFin ?? []) as any[]) {
+      if (c.codigo) map.set(c.codigo, !!c.gera_estoque)
+    }
+    return map
+  }, [classesFin])
 
   // qty already received per requisicao_item_id (sum across previous recebimentos)
   const jaRecebidoPorItem = useMemo(() => {
@@ -107,7 +123,7 @@ export default function RecebimentoModal({
   // Pedido Direto (sem RC) guarda os itens em pedido.itens_direto, sem vínculo
   // de requisição nem de catálogo; usamos esses como fallback quando não há RC.
   const temRcVinculada = !!pedido.requisicao_id
-  if (!loadingRecebs && !initialized && (!temRcVinculada || itensRC !== undefined)) {
+  if (!loadingRecebs && !loadingClasses && !initialized && (!temRcVinculada || itensRC !== undefined)) {
     const rcItens = itensRC ?? []
     const base: RecebimentoItemForm[] = rcItens.length > 0
       ? rcItens.map(item => {
@@ -135,8 +151,8 @@ export default function RecebimentoModal({
             quantidade_esperada: saldo,
             quantidade_recebida: saldo,
             valor_unitario: it.valor_unitario,
-            // Serviço não gera estoque; produto (01.*) entra como consumo.
-            tipo_destino: derivarDestinoDireto(pedido.classe_financeira),
+            // Destino default pela flag gera_estoque da classe financeira (plano RM).
+            tipo_destino: derivarDestinoDireto(pedido.classe_financeira, geraEstoquePorCodigo),
             destino_padrao: undefined,
           }
         })

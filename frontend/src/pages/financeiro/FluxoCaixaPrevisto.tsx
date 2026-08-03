@@ -33,6 +33,18 @@ function catDaClasse(codigo: string | null, descricao: string): string {
   if (/equipament|epi|ferrament|m[aá]quina/.test(d)) return 'Equipamentos e EPIs'
   if (/sistema|software|internet|telefon|licen[cç]a de uso/.test(d)) return 'Sistemas'
   if (/juro|tarifa|banc[aá]|financeir|seguro|multa/.test(d)) return 'Desp Fin. e Outra Desp Adm'
+  // plano RM (mig 200): códigos G.SS.III — fallback por grupo/subgrupo
+  const rm = /^(\d)\.(\d{2})/.exec(codigo ?? '')
+  if (rm) {
+    const sub = `${rm[1]}.${rm[2]}`
+    if (sub === '2.01' || sub === '2.02') return 'Mão de Obra Direta'
+    if (sub === '2.06') return 'Amortizações'
+    if (sub === '2.08') return 'Investimentos'
+    if (sub === '2.09' || sub === '2.11') return 'Impostos (PIS/COFINS/IRPJ/CSLL)'
+    if (sub === '2.10' || sub === '2.12') return 'Desp Fin. e Outra Desp Adm'
+    if (sub === '2.03' || sub === '2.14' || sub === '2.15') return 'Serviços Terc. + Outros C. Diretos'
+    return 'Administrativo'
+  }
   const grp = /^CLS-(\d{2})/.exec(codigo ?? '')?.[1]
   if (grp === '02') {
     if (/sal[aá]rio|fopag|inss|fgts|rescis|f[eé]rias|13|gratifica|pens[aã]o|sindical|m[aã]o de obra|di[aá]ria/.test(d)) return 'Mão de Obra Direta'
@@ -148,7 +160,7 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
   cp.filter(c => c.status !== 'cancelado').forEach(c => {
     const d = ['pago', 'conciliado'].includes(c.status) ? (c.data_pagamento || c.data_vencimento) : c.data_vencimento
     const key = c.classe_financeira || ''
-    const cat = catDaClasse(key.startsWith('CLS-') ? key : null, key.startsWith('CLS-') ? classeDesc(key) : key)
+    const cat = catDaClasse(key, classeDesc(key))
     soma(cat, (d ?? '').slice(0, 7), c.valor_original)
   })
   // 2. contratos recorrentes (grupo do contrato → categoria), mês a mês na vigência
