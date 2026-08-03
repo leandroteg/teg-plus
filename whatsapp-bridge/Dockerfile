@@ -1,4 +1,5 @@
-FROM node:20-alpine
+# node >= 22: o @supabase/supabase-js atual exige WebSocket nativo do runtime
+FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./

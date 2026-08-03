@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Bridge que liga o WhatsApp (Evolution API, via webhook) ao TEG+ (Supabase): abre/atualiza chamados de TI a partir de mensagens, anexa mídias e devolve as respostas dos agentes ao WhatsApp do solicitante. Substitui o whatsapp-worker (whatsapp-web.js on-prem).",
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22" },
   "scripts": {
     "start": "node src/index.js"
   },
