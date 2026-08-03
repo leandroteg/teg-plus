@@ -36,7 +36,7 @@ import {
 import { supabase } from '../../services/supabase'
 import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import { useCadFornecedores } from '../../hooks/useCadastros'
-import { formatCNPJ, normalizeDigits } from '../../hooks/useFornecedorVinculo'
+import { formatCNPJ, formatCpfCnpj, isCpfOuCnpj, normalizeDigits } from '../../hooks/useFornecedorVinculo'
 import CancelamentoDocControl from '../../components/financeiro/CancelamentoDocControl'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras, useLookupEmpresas } from '../../hooks/useLookups'
 import SearchableSelect from '../../components/SearchableSelect'
@@ -226,6 +226,7 @@ type NovaSolicitacaoExtraForm = {
   centro_custo: string
   classe_financeira: string
   valor: string
+  data_vencimento: string
   fornecedor_id: string
   fornecedor_cnpj: string
   favorecido: string
@@ -255,6 +256,7 @@ const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
   centro_custo: '',
   classe_financeira: '',
   valor: '',
+  data_vencimento: new Date().toISOString().slice(0, 10),
   fornecedor_id: '',
   fornecedor_cnpj: '',
   favorecido: '',
@@ -777,6 +779,7 @@ function NovaSolicitacaoExtraordinariaModal({
     && form.centro_custo.length > 0
     && form.classe_financeira.length > 0
     && Number(form.valor) > 0
+    && form.data_vencimento.length > 0
     && form.fornecedor_id.length > 0
 
   const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
@@ -804,7 +807,7 @@ function NovaSolicitacaoExtraordinariaModal({
     setForm(prev => ({
       ...prev,
       fornecedor_id: fornecedor.id,
-      fornecedor_cnpj: formatCNPJ(fornecedor.cnpj),
+      fornecedor_cnpj: formatCpfCnpj(fornecedor.cnpj),
       favorecido: fornecedor.nome_fantasia?.trim() || fornecedor.razao_social?.trim() || prev.favorecido,
       banco_nome: fornecedor.banco_nome ?? '',
       agencia: fornecedor.agencia ?? '',
@@ -825,7 +828,7 @@ function NovaSolicitacaoExtraordinariaModal({
 
   const handleFornecedorLookup = useCallback(async (cnpjValue: string) => {
     const digits = normalizeDigits(cnpjValue)
-    if (digits.length !== 14) {
+    if (digits.length !== 14 && digits.length !== 11) {
       setFornecedorSelecionado(null)
       setForm(prev => ({ ...prev, fornecedor_id: '' }))
       return
@@ -847,11 +850,12 @@ function NovaSolicitacaoExtraordinariaModal({
       pix_tipo: '',
       pix_chave: '',
     }))
-    await cnpjLookup.consultar(digits)
+    // Consulta pública da Receita só existe para CNPJ (pessoa física não tem).
+    if (digits.length === 14) await cnpjLookup.consultar(digits)
   }, [cnpjLookup, fornecedorPorCnpj, preencherFornecedor])
 
   const fornecedorCadastroInitialData = useMemo<FornecedorFormData>(() => ({
-    cnpj: formatCNPJ(form.fornecedor_cnpj),
+    cnpj: formatCpfCnpj(form.fornecedor_cnpj),
     razao_social: cnpjLookup.dados?.razao_social || form.favorecido || '',
     nome_fantasia: cnpjLookup.dados?.nome_fantasia || '',
     telefone: cnpjLookup.dados?.telefone || '',
@@ -902,7 +906,8 @@ function NovaSolicitacaoExtraordinariaModal({
         solicitanteNome: perfil?.nome,
         fornecedorId: form.fornecedor_id || undefined,
         fornecedorNome: form.favorecido || undefined,
-        fornecedorCnpj: formatCNPJ(form.fornecedor_cnpj) || undefined,
+        fornecedorCnpj: formatCpfCnpj(form.fornecedor_cnpj) || undefined,
+        dataVencimento: form.data_vencimento,
         dadosBancarios: {
           favorecido: form.favorecido || undefined,
           banco_nome: form.banco_nome || undefined,
@@ -1058,38 +1063,44 @@ function NovaSolicitacaoExtraordinariaModal({
             </div>
           </div>
 
-          <div>
-            <label className={labelCls}>Valor *</label>
-            <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setField('valor', e.target.value)} className={inputCls} placeholder="0,00" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Valor *</label>
+              <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setField('valor', e.target.value)} className={inputCls} placeholder="0,00" />
+            </div>
+            <div>
+              <label className={labelCls}>Data de Vencimento *</label>
+              <input type="date" value={form.data_vencimento} onChange={e => setField('data_vencimento', e.target.value)} className={inputCls} />
+            </div>
           </div>
 
           <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
             <div>
               <p className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Dados bancários</p>
-              <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Selecione o favorecido pelo CNPJ para reaproveitar o cadastro de fornecedores e os dados de pagamento existentes.</p>
+              <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Selecione o favorecido pelo CPF ou CNPJ para reaproveitar o cadastro de fornecedores e os dados de pagamento existentes.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>CNPJ do Favorecido *</label>
+                <label className={labelCls}>CPF/CNPJ do Favorecido *</label>
                 <input
                   value={form.fornecedor_cnpj}
                   onChange={e => {
-                    const value = formatCNPJ(e.target.value)
+                    const value = formatCpfCnpj(e.target.value)
                     setForm(prev => ({
                       ...prev,
                       fornecedor_cnpj: value,
                       fornecedor_id: '',
                     }))
-                    if (normalizeDigits(value).length < 14) {
+                    if (!isCpfOuCnpj(value)) {
                       setFornecedorSelecionado(null)
                     }
-                    if (normalizeDigits(value).length === 14) {
+                    if (isCpfOuCnpj(value)) {
                       void handleFornecedorLookup(value)
                     }
                   }}
                   onBlur={() => void handleFornecedorLookup(form.fornecedor_cnpj)}
                   className={inputCls}
-                  placeholder="00.000.000/0000-00"
+                  placeholder="CPF ou CNPJ"
                 />
                 {cnpjLookup.loading && <p className={`mt-1 text-[11px] ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>Consultando CNPJ...</p>}
                 {cnpjLookup.erro && cnpjDigits.length === 14 && !fornecedorSelecionado && (
@@ -1130,7 +1141,7 @@ function NovaSolicitacaoExtraordinariaModal({
                   <button
                     type="button"
                     onClick={() => setShowFornecedorCadastro(true)}
-                    disabled={cnpjDigits.length !== 14}
+                    disabled={cnpjDigits.length !== 14 && cnpjDigits.length !== 11}
                     className="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cadastrar fornecedor

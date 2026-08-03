@@ -40,6 +40,20 @@ export function formatCNPJ(value?: string | null) {
   return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
 }
 
+// CPF (11 dígitos) ou CNPJ (14). Fornecedor pessoa física é guardado no mesmo
+// campo cnpj de cmp_fornecedores — o índice único da mig 198 deduplica por dígitos.
+export function formatCpfCnpj(value?: string | null) {
+  const digits = normalizeDigits(value)
+  if (digits.length === 11) return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4')
+  if (digits.length === 14) return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
+  return value?.trim() ?? ''
+}
+
+export const isCpfOuCnpj = (value?: string | null) => {
+  const len = normalizeDigits(value).length
+  return len === 11 || len === 14
+}
+
 export function getFornecedorPaymentMissingFields(fornecedor?: Partial<Fornecedor> | null) {
   if (fornecedor?.boleto || fornecedor?.cartao) return []
 

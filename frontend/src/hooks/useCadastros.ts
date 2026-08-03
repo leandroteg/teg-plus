@@ -70,11 +70,13 @@ export function useSalvarFornecedor() {
     mutationFn: async (payload: Partial<Fornecedor> & { id?: string }) => {
       const { id, ...rest } = payload
 
-      // Um fornecedor por CNPJ: compara por dígitos (o banco guarda com máscara,
+      // Um fornecedor por CPF/CNPJ: compara por dígitos (o banco guarda com máscara,
       // mas legado pode ter só números — mig 198 normaliza e trava com unique).
       const digits = String(rest.cnpj ?? '').replace(/\D/g, '')
-      if (digits.length === 14) {
-        const masked = `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
+      if (digits.length === 14 || digits.length === 11) {
+        const masked = digits.length === 14
+          ? `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
+          : `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
         rest.cnpj = masked
         const { data: existentes } = await supabase
           .from('cmp_fornecedores')
@@ -83,7 +85,7 @@ export function useSalvarFornecedor() {
         const conflito = (existentes ?? []).find(f => f.id !== id)
         if (conflito) {
           throw new Error(
-            `CNPJ ${masked} já cadastrado como "${conflito.nome_fantasia || conflito.razao_social}". ` +
+            `CPF/CNPJ ${masked} já cadastrado como "${conflito.nome_fantasia || conflito.razao_social}". ` +
             'Edite o cadastro existente em vez de criar outro.',
           )
         }
