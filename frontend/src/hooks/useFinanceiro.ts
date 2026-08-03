@@ -288,6 +288,7 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       centro_custo,
       classe_financeira,
       valor,
+      dataVencimento,
       solicitanteNome,
       fornecedorId,
       fornecedorNome,
@@ -300,6 +301,7 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       centro_custo: string
       classe_financeira: string
       valor: number
+      dataVencimento?: string
       solicitanteNome?: string
       fornecedorId?: string
       fornecedorNome?: string
@@ -315,6 +317,7 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       arquivos?: File[]
     }) => {
       const hoje = new Date().toISOString().split('T')[0]
+      const vencimento = dataVencimento?.trim() || hoje
       const numeroDocumento = `EXT-${new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)}`
       const uploadedArquivos: Array<{ nome: string; url: string }> = []
       const uploadFalhas: string[] = []
@@ -329,8 +332,8 @@ export function useCriarSolicitacaoExtraordinariaCP() {
           valor_original: valor,
           valor_pago: 0,
           data_emissao: hoje,
-          data_vencimento: hoje,
-          data_vencimento_orig: hoje,
+          data_vencimento: vencimento,
+          data_vencimento_orig: vencimento,
           centro_custo,
           classe_financeira,
           natureza: 'extraordinario',

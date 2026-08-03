@@ -4,7 +4,7 @@ import { UpperInput } from './UpperInput'
 import { useSalvarFornecedor } from '../hooks/useCadastros'
 import { useConsultaCNPJ } from '../hooks/useConsultas'
 import {
-  formatCNPJ,
+  formatCpfCnpj,
   getFornecedorPaymentMissingFields,
   hasFornecedorPaymentData,
   normalizeDigits,
@@ -122,8 +122,8 @@ export default function FornecedorCadastroModal({
       return
     }
 
-    if (cnpjDigits.length !== 14) {
-      setErrorMessage('Informe um CNPJ válido com 14 dígitos.')
+    if (cnpjDigits.length !== 14 && cnpjDigits.length !== 11) {
+      setErrorMessage('Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.')
       return
     }
 
@@ -204,13 +204,13 @@ export default function FornecedorCadastroModal({
               <UpperInput value={form.nome_fantasia ?? ''} onChange={(event) => setField('nome_fantasia', event.target.value)} placeholder="Nome fantasia" className={`input-base ${input}`} />
             </div>
             <div>
-              <label className={`block text-xs font-bold mb-1 ${subtext}`}>CNPJ *</label>
+              <label className={`block text-xs font-bold mb-1 ${subtext}`}>CPF/CNPJ *</label>
               <div className="relative">
                 <input
                   value={form.cnpj ?? ''}
                   onChange={(event) => setField('cnpj', event.target.value)}
                   onBlur={() => cnpjLookup.consultar(form.cnpj ?? '')}
-                  placeholder="00.000.000/0000-00"
+                  placeholder="CPF ou CNPJ"
                   className={`input-base pr-24 ${input}`}
                 />
                 {cnpjLookup.loading && (
@@ -332,12 +332,16 @@ export default function FornecedorCadastroModal({
             <div>
               <p className={`text-xs font-semibold ${text}`}>Prévia do cadastro</p>
               <p className={`text-[11px] mt-0.5 ${subtext}`}>
-                {form.razao_social?.trim() || 'Razão social pendente'}{form.cnpj ? ` • ${formatCNPJ(form.cnpj)}` : ''}
+                {form.razao_social?.trim() || 'Razão social pendente'}{form.cnpj ? ` • ${formatCpfCnpj(form.cnpj)}` : ''}
               </p>
             </div>
             <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${paymentReady ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
               {paymentReady ? 'Pagamento OK' : 'Cadastro em edição'}
             </span>
+          </div>
+
+          <div className={`rounded-xl px-4 py-2.5 border text-[11px] ${dark ? 'border-white/10 bg-white/[0.02] text-slate-400' : 'border-slate-200 bg-white text-slate-500'}`}>
+            Pessoa física: informe o CPF no campo CPF/CNPJ — o Cartão CNPJ não é exigido.
           </div>
 
           {errorMessage && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{errorMessage}</div>}
