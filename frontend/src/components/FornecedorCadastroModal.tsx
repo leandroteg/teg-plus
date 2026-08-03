@@ -168,7 +168,7 @@ export default function FornecedorCadastroModal({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onMouseDown={e => { if (e.target === e.currentTarget && e.button === 0) onClose() }}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div
         onClick={(event) => event.stopPropagation()}
         className={`${bg} w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl border ${border}`}
