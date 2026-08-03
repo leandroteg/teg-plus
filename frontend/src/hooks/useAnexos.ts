@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { autoPreencherImpostosNF } from '../utils/lerImpostosNF'
+import { gerarNomeAmigavelAnexo } from '../utils/nomeAmigavelAnexo'
 
 export interface PedidoAnexo {
   id: string
@@ -119,13 +120,26 @@ export function useUploadAnexo() {
         .from('pedidos-anexos')
         .getPublicUrl(path)
 
-      // 3. Save record to cmp_pedidos_anexos
+      // 3. Nome de exibição legível: DANFE vem batizada com a chave de acesso
+      //    ("31260830927398...-nfe.pdf") → "NFe 3778 - FORNECEDOR.pdf".
+      //    Best-effort: qualquer falha mantém o nome original do arquivo.
+      let nomeExibicao = file.name
+      try {
+        const { data: ped } = await supabase
+          .from('cmp_pedidos')
+          .select('fornecedor_nome')
+          .eq('id', pedidoId)
+          .maybeSingle()
+        nomeExibicao = await gerarNomeAmigavelAnexo(file, tipo, ped?.fornecedor_nome)
+      } catch { /* mantém file.name */ }
+
+      // 4. Save record to cmp_pedidos_anexos
       const { data: registro, error: dbError } = await supabase
         .from('cmp_pedidos_anexos')
         .insert({
           pedido_id: pedidoId,
           tipo,
-          nome_arquivo: file.name,
+          nome_arquivo: nomeExibicao,
           url: publicUrl || uploadData.path,
           tamanho_bytes: file.size,
           mime_type: file.type,
@@ -138,7 +152,7 @@ export function useUploadAnexo() {
         .single()
       if (dbError) throw new Error('Falha ao salvar registro: ' + dbError.message)
 
-      // 4. NF anexada: tenta ler os impostos do arquivo (XML exato / PDF melhor
+      // 5. NF anexada: tenta ler os impostos do arquivo (XML exato / PDF melhor
       //    esforço) e pré-preencher a seção Impostos. Best-effort, nunca bloqueia.
       if (tipo === 'nota_fiscal') {
         try { await autoPreencherImpostosNF(pedidoId, file) } catch { /* noop */ }
