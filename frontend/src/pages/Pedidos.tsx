@@ -36,7 +36,7 @@ import {
 } from '../hooks/useFornecedorVinculo'
 import { api } from '../services/api'
 import { supabase } from '../services/supabase'
-import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../hooks/useAnexos'
+import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, useConferirAnexo, TIPO_LABEL } from '../hooks/useAnexos'
 import type { PedidoAnexo } from '../hooks/useAnexos'
 import FluxoTimeline from '../components/FluxoTimeline'
 import RecebimentoModal from '../components/RecebimentoModal'
@@ -1523,7 +1523,14 @@ function DocSection({ title, icon, color, count, children }: { title: string; ic
   )
 }
 
-function DocItem({ name, url, mime, tipo, date, origem }: { name: string; url: string; mime?: string | null; tipo?: string; date?: string; origem?: string }) {
+interface DocConferencia {
+  status: boolean | null
+  por?: string | null
+  pending?: boolean
+  onDecidir: (aprovado: boolean | null) => void
+}
+
+function DocItem({ name, url, mime, tipo, date, origem, conferencia }: { name: string; url: string; mime?: string | null; tipo?: string; date?: string; origem?: string; conferencia?: DocConferencia }) {
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-50 transition-colors group">
       <AnexoIcon mime={mime ?? null} />
@@ -1533,8 +1540,51 @@ function DocItem({ name, url, mime, tipo, date, origem }: { name: string; url: s
           {tipo && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">{tipo}</span>}
           {origem && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${origem === 'financeiro' ? 'bg-purple-100 text-purple-600' : 'bg-teal-100 text-teal-600'}`}>{origem === 'financeiro' ? 'Financeiro' : 'Compras'}</span>}
           {date && <span className="text-[10px] text-slate-400">{new Date(date).toLocaleDateString('pt-BR')}</span>}
+          {conferencia?.status === true && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+              <CheckCircle size={9} /> Aprovado{conferencia.por ? ` · ${conferencia.por.split(' ')[0]}` : ''}
+            </span>
+          )}
+          {conferencia?.status === false && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">
+              <X size={9} /> Reprovado{conferencia.por ? ` · ${conferencia.por.split(' ')[0]}` : ''}
+            </span>
+          )}
         </div>
       </div>
+      {conferencia && (
+        <div className="flex items-center gap-1 flex-shrink-0" onClick={e => { e.preventDefault(); e.stopPropagation() }}>
+          {conferencia.status === null ? (
+            <>
+              <button
+                title="Aprovar documento"
+                disabled={conferencia.pending}
+                onClick={e => { e.preventDefault(); e.stopPropagation(); conferencia.onDecidir(true) }}
+                className="w-7 h-7 rounded-lg flex items-center justify-center bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-600 hover:text-white transition-colors disabled:opacity-50"
+              >
+                <CheckCircle size={13} />
+              </button>
+              <button
+                title="Reprovar documento"
+                disabled={conferencia.pending}
+                onClick={e => { e.preventDefault(); e.stopPropagation(); conferencia.onDecidir(false) }}
+                className="w-7 h-7 rounded-lg flex items-center justify-center bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white transition-colors disabled:opacity-50"
+              >
+                <X size={13} />
+              </button>
+            </>
+          ) : (
+            <button
+              title="Desfazer conferência deste documento"
+              disabled={conferencia.pending}
+              onClick={e => { e.preventDefault(); e.stopPropagation(); conferencia.onDecidir(null) }}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 border border-slate-200 hover:bg-slate-100 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={12} />
+            </button>
+          )}
+        </div>
+      )}
       <ExternalLink size={11} className="flex-shrink-0 text-slate-300 group-hover:text-slate-500 transition-colors" />
     </a>
   )
@@ -1615,10 +1665,20 @@ function UploadAnexoInline({ pedidoId }: { pedidoId: string }) {
   )
 }
 
-function AnexosOrganizados({ pedidoId, cotacaoId, canUpload = true }: { pedidoId: string; cotacaoId?: string; canUpload?: boolean }) {
+function AnexosOrganizados({ pedidoId, cotacaoId, canUpload = true, conferencia = false }: { pedidoId: string; cotacaoId?: string; canUpload?: boolean; conferencia?: boolean }) {
   const { data: anexos, isLoading: loadingAnexos }  = useAnexosPedido(pedidoId)
   const { data: cotDocs, isLoading: loadingCot }     = useCotacaoDocs(cotacaoId)
+  const conferirAnexo = useConferirAnexo()
   const isLoading = loadingAnexos || (cotacaoId ? loadingCot : false)
+
+  const confProps = (a: PedidoAnexo): DocConferencia | undefined => conferencia
+    ? {
+        status: a.conferido ?? null,
+        por: a.conferido_por_nome,
+        pending: conferirAnexo.isPending,
+        onDecidir: (aprovado) => conferirAnexo.mutate({ anexoId: a.id, pedidoId, aprovado }),
+      }
+    : undefined
 
   if (isLoading) return <div className="flex items-center gap-2 py-2 text-xs text-slate-400"><div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />Carregando documentos...</div>
 
@@ -1639,12 +1699,12 @@ function AnexosOrganizados({ pedidoId, cotacaoId, canUpload = true }: { pedidoId
       )}
       {nfDocs.length > 0 && (
         <DocSection title="Nota Fiscal" icon={<FileText size={13} className="text-amber-500" />} color="amber" count={nfDocs.length}>
-          {nfDocs.map(a => <DocItem key={a.id} name={a.nome_arquivo} url={a.url} mime={a.mime_type} date={a.uploaded_at} origem={a.origem} />)}
+          {nfDocs.map(a => <DocItem key={a.id} name={a.nome_arquivo} url={a.url} mime={a.mime_type} date={a.uploaded_at} origem={a.origem} conferencia={confProps(a)} />)}
         </DocSection>
       )}
       {pedidoAnexos.length > 0 && (
         <DocSection title="Pedido" icon={<Package size={13} className="text-cyan-500" />} color="cyan" count={pedidoAnexos.length}>
-          {pedidoAnexos.map(a => <DocItem key={a.id} name={a.nome_arquivo} url={a.url} mime={a.mime_type} tipo={TIPO_LABEL[a.tipo]} date={a.uploaded_at} origem={a.origem} />)}
+          {pedidoAnexos.map(a => <DocItem key={a.id} name={a.nome_arquivo} url={a.url} mime={a.mime_type} tipo={TIPO_LABEL[a.tipo]} date={a.uploaded_at} origem={a.origem} conferencia={confProps(a)} />)}
         </DocSection>
       )}
       {pagamentoDocs.length > 0 && (
@@ -1987,6 +2047,15 @@ function DetailModal({
   const conferirDocs = useConferirDocsPedido()
   const [conferirErro, setConferirErro] = useState<string | null>(null)
   const docsConferidos = (pedido as any).docs_conferidos === true
+  // Conferência POR DOCUMENTO: pedido só libera quando todos os anexos
+  // conferíveis estiverem aprovados. Sem anexo nenhum, vale o aprovar geral.
+  const { data: anexosConf } = useAnexosPedido(entregue || parcial ? pedido.id : undefined)
+  const anexosConferiveis = (anexosConf ?? []).filter(a => a.tipo !== 'comprovante_pagamento')
+  const docsAprovados  = anexosConferiveis.filter(a => a.conferido === true).length
+  const docsReprovados = anexosConferiveis.filter(a => a.conferido === false).length
+  const conferenciaOk = anexosConferiveis.length === 0
+    ? docsConferidos
+    : docsAprovados === anexosConferiveis.length
   const [showDesfazer, setShowDesfazer] = useState(false)
   const [motivoDesfazer, setMotivoDesfazer] = useState('')
   const [desfazerMsg, setDesfazerMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -2503,7 +2572,7 @@ function DetailModal({
               <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1 ${sub}`}>
                 <Paperclip size={11} /> Documentos
               </p>
-              <AnexosOrganizados pedidoId={pedido.id} cotacaoId={pedido.cotacao_id} canUpload={!podeLiberar && !isLiberado && !isPago} />
+              <AnexosOrganizados pedidoId={pedido.id} cotacaoId={pedido.cotacao_id} canUpload={!podeLiberar && !isLiberado && !isPago} conferencia={podeLiberar} />
             </div>
           )}
 
@@ -2562,47 +2631,61 @@ function DetailModal({
                 <span>O recebimento é confirmado por quem está no <b>local de destino</b>{(pedido.requisicao as any)?.base_destino?.nome ? ` (${(pedido.requisicao as any).base_destino.nome})` : ''} ou no <b>CD Araxá</b>.</span>
               </div>
             )}
-            {/* Conferência dos documentos (NF/boleto) antes de liberar o pagamento */}
-            {podeLiberar && !docsConferidos && (
-              <div className={`rounded-xl border-2 p-3 space-y-2 ${dark ? 'border-sky-500/40 bg-sky-500/5' : 'border-sky-300 bg-sky-50'}`}>
-                <p className={`text-[11px] font-bold flex items-center gap-1.5 ${dark ? 'text-sky-300' : 'text-sky-700'}`}>
+            {/* Conferência dos documentos (por anexo) antes de liberar o pagamento */}
+            {podeLiberar && !conferenciaOk && (
+              <div className={`rounded-xl border-2 p-3 space-y-2 ${docsReprovados > 0 ? (dark ? 'border-red-500/40 bg-red-500/5' : 'border-red-300 bg-red-50') : (dark ? 'border-sky-500/40 bg-sky-500/5' : 'border-sky-300 bg-sky-50')}`}>
+                <p className={`text-[11px] font-bold flex items-center gap-1.5 ${docsReprovados > 0 ? (dark ? 'text-red-300' : 'text-red-700') : (dark ? 'text-sky-300' : 'text-sky-700')}`}>
                   <ShieldCheck size={13} /> Conferência de documentos
-                </p>
-                <p className={`text-[11px] ${dark ? 'text-sky-200/80' : 'text-sky-700/90'}`}>
-                  Confira a Nota Fiscal, boleto e demais anexos em <b>Documentos</b> acima. Aprovando, o pedido fica liberável para pagamento; reprovando, ele volta para a etapa anterior (Emitido).
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={async () => {
-                      setConferirErro(null)
-                      try { await conferirDocs.mutateAsync(pedido.id) } catch (e: any) { setConferirErro(e?.message ?? 'Erro ao registrar a conferência.') }
-                    }}
-                    disabled={conferirDocs.isPending}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50"
-                  >
-                    {conferirDocs.isPending
-                      ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      : <CheckCircle size={13} />}
-                    Documentos corretos
-                  </button>
-                  {podeDesfazerReceb && (
-                    <button
-                      onClick={() => { setShowDesfazer(true); setDesfazerMsg(null); if (!motivoDesfazer) setMotivoDesfazer('DOCUMENTOS REPROVADOS NA CONFERENCIA: ') }}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-300 hover:bg-red-600 hover:text-white transition-colors"
-                    >
-                      <X size={13} /> Reprovar — voltar etapa
-                    </button>
+                  {anexosConferiveis.length > 0 && (
+                    <span className="ml-auto font-extrabold">{docsAprovados}/{anexosConferiveis.length} aprovados</span>
                   )}
-                </div>
+                </p>
+                {anexosConferiveis.length > 0 ? (
+                  <p className={`text-[11px] ${docsReprovados > 0 ? (dark ? 'text-red-200/80' : 'text-red-700/90') : (dark ? 'text-sky-200/80' : 'text-sky-700/90')}`}>
+                    {docsReprovados > 0
+                      ? <>Há <b>{docsReprovados} documento(s) reprovado(s)</b> — use o "Voltar etapa" abaixo para devolver o pedido para correção (Emitido).</>
+                      : <>Aprove ou reprove cada documento (NF, boleto...) pelos botões <b>✓ / ✗</b> na seção <b>Documentos</b> acima. O pagamento só libera com todos aprovados.</>}
+                  </p>
+                ) : (
+                  <>
+                    <p className={`text-[11px] ${dark ? 'text-sky-200/80' : 'text-sky-700/90'}`}>
+                      Este pedido não tem documentos anexados. Confirme para liberar o pagamento mesmo assim, ou anexe a NF/boleto acima e confira documento a documento.
+                    </p>
+                    <button
+                      onClick={async () => {
+                        setConferirErro(null)
+                        try { await conferirDocs.mutateAsync(pedido.id) } catch (e: any) { setConferirErro(e?.message ?? 'Erro ao registrar a conferência.') }
+                      }}
+                      disabled={conferirDocs.isPending}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50"
+                    >
+                      {conferirDocs.isPending
+                        ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        : <CheckCircle size={13} />}
+                      Liberar sem documentos
+                    </button>
+                  </>
+                )}
+                {docsReprovados > 0 && podeDesfazerReceb && (
+                  <button
+                    onClick={() => { setShowDesfazer(true); setDesfazerMsg(null); if (!motivoDesfazer) setMotivoDesfazer('DOCUMENTOS REPROVADOS NA CONFERENCIA: ') }}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-300 hover:bg-red-600 hover:text-white transition-colors"
+                  >
+                    <X size={13} /> Reprovar — voltar etapa
+                  </button>
+                )}
                 {conferirErro && (
                   <p className="text-[11px] text-red-600">{conferirErro}</p>
                 )}
               </div>
             )}
-            {podeLiberar && docsConferidos && (
+            {podeLiberar && conferenciaOk && (
               <>
                 <div className={`flex items-center gap-2 text-[11px] font-semibold rounded-lg px-3 py-2 border ${dark ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' : 'text-emerald-700 border-emerald-200 bg-emerald-50'}`}>
-                  <ShieldCheck size={13} /> Documentos conferidos por {(pedido as any).docs_conferidos_por_nome ?? '—'}{(pedido as any).docs_conferidos_em ? ` em ${fmtData((pedido as any).docs_conferidos_em)}` : ''}
+                  <ShieldCheck size={13} />
+                  {anexosConferiveis.length > 0
+                    ? `${anexosConferiveis.length} documento(s) conferido(s) e aprovado(s)`
+                    : `Liberação sem documentos autorizada por ${(pedido as any).docs_conferidos_por_nome ?? '—'}${(pedido as any).docs_conferidos_em ? ` em ${fmtData((pedido as any).docs_conferidos_em)}` : ''}`}
                 </div>
                 <button onClick={() => onLiberarPagamento(pedido.id)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-600 hover:text-white transition-all">
                   <Banknote size={16} /> Liberar para Pagamento

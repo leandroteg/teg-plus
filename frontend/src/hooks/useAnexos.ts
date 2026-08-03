@@ -16,6 +16,10 @@ export interface PedidoAnexo {
   origem: 'compras' | 'financeiro'
   uploaded_at: string
   observacao: string | null
+  /** Conferência individual (mig 206): null = pendente, true = aprovado, false = reprovado */
+  conferido: boolean | null
+  conferido_por_nome: string | null
+  conferido_em: string | null
 }
 
 export interface CotacaoDoc {
@@ -54,6 +58,32 @@ export function useAnexosPedido(pedidoId: string | undefined) {
     // gravados por integrações externas (n8n) — 120s basta.
     refetchInterval: 120_000,
     refetchOnWindowFocus: false,
+  })
+}
+
+// ── Conferência individual do anexo (NF aprova/reprova, Boleto aprova/reprova) ──
+export function useConferirAnexo() {
+  const qc = useQueryClient()
+  const { perfil } = useAuth()
+  return useMutation({
+    mutationFn: async ({ anexoId, pedidoId, aprovado }: { anexoId: string; pedidoId: string; aprovado: boolean | null }) => {
+      const { data, error } = await supabase
+        .from('cmp_pedidos_anexos')
+        .update({
+          conferido: aprovado,
+          conferido_por_nome: aprovado === null ? null : perfil?.nome ?? null,
+          conferido_em: aprovado === null ? null : new Date().toISOString(),
+        })
+        .eq('id', anexoId)
+        .select('id')
+      if (error) throw error
+      // RLS sem match = 0 linhas sem erro — não deixa passar como sucesso
+      if (!data?.length) throw new Error('Sem permissão para conferir este documento.')
+    },
+    onSuccess: (_d, { pedidoId }) => {
+      qc.invalidateQueries({ queryKey: ['pedido-anexos', pedidoId] })
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
+    },
   })
 }
 
