@@ -16,7 +16,10 @@ import { UpperInput, UpperTextarea } from './UpperInput'
 type ModalCotacao = {
   id?: string
   fornecedorNome?: string
+  /** Total entregue da proposta (produtos + frete − desconto) */
   valorTotal?: number
+  valorFrete?: number
+  valorDesconto?: number
   compradorId?: string
   condicaoPagamento?: string
   empresaId?: string | null
@@ -77,6 +80,8 @@ interface EmitirPedidoModalProps {
     fornecedorId?: string
     fornecedorNome: string
     valorTotal: number
+    valorFrete?: number
+    valorDesconto?: number
     compradorId?: string
     centroCustoId?: string
     centroCusto?: string
@@ -157,7 +162,7 @@ export default function EmitirPedidoModal({
         // Detecta split: mais de 1 fornecedor com selecionado=true
         const { data: selecionados } = await supabase
           .from('cmp_cotacao_fornecedores')
-          .select('id, fornecedor_nome, valor_total, itens_precos')
+          .select('id, fornecedor_nome, valor_total, itens_precos, valor_frete, valor_desconto')
           .eq('cotacao_id', cotacaoId)
           .eq('selecionado', true)
         fornecedoresEscolhidos = (selecionados ?? []).map(s => {
@@ -207,10 +212,17 @@ export default function EmitirPedidoModal({
           }
         }
 
+        // Frete/desconto negociados na cotação (proposta vencedora) — servem de
+        // ponto de partida no modal e podem ser ajustados no fechamento.
+        const propostaVencedora = (selecionados ?? []).find(s => s.id === cotacaoData.fornecedor_selecionado_id)
+          ?? (selecionados ?? [])[0]
+
         return {
           id: cotacaoData.id,
           fornecedorNome: cotacao?.fornecedorNome ?? cotacaoData.fornecedor_selecionado_nome ?? undefined,
           valorTotal: cotacao?.valorTotal ?? cotacaoData.valor_selecionado ?? undefined,
+          valorFrete: Number((propostaVencedora as any)?.valor_frete) || 0,
+          valorDesconto: Number((propostaVencedora as any)?.valor_desconto) || 0,
           compradorId: cotacao?.compradorId ?? cotacaoData.comprador_id ?? undefined,
           empresaId: cotacao?.empresaId ?? (cotacaoData as any).empresa_id ?? undefined,
           condicaoPagamento,
@@ -265,6 +277,8 @@ export default function EmitirPedidoModal({
   const [adiantamentoData, setAdiantamentoData] = useState('')
   const [parcelasEditaveis, setParcelasEditaveis] = useState<ParcelaEditavel[]>([])
   const [parcelasEditadasManualmente, setParcelasEditadasManualmente] = useState(false)
+  const [valorFrete, setValorFrete] = useState(0)
+  const [valorDesconto, setValorDesconto] = useState(0)
   const [naoSolicitarContrato, setNaoSolicitarContrato] = useState(false)
   const [justNaoContrato, setJustNaoContrato] = useState('')
   const [bancoBancoNome, setBancoBancoNome] = useState('')
@@ -288,6 +302,15 @@ export default function EmitirPedidoModal({
     if (!open) return
     setEmpresaId(empresaCotacaoId || empresaMatrizId)
   }, [open, empresaMatrizId, empresaCotacaoId])
+
+  // Semeia frete/desconto com o que foi negociado na cotação
+  const freteCotacao = cotacaoResolvida?.valorFrete ?? 0
+  const descontoCotacao = cotacaoResolvida?.valorDesconto ?? 0
+  useEffect(() => {
+    if (!open) return
+    setValorFrete(freteCotacao)
+    setValorDesconto(descontoCotacao)
+  }, [open, cotacaoResolvida?.id, freteCotacao, descontoCotacao])
 
   useEffect(() => {
     if (!open || !requisicao) return
@@ -329,7 +352,14 @@ export default function EmitirPedidoModal({
   const cartaoSelecionado = cartoes.find((cartao) => cartao.id === cartaoId)
   const bankingIncomplete = !!fornecedorDB && !fornecedorDB.boleto && !fornecedorDB.cartao && !fornecedorDB.pix_chave && (!fornecedorDB.banco_nome || !fornecedorDB.conta)
   const bankingProvided = bancoBoleto || bancoCartao || bancoPix.trim() || (bancoBancoNome.trim() && bancoConta.trim())
-  const valorTotal = cotacaoResolvida?.valorTotal ?? 0
+  // Frete/desconto vêm da proposta vencedora e podem ser renegociados aqui no
+  // fechamento. O total do pedido é sempre produtos + frete − desconto.
+  const valorLiquidoCotacao = cotacaoResolvida?.valorTotal ?? 0
+  const subtotalProdutos = Math.round(
+    (valorLiquidoCotacao - (cotacaoResolvida?.valorFrete ?? 0) + (cotacaoResolvida?.valorDesconto ?? 0)) * 100,
+  ) / 100
+  const valorTotal = Math.max(0, Math.round((subtotalProdutos + valorFrete - valorDesconto) * 100) / 100)
+  const descontoInvalido = valorDesconto > 0 && valorDesconto >= subtotalProdutos + valorFrete
   // fluxo efetivo: contrato OU dispensado pelo comprador
   const fluxoContrato = !!compraRecorrente && !naoSolicitarContrato
   const valorAdiantamento = Math.round((Number(adiantamentoValor || 0) || 0) * 100) / 100
@@ -371,7 +401,7 @@ export default function EmitirPedidoModal({
   useEffect(() => {
     if (!open) return
     setParcelasEditadasManualmente(false)
-  }, [open, temAdiantamento, adiantamentoValor, adiantamentoData, numParcelas])
+  }, [open, temAdiantamento, adiantamentoValor, adiantamentoData, numParcelas, valorFrete, valorDesconto])
 
   const totalParcelas = useMemo(
     () => parcelasEditaveis.reduce((sum, parcela) => sum + (Number(parcela.valor) || 0), 0),
@@ -454,6 +484,8 @@ export default function EmitirPedidoModal({
       fornecedorId: fornecedorDB?.id || undefined,
       fornecedorNome: cotacaoResolvida?.fornecedorNome || 'N/A',
       valorTotal: totalParcelas,
+      valorFrete,
+      valorDesconto,
       compradorId: cotacaoResolvida?.compradorId,
       centroCustoId: centroSelecionado?.id,
       centroCusto: centroSelecionado?.codigo,
@@ -569,6 +601,45 @@ export default function EmitirPedidoModal({
                     {valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
                 </div>
+              </div>
+
+              {/* Frete e desconto: herdados da proposta vencedora, ajustáveis se
+                  o comprador renegociar no fechamento. Total = produtos + frete − desconto. */}
+              <div className="rounded-2xl border border-slate-200 px-4 py-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-semibold text-slate-500">Produtos</p>
+                  <p className="text-sm font-semibold text-slate-700">
+                    {subtotalProdutos.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-500">Frete (R$)</label>
+                    <NumericInput
+                      min={0} step={0.01}
+                      className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-right focus:ring-2 focus:ring-teal-300 outline-none"
+                      value={valorFrete}
+                      onChange={setValorFrete}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-500">Desconto (R$)</label>
+                    <NumericInput
+                      min={0} step={0.01}
+                      className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-right focus:ring-2 focus:ring-teal-300 outline-none"
+                      value={valorDesconto}
+                      onChange={setValorDesconto}
+                    />
+                  </div>
+                </div>
+                {descontoInvalido && (
+                  <p className="text-[11px] text-red-600">Desconto maior ou igual ao total — confira o valor.</p>
+                )}
+                {(valorFrete !== freteCotacao || valorDesconto !== descontoCotacao) && (
+                  <p className="text-[11px] text-amber-600">
+                    Diferente da cotação (frete {freteCotacao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} · desconto {descontoCotacao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}) — o pedido sai com os valores acima.
+                  </p>
+                )}
               </div>
 
               {/* Banner: compra recorrente / serviço exige contrato */}
@@ -1119,6 +1190,7 @@ export default function EmitirPedidoModal({
               !requisicao ||
               !cotacaoResolvida?.id ||
               (naoSolicitarContrato && !justNaoContrato.trim()) ||
+              descontoInvalido ||
               (!fluxoContrato && (
                 !formaPagamento ||
                 (formaPagamento === 'cartao' && !cartaoId) ||

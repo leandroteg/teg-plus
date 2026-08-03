@@ -203,6 +203,9 @@ export interface EmitirPedidoPayload {
   fornecedorId?: string
   fornecedorNome: string
   valorTotal: number
+  /** Frete/desconto confirmados no fechamento (default = os da proposta vencedora) */
+  valorFrete?: number
+  valorDesconto?: number
   compradorId?: string
   condicaoPagamento?: string
   formaPagamento?: 'pix' | 'cartao' | 'boleto' | 'transferencia'
@@ -314,6 +317,8 @@ export function useEmitirPedido() {
         centroCustoId,
         empresaId,
         parcelasPreview,
+        valorFrete,
+        valorDesconto,
       } = payload
 
       if (!cotacaoId) {
@@ -433,6 +438,8 @@ export function useEmitirPedido() {
           centro_custo_id: centroCustoId || null,
           empresa_id: empresaId || null,
           parcelas_preview: parcelasResolvidas,
+          ...(valorFrete !== undefined ? { valor_frete: valorFrete } : {}),
+          ...(valorDesconto !== undefined ? { valor_desconto: valorDesconto } : {}),
         })
         .select('id, numero_pedido')
         .single()
@@ -471,8 +478,10 @@ export function useEmitirPedido() {
           cotFor = cotForSel
         }
 
-        // Frete/desconto da proposta vencedora → quadro Subtotal/Frete/Desconto do PDF
-        if (Number(cotFor?.valor_frete) > 0 || Number(cotFor?.valor_desconto) > 0) {
+        // Frete/desconto da proposta vencedora → quadro Subtotal/Frete/Desconto
+        // do PDF. Só entra se o modal não tiver mandado os valores confirmados.
+        if (valorFrete === undefined && valorDesconto === undefined
+          && (Number(cotFor?.valor_frete) > 0 || Number(cotFor?.valor_desconto) > 0)) {
           await supabase
             .from('cmp_pedidos')
             .update({

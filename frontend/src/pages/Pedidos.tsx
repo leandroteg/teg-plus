@@ -2544,6 +2544,34 @@ function DetailModal({
             )
           })()}
 
+          {/* Quadro Produtos / Frete / Desconto — só quando houve negociação */}
+          {(Number((pedido as any).valor_frete) > 0 || Number((pedido as any).valor_desconto) > 0) && (
+            <div className={`rounded-xl border px-3 py-2.5 space-y-1 ${brd}`}>
+              <div className="flex items-center justify-between text-xs">
+                <span className={sub}>Produtos</span>
+                <span className={txt}>
+                  {fmt((pedido.valor_total ?? 0) - (Number((pedido as any).valor_frete) || 0) + (Number((pedido as any).valor_desconto) || 0))}
+                </span>
+              </div>
+              {Number((pedido as any).valor_frete) > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className={sub}>Frete</span>
+                  <span className={txt}>{fmt(Number((pedido as any).valor_frete))}</span>
+                </div>
+              )}
+              {Number((pedido as any).valor_desconto) > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-emerald-600 font-semibold">Desconto</span>
+                  <span className="text-emerald-600 font-semibold">− {fmt(Number((pedido as any).valor_desconto))}</span>
+                </div>
+              )}
+              <div className={`flex items-center justify-between pt-1 border-t ${dark ? 'border-white/10' : 'border-slate-200'}`}>
+                <span className={`text-[11px] font-bold ${sub}`}>Total do Pedido</span>
+                <span className={`text-sm font-extrabold ${txt}`}>{fmt(pedido.valor_total ?? 0)}</span>
+              </div>
+            </div>
+          )}
+
           {/* Impostos (NF de Produto + NFS-e conforme natureza dos itens) */}
           {!pending && (pedido.requisicao?.itens ?? []).length > 0 && (() => {
             const todos = pedido.requisicao!.itens!
