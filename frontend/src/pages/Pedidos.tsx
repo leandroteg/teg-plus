@@ -22,6 +22,7 @@ import {
   useLiberarPagamento,
   useEmitirPedido,
   useDesfazerRecebimento,
+  useConferirDocsPedido,
   type ImpostoPayload,
 } from '../hooks/usePedidos'
 import { useCadFornecedores } from '../hooks/useCadastros'
@@ -1983,6 +1984,9 @@ function DetailModal({
   // Voltar etapa: desfaz o recebimento (Entregue/Parcial -> Emitido) p/ correcao.
   // Admin/comprador, motivo obrigatorio; bloqueado se pagamento ja liberado/pago.
   const desfazerRecebimento = useDesfazerRecebimento()
+  const conferirDocs = useConferirDocsPedido()
+  const [conferirErro, setConferirErro] = useState<string | null>(null)
+  const docsConferidos = (pedido as any).docs_conferidos === true
   const [showDesfazer, setShowDesfazer] = useState(false)
   const [motivoDesfazer, setMotivoDesfazer] = useState('')
   const [desfazerMsg, setDesfazerMsg] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -2558,10 +2562,52 @@ function DetailModal({
                 <span>O recebimento é confirmado por quem está no <b>local de destino</b>{(pedido.requisicao as any)?.base_destino?.nome ? ` (${(pedido.requisicao as any).base_destino.nome})` : ''} ou no <b>CD Araxá</b>.</span>
               </div>
             )}
-            {podeLiberar && (
-              <button onClick={() => onLiberarPagamento(pedido.id)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-600 hover:text-white transition-all">
-                <Banknote size={16} /> Liberar para Pagamento
-              </button>
+            {/* Conferência dos documentos (NF/boleto) antes de liberar o pagamento */}
+            {podeLiberar && !docsConferidos && (
+              <div className={`rounded-xl border-2 p-3 space-y-2 ${dark ? 'border-sky-500/40 bg-sky-500/5' : 'border-sky-300 bg-sky-50'}`}>
+                <p className={`text-[11px] font-bold flex items-center gap-1.5 ${dark ? 'text-sky-300' : 'text-sky-700'}`}>
+                  <ShieldCheck size={13} /> Conferência de documentos
+                </p>
+                <p className={`text-[11px] ${dark ? 'text-sky-200/80' : 'text-sky-700/90'}`}>
+                  Confira a Nota Fiscal, boleto e demais anexos em <b>Documentos</b> acima. Aprovando, o pedido fica liberável para pagamento; reprovando, ele volta para a etapa anterior (Emitido).
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      setConferirErro(null)
+                      try { await conferirDocs.mutateAsync(pedido.id) } catch (e: any) { setConferirErro(e?.message ?? 'Erro ao registrar a conferência.') }
+                    }}
+                    disabled={conferirDocs.isPending}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50"
+                  >
+                    {conferirDocs.isPending
+                      ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      : <CheckCircle size={13} />}
+                    Documentos corretos
+                  </button>
+                  {podeDesfazerReceb && (
+                    <button
+                      onClick={() => { setShowDesfazer(true); setDesfazerMsg(null); if (!motivoDesfazer) setMotivoDesfazer('DOCUMENTOS REPROVADOS NA CONFERENCIA: ') }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-300 hover:bg-red-600 hover:text-white transition-colors"
+                    >
+                      <X size={13} /> Reprovar — voltar etapa
+                    </button>
+                  )}
+                </div>
+                {conferirErro && (
+                  <p className="text-[11px] text-red-600">{conferirErro}</p>
+                )}
+              </div>
+            )}
+            {podeLiberar && docsConferidos && (
+              <>
+                <div className={`flex items-center gap-2 text-[11px] font-semibold rounded-lg px-3 py-2 border ${dark ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' : 'text-emerald-700 border-emerald-200 bg-emerald-50'}`}>
+                  <ShieldCheck size={13} /> Documentos conferidos por {(pedido as any).docs_conferidos_por_nome ?? '—'}{(pedido as any).docs_conferidos_em ? ` em ${fmtData((pedido as any).docs_conferidos_em)}` : ''}
+                </div>
+                <button onClick={() => onLiberarPagamento(pedido.id)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-600 hover:text-white transition-all">
+                  <Banknote size={16} /> Liberar para Pagamento
+                </button>
+              </>
             )}
             {entregue && !podeLiberar && !isLiberado && !isPago && (
               <div className="flex items-center gap-2 text-emerald-500 text-xs font-semibold"><CheckCircle size={14} /> Entrega confirmada {pedido.data_entrega_real ? `em ${fmtData(pedido.data_entrega_real)}` : ''}</div>

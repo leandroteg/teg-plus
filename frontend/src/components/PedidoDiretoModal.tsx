@@ -771,10 +771,10 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
                 </div>
               ))}
             </div>
-            {subtotal > 0 && (
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center justify-between gap-3">
-                  <label className="text-[10px] text-slate-400 font-semibold">Desconto (R$)</label>
+            {/* Desconto sempre visível — antes só aparecia com item valorado, e ninguém achava o campo */}
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-[10px] text-slate-400 font-semibold">Desconto (R$)</label>
                   <div className="relative w-36">
                     <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">R$</span>
                     <NumericInput
@@ -795,7 +795,6 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
                   <span className="text-sm font-extrabold text-orange-600">{fmt(total)}</span>
                 </div>
               </div>
-            )}
           </div>
 
           {/* Justificativa (obrigatória) */}
