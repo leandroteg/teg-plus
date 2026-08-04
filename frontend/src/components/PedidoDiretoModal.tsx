@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { X, PlusCircle, Trash2, Loader2, AlertTriangle, ShoppingCart, Search, UserPlus, CheckCircle2, Landmark } from 'lucide-react'
 import { useEmitirPedidoDireto, useEditarPedidoDireto, type TipoPedidoDireto } from '../hooks/usePedidos'
 import { useCadFornecedores, useCadClasses, useSalvarFornecedor } from '../hooks/useCadastros'
@@ -12,9 +12,9 @@ import { toUpperNorm } from './UpperInput'
 type FormaPagamentoPedido = 'pix' | 'cartao' | 'boleto' | 'transferencia'
 const FORMA_PAGAMENTO_OPTIONS: Array<{ value: FormaPagamentoPedido; label: string }> = [
   { value: 'pix', label: 'Pix' },
-  { value: 'cartao', label: 'CartÃ£o' },
+  { value: 'cartao', label: 'Cartão' },
   { value: 'boleto', label: 'Boleto' },
-  { value: 'transferencia', label: 'TransferÃªncia' },
+  { value: 'transferencia', label: 'Transferência' },
 ]
 
 const soDigitos = (s: string) => s.replace(/\D/g, '')
@@ -38,33 +38,33 @@ interface ItemDireto {
 
 const emptyItem = (): ItemDireto => ({ descricao: '', quantidade: 1, unidade: 'un', valor_unitario: 0 })
 
-const UNIDADES = ['un', 'par', 'jg', 'kg', 'ton', 'm', 'mÂ²', 'mÂ³', 'L', 'pc', 'cx', 'rl', 'hr', 'vb', 'sc']
+const UNIDADES = ['un', 'par', 'jg', 'kg', 'ton', 'm', 'm²', 'm³', 'L', 'pc', 'cx', 'rl', 'hr', 'vb', 'sc']
 
 interface Props {
   open: boolean
   onClose: () => void
   onSuccess?: (numeroPedido: string) => void
-  /** Modo ediÃ§Ã£o: pedido extraordinÃ¡rio jÃ¡ emitido. Todos os campos editÃ¡veis, exceto fornecedor. */
+  /** Modo edição: pedido extraordinário já emitido. Todos os campos editáveis, exceto fornecedor. */
   pedido?: any
   /** Mesmos campos, naturezas diferentes: compra emergencial x pagamento antecipado. */
   tipo?: TipoPedidoDireto
 }
 
-/** SÃ³ muda o texto â€” a mecÃ¢nica do pedido sem cotaÃ§Ã£o Ã© idÃªntica nos dois casos. */
+/** Só muda o texto — a mecânica do pedido sem cotação é idêntica nos dois casos. */
 const TEXTOS: Record<TipoPedidoDireto, {
   titulo: string; subtitulo: string; labelJustificativa: string; placeholderJustificativa: string
 }> = {
   extraordinario: {
     titulo: 'Pedido Direto',
-    subtitulo: 'Sem RequisiÃ§Ã£o nem CotaÃ§Ã£o',
-    labelJustificativa: 'Justificativa para dispensa de RC/CotaÃ§Ã£o *',
-    placeholderJustificativa: 'Ex: COMPRA DE EMERGÃŠNCIA, FORNECEDOR ÃšNICO, VALOR ABAIXO DO LIMITE...',
+    subtitulo: 'Sem Requisição nem Cotação',
+    labelJustificativa: 'Justificativa para dispensa de RC/Cotação *',
+    placeholderJustificativa: 'Ex: COMPRA DE EMERGÊNCIA, FORNECEDOR ÚNICO, VALOR ABAIXO DO LIMITE...',
   },
   adiantamento_fornecedor: {
     titulo: 'Adiantamento a Fornecedor',
-    subtitulo: 'Pagamento antecipado, sem RequisiÃ§Ã£o nem CotaÃ§Ã£o',
+    subtitulo: 'Pagamento antecipado, sem Requisição nem Cotação',
     labelJustificativa: 'Justificativa do adiantamento *',
-    placeholderJustificativa: 'Ex: SINAL DE 50% EXIGIDO PELO FORNECEDOR, PAGAMENTO ANTECIPADO PARA INÃCIO DA FABRICAÃ‡ÃƒO...',
+    placeholderJustificativa: 'Ex: SINAL DE 50% EXIGIDO PELO FORNECEDOR, PAGAMENTO ANTECIPADO PARA INÍCIO DA FABRICAÇÃO...',
   },
 }
 
@@ -73,7 +73,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   const emitir = useEmitirPedidoDireto()
   const editar = useEditarPedidoDireto()
   const editMode = !!pedido
-  // Na ediÃ§Ã£o manda o que estÃ¡ gravado; na criaÃ§Ã£o, o atalho que abriu o modal.
+  // Na edição manda o que está gravado; na criação, o atalho que abriu o modal.
   const tipoPedido: TipoPedidoDireto = (pedido?.tipo_pedido as TipoPedidoDireto) || tipo || 'extraordinario'
   const txt = TEXTOS[tipoPedido] ?? TEXTOS.extraordinario
 
@@ -99,9 +99,9 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   const [condicaoPagamento, setCondicaoPagamento] = useState('')
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoPedido | ''>('')
   const [cartaoId, setCartaoId] = useState('')
-  // Dados bancÃ¡rios/PIX do fornecedor â€” preenchidos aqui quando o cadastro nÃ£o
+  // Dados bancários/PIX do fornecedor — preenchidos aqui quando o cadastro não
   // tem, e salvos de volta em cmp_fornecedores no submit (mesmo fluxo do
-  // EmitirPedidoModal). Boleto/cartÃ£o dispensam dados bancÃ¡rios.
+  // EmitirPedidoModal). Boleto/cartão dispensam dados bancários.
   const [bancoBoleto, setBancoBoleto] = useState(false)
   const [bancoCartao, setBancoCartao] = useState(false)
   const [bancoPix, setBancoPix] = useState('')
@@ -110,8 +110,8 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   const [bancoAgencia, setBancoAgencia] = useState('')
   const [bancoConta, setBancoConta] = useState('')
   const [dataPrevistaEntrega, setDataPrevistaEntrega] = useState('')
-  // Vencimento explÃ­cito (boleto com data fechada). Preenchido, manda na frente
-  // da condiÃ§Ã£o de pagamento e gera uma Ãºnica parcela nessa data.
+  // Vencimento explícito (boleto com data fechada). Preenchido, manda na frente
+  // da condição de pagamento e gera uma única parcela nessa data.
   const [dataVencimento, setDataVencimento] = useState('')
   const [valorDesconto, setValorDesconto] = useState(0)
   const [justificativa, setJustificativa] = useState('')
@@ -119,7 +119,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   const [itens, setItens] = useState<ItemDireto[]>([emptyItem()])
   const [erro, setErro] = useState<string | null>(null)
 
-  // Empresa emitente. Default = Matriz (EMP-001), editÃ¡vel.
+  // Empresa emitente. Default = Matriz (EMP-001), editável.
   const empresaMatrizId = useMemo(() => {
     if (empresas.length === 0) return ''
     return empresas.find(e => e.codigo === 'EMP-001')?.id ?? empresas[0].id
@@ -129,7 +129,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
     if (open && !editMode) setEmpresaId(empresaMatrizId)
   }, [open, editMode, empresaMatrizId])
 
-  // Modo ediÃ§Ã£o: preenche o form com os dados do pedido emitido
+  // Modo edição: preenche o form com os dados do pedido emitido
   useEffect(() => {
     if (!open || !pedido) return
     setFornecedorNome(pedido.fornecedor_nome ?? '')
@@ -142,7 +142,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
     setJustificativa(pedido.justificativa_sem_cotacao ?? '')
     setObservacoes(pedido.observacoes ?? '')
     setItens(pedido.itens_direto?.length ? pedido.itens_direto.map((i: any) => ({ ...i })) : [emptyItem()])
-    // Forma de pagamento/cartÃ£o vivem na parcela do Contas a Pagar
+    // Forma de pagamento/cartão vivem na parcela do Contas a Pagar
     supabase
       .from('fin_contas_pagar')
       .select('forma_pagamento, cartao_id, data_vencimento')
@@ -153,15 +153,15 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
         const primeira = data?.[0]
         setFormaPagamento((primeira?.forma_pagamento as FormaPagamentoPedido) ?? '')
         setCartaoId(primeira?.cartao_id ?? '')
-        // SÃ³ reexibe como vencimento explÃ­cito quando Ã© parcela Ãºnica sem condiÃ§Ã£o
-        // â€” com condiÃ§Ã£o preenchida, quem manda continua sendo ela.
+        // Só reexibe como vencimento explícito quando é parcela única sem condição
+        // — com condição preenchida, quem manda continua sendo ela.
         const semCondicao = !(pedido.condicao_pagamento ?? '').trim()
         setDataVencimento(semCondicao && data?.length === 1 ? (primeira?.data_vencimento ?? '') : '')
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, pedido?.id])
 
-  // Modo ediÃ§Ã£o: resolve a obra a partir do centro de custo gravado no pedido
+  // Modo edição: resolve a obra a partir do centro de custo gravado no pedido
   useEffect(() => {
     if (!open || !pedido?.centro_custo_id || obras.length === 0) return
     const o = obras.find((x: any) => x.centro_custo_id === pedido.centro_custo_id)
@@ -190,7 +190,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
     setItens(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
   }
 
-  // Busca por nome (fantasia/razÃ£o) ou CNPJ (compara sÃ³ dÃ­gitos)
+  // Busca por nome (fantasia/razão) ou CNPJ (compara só dígitos)
   const buscaDigitos = soDigitos(fornecedorBusca)
   const fornecedoresFiltrados = fornecedores
     .filter(f => {
@@ -204,14 +204,14 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
 
   const fornecedorSel = fornecedores.find(f => f.id === fornecedorId)
   const fSel = fornecedorSel as any
-  // Cadastro sem nenhum meio de recebimento conhecido â†’ oferece completar aqui
+  // Cadastro sem nenhum meio de recebimento conhecido → oferece completar aqui
   const bankingIncomplete = !!fornecedorSel && !fSel?.boleto && !fSel?.cartao && !fSel?.pix_chave && (!fSel?.banco_nome || !fSel?.conta)
-  // ...mas o cadastro pode ter UM meio e o pedido sair por OUTRO: fornecedor sÃ³
-  // com boleto e pagamento por Pix precisa da chave aqui (antes nÃ£o havia onde digitar).
+  // ...mas o cadastro pode ter UM meio e o pedido sair por OUTRO: fornecedor só
+  // com boleto e pagamento por Pix precisa da chave aqui (antes não havia onde digitar).
   const faltaPix = formaPagamento === 'pix' && !fSel?.pix_chave
   const faltaBanco = formaPagamento === 'transferencia' && (!fSel?.banco_nome || !fSel?.conta)
   const mostrarDadosPagamento = !!fornecedorSel && (bankingIncomplete || faltaPix || faltaBanco)
-  // Boleto/cartÃ£o nÃ£o usam PIX nem conta â€” trava os campos sÃ³ nesses casos.
+  // Boleto/cartão não usam PIX nem conta — trava os campos só nesses casos.
   const dispensaDadosBanco = formaPagamento === 'boleto' || formaPagamento === 'cartao'
     || (!formaPagamento && (bancoBoleto || bancoCartao))
   const bankingProvided = bancoBoleto || bancoCartao || bancoPix.trim() !== '' || (bancoBancoNome.trim() !== '' && bancoConta.trim() !== '')
@@ -223,7 +223,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
     setFornecedorBusca('')
     setFornecedorDropdown(false)
     setShowNovoFornecedor(false)
-    // Infere o meio de pagamento pelo cadastro e semeia os dados bancÃ¡rios
+    // Infere o meio de pagamento pelo cadastro e semeia os dados bancários
     setFormaPagamento(f?.cartao ? 'cartao' : f?.boleto ? 'boleto' : f?.pix_chave ? 'pix' : (f?.banco_nome && f?.conta) ? 'transferencia' : '')
     setBancoBoleto(Boolean(f?.boleto))
     setBancoCartao(Boolean(f?.cartao))
@@ -262,14 +262,14 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
 
   async function handleCadastrarFornecedor() {
     setErro(null)
-    if (!novoForn.razao_social.trim()) return setErro('Informe a razÃ£o social do novo fornecedor.')
+    if (!novoForn.razao_social.trim()) return setErro('Informe a razão social do novo fornecedor.')
     const cnpjDig = soDigitos(novoForn.cnpj)
     if (cnpjDig) {
       const existente = fornecedores.find(f => soDigitos(f.cnpj ?? '') === cnpjDig)
       if (existente) {
-        // CNPJ jÃ¡ cadastrado â€” seleciona o existente em vez de duplicar
+        // CNPJ já cadastrado — seleciona o existente em vez de duplicar
         selecionarFornecedor(existente.id)
-        setErro(`CNPJ jÃ¡ cadastrado para "${existente.nome_fantasia || existente.razao_social}" â€” fornecedor selecionado.`)
+        setErro(`CNPJ já cadastrado para "${existente.nome_fantasia || existente.razao_social}" — fornecedor selecionado.`)
         return
       }
     }
@@ -294,13 +294,13 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   async function handleSubmit() {
     setErro(null)
     if (!fornecedorNome.trim()) return setErro('Informe o fornecedor.')
-    if (itens.every(i => !i.descricao.trim())) return setErro('Adicione ao menos 1 item com descriÃ§Ã£o.')
+    if (itens.every(i => !i.descricao.trim())) return setErro('Adicione ao menos 1 item com descrição.')
     if (!justificativa.trim()) return setErro(
       tipoPedido === 'adiantamento_fornecedor'
         ? 'Informe a justificativa do adiantamento.'
-        : 'Informe a justificativa para dispensar RequisiÃ§Ã£o/CotaÃ§Ã£o.'
+        : 'Informe a justificativa para dispensar Requisição/Cotação.'
     )
-    if (formaPagamento === 'cartao' && !cartaoId) return setErro('Selecione qual cartÃ£o corporativo serÃ¡ usado.')
+    if (formaPagamento === 'cartao' && !cartaoId) return setErro('Selecione qual cartão corporativo será usado.')
 
     const itensFiltrados = itens.filter(i => i.descricao.trim())
 
@@ -328,13 +328,13 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
         onSuccess?.(pedido.numero_pedido)
         onClose()
       } catch (e) {
-        setErro((e as Error).message || 'Erro ao salvar alteraÃ§Ãµes.')
+        setErro((e as Error).message || 'Erro ao salvar alterações.')
       }
       return
     }
 
     try {
-      // Completou dados bancÃ¡rios/PIX de fornecedor que nÃ£o tinha â†’ salva no cadastro
+      // Completou dados bancários/PIX de fornecedor que não tinha → salva no cadastro
       if (fornecedorId && mostrarDadosPagamento && bankingProvided) {
         await supabase.from('cmp_fornecedores').update({
           boleto: bancoBoleto,
@@ -389,7 +389,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
             </div>
             <div>
               <h2 className="text-sm font-extrabold text-slate-800">{editMode ? `Editar ${pedido?.numero_pedido ?? txt.titulo}` : txt.titulo}</h2>
-              <p className="text-[11px] text-slate-400">{editMode ? 'Todos os campos editÃ¡veis, exceto o fornecedor' : txt.subtitulo}</p>
+              <p className="text-[11px] text-slate-400">{editMode ? 'Todos os campos editáveis, exceto o fornecedor' : txt.subtitulo}</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
@@ -402,11 +402,11 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
           <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
             <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-700">
-              Este pedido serÃ¡ marcado como <strong>Sem CotaÃ§Ã£o</strong> e ficarÃ¡ visÃ­vel nos relatÃ³rios de compras sem processo formal.
+              Este pedido será marcado como <strong>Sem Cotação</strong> e ficará visível nos relatórios de compras sem processo formal.
             </p>
           </div>
 
-          {/* Fornecedor: busca por nome/CNPJ + cadastro rÃ¡pido */}
+          {/* Fornecedor: busca por nome/CNPJ + cadastro rápido */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-600">Fornecedor *</label>
 
@@ -417,7 +417,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                     <CheckCircle2 size={14} className="shrink-0 text-slate-400" />
                     {fornecedorSel?.nome_fantasia || fornecedorSel?.razao_social || fornecedorNome}
                   </p>
-                  <p className="text-[11px] text-slate-400 ml-5">Fornecedor nÃ£o pode ser alterado â€” cancele o pedido se precisar trocar.</p>
+                  <p className="text-[11px] text-slate-400 ml-5">Fornecedor não pode ser alterado — cancele o pedido se precisar trocar.</p>
                 </div>
               </div>
             ) : fornecedorId && fornecedorSel ? (
@@ -481,7 +481,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                 </p>
                 <input
                   className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm uppercase bg-white focus:ring-2 focus:ring-orange-300 outline-none"
-                  placeholder="RazÃ£o social *"
+                  placeholder="Razão social *"
                   value={novoForn.razao_social}
                   onChange={e => setNovoForn(p => ({ ...p, razao_social: e.target.value.toUpperCase() }))}
                 />
@@ -538,7 +538,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
 
             {!editMode && !fornecedorId && !showNovoFornecedor && fornecedorNome.trim() && (
               <p className="text-[11px] text-slate-400">
-                Sem cadastro selecionado â€” o pedido sairÃ¡ com o nome digitado: <strong>{fornecedorNome}</strong>
+                Sem cadastro selecionado — o pedido sairá com o nome digitado: <strong>{fornecedorNome}</strong>
               </p>
             )}
           </div>
@@ -554,11 +554,11 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
               {empresas.length === 0 && <option value="">Carregando empresas...</option>}
               {empresas.map(emp => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.nome_fantasia || emp.razao_social}{emp.cnpjs?.[0] ? ` â€¢ ${emp.cnpjs[0]}` : ''}
+                  {emp.nome_fantasia || emp.razao_social}{emp.cnpjs?.[0] ? ` • ${emp.cnpjs[0]}` : ''}
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-[11px] text-slate-400">Pessoa jurÃ­dica que emite o pedido. PadrÃ£o: Matriz.</p>
+            <p className="mt-1 text-[11px] text-slate-400">Pessoa jurídica que emite o pedido. Padrão: Matriz.</p>
           </div>
 
           {/* Obra */}
@@ -576,16 +576,16 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
             </select>
           </div>
 
-          {/* Natureza OrÃ§amentÃ¡ria Financeira */}
+          {/* Natureza Orçamentária Financeira */}
           <div>
-            <label className="text-xs font-bold text-slate-600">Natureza OrÃ§amentÃ¡ria Financeira</label>
+            <label className="text-xs font-bold text-slate-600">Natureza Orçamentária Financeira</label>
             <div className="relative mt-1">
               <input
                 value={classeId ? `${classeSel?.codigo} - ${classeSel?.descricao}` : classeBusca}
                 onChange={e => { setClasseBusca(e.target.value); setClasseId(''); setClasseDropdown(true) }}
                 onFocus={() => setClasseDropdown(true)}
                 onBlur={() => setTimeout(() => setClasseDropdown(false), 150)}
-                placeholder="Buscar por cÃ³digo ou descriÃ§Ã£o..."
+                placeholder="Buscar por código ou descrição..."
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-orange-300 outline-none"
               />
               {classeDropdown && classesFiltradas.length > 0 && (
@@ -603,7 +603,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                   ))}
                   {classesMatches.length > classesFiltradas.length && (
                     <div className="px-3 py-2 text-[11px] text-slate-400 border-t border-slate-100 bg-slate-50">
-                      Mostrando {classesFiltradas.length} de {classesMatches.length} â€” digite para filtrar
+                      Mostrando {classesFiltradas.length} de {classesMatches.length} — digite para filtrar
                     </div>
                   )}
                 </div>
@@ -611,7 +611,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
             </div>
           </div>
 
-          {/* CondiÃ§Ã£o e Datas */}
+          {/* Condição e Datas */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-bold text-slate-600">Cond. Pagamento</label>
@@ -634,7 +634,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
               />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-600">PrevisÃ£o de Entrega</label>
+              <label className="text-xs font-bold text-slate-600">Previsão de Entrega</label>
               <input
                 type="date"
                 min={new Date().toISOString().split('T')[0]}
@@ -646,8 +646,8 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
           </div>
           <p className="-mt-2 text-[11px] text-slate-400">
             {dataVencimento
-              ? 'Vencimento informado: gera uma Ãºnica parcela nessa data (a condiÃ§Ã£o de pagamento fica sÃ³ como referÃªncia).'
-              : 'Sem data de vencimento, as parcelas saem da condiÃ§Ã£o de pagamento contada a partir da previsÃ£o de entrega.'}
+              ? 'Vencimento informado: gera uma única parcela nessa data (a condição de pagamento fica só como referência).'
+              : 'Sem data de vencimento, as parcelas saem da condição de pagamento contada a partir da previsão de entrega.'}
           </p>
 
           {/* Meio de pagamento */}
@@ -667,15 +667,15 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
             </div>
             {formaPagamento === 'cartao' && (
               <div>
-                <label className="text-xs font-bold text-slate-600">Qual CartÃ£o</label>
+                <label className="text-xs font-bold text-slate-600">Qual Cartão</label>
                 <select
                   className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-orange-300 outline-none"
                   value={cartaoId}
                   onChange={e => setCartaoId(e.target.value)}
                 >
-                  <option value="">Selecionar cartÃ£o...</option>
+                  <option value="">Selecionar cartão...</option>
                   {cartoes.map(c => (
-                    <option key={c.id} value={c.id}>{c.nome}{c.ultimos4 ? ` â€¢ ${c.ultimos4}` : ''}</option>
+                    <option key={c.id} value={c.id}>{c.nome}{c.ultimos4 ? ` • ${c.ultimos4}` : ''}</option>
                   ))}
                 </select>
               </div>
@@ -689,15 +689,15 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
               <p className="text-[11px] text-slate-500 leading-relaxed">
                 {[
                   fSel?.pix_chave ? `PIX: ${fSel.pix_chave}${fSel?.pix_tipo ? ` (${fSel.pix_tipo})` : ''}` : null,
-                  fSel?.banco_nome ? `Banco: ${fSel.banco_nome}${fSel?.agencia ? ` â€¢ Ag. ${fSel.agencia}` : ''}${fSel?.conta ? ` â€¢ Conta ${fSel.conta}` : ''}` : null,
+                  fSel?.banco_nome ? `Banco: ${fSel.banco_nome}${fSel?.agencia ? ` • Ag. ${fSel.agencia}` : ''}${fSel?.conta ? ` • Conta ${fSel.conta}` : ''}` : null,
                   fSel?.boleto ? 'Aceita boleto' : null,
-                  fSel?.cartao ? 'Aceita cartÃ£o' : null,
-                ].filter(Boolean).join(' Â· ')}
+                  fSel?.cartao ? 'Aceita cartão' : null,
+                ].filter(Boolean).join(' · ')}
               </p>
             </div>
           )}
 
-          {/* Falta o dado do meio escolhido â†’ completar aqui (salva no fornecedor) */}
+          {/* Falta o dado do meio escolhido → completar aqui (salva no fornecedor) */}
           {mostrarDadosPagamento && (
             <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 space-y-2.5">
               <div className="flex items-start gap-2">
@@ -705,13 +705,13 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                 <div>
                   <p className="text-xs font-bold text-violet-700">
                     {faltaPix ? 'Fornecedor sem chave PIX cadastrada'
-                      : faltaBanco ? 'Fornecedor sem dados bancÃ¡rios cadastrados'
+                      : faltaBanco ? 'Fornecedor sem dados bancários cadastrados'
                       : 'Dados de pagamento do fornecedor incompletos'}
                   </p>
                   <p className="text-[11px] text-violet-500">
-                    {faltaPix ? 'Informe a chave PIX para pagar por Pix â€” serÃ¡ salva no cadastro.'
-                      : faltaBanco ? 'Informe banco, agÃªncia e conta para a transferÃªncia â€” serÃ¡ salvo no cadastro.'
-                      : 'Informe PIX, dados bancÃ¡rios ou marque boleto/cartÃ£o â€” serÃ¡ salvo no cadastro.'}
+                    {faltaPix ? 'Informe a chave PIX para pagar por Pix — será salva no cadastro.'
+                      : faltaBanco ? 'Informe banco, agência e conta para a transferência — será salvo no cadastro.'
+                      : 'Informe PIX, dados bancários ou marque boleto/cartão — será salvo no cadastro.'}
                   </p>
                 </div>
               </div>
@@ -726,7 +726,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                   <input type="checkbox" checked={bancoCartao}
                     onChange={e => { setBancoCartao(e.target.checked); if (e.target.checked) setBancoBoleto(false) }}
                     className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
-                  CartÃ£o
+                  Cartão
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -748,7 +748,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                   <option value="cnpj">CNPJ</option>
                   <option value="email">E-mail</option>
                   <option value="telefone">Telefone</option>
-                  <option value="aleatoria">Chave aleatÃ³ria</option>
+                  <option value="aleatoria">Chave aleatória</option>
                 </select>
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -761,7 +761,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                 />
                 <input
                   className={`w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:ring-2 focus:ring-violet-300 outline-none ${dispensaDadosBanco ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
-                  placeholder="AgÃªncia"
+                  placeholder="Agência"
                   disabled={dispensaDadosBanco}
                   value={bancoAgencia}
                   onChange={e => setBancoAgencia(e.target.value)}
@@ -802,7 +802,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                   </div>
                   <input
                     className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm uppercase bg-white focus:ring-2 focus:ring-orange-300 outline-none"
-                    placeholder="DescriÃ§Ã£o do item..."
+                    placeholder="Descrição do item..."
                     value={item.descricao}
                     onChange={e => updateItem(idx, 'descricao', e.target.value.toUpperCase())}
                   />
@@ -839,7 +839,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                 </div>
               ))}
             </div>
-            {/* Desconto sempre visÃ­vel â€” antes sÃ³ aparecia com item valorado, e ninguÃ©m achava o campo */}
+            {/* Desconto sempre visível — antes só aparecia com item valorado, e ninguém achava o campo */}
             <div className="mt-2 space-y-1">
               <div className="flex items-center justify-between gap-3">
                 <label className="text-[10px] text-slate-400 font-semibold">Desconto (R$)</label>
@@ -854,7 +854,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                   </div>
                 </div>
                 {valorDesconto >= subtotal && valorDesconto > 0 && (
-                  <p className="text-[10px] text-red-600 text-right">Desconto maior ou igual ao total dos itens â€” confira.</p>
+                  <p className="text-[10px] text-red-600 text-right">Desconto maior ou igual ao total dos itens — confira.</p>
                 )}
                 <div className="flex justify-end items-baseline gap-2">
                   {valorDesconto > 0 && (
@@ -865,7 +865,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
               </div>
           </div>
 
-          {/* Justificativa (obrigatÃ³ria) */}
+          {/* Justificativa (obrigatória) */}
           <div>
             <label className="text-xs font-bold text-slate-600">
               {txt.labelJustificativa}
@@ -879,13 +879,13 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
             />
           </div>
 
-          {/* ObservaÃ§Ãµes */}
+          {/* Observações */}
           <div>
-            <label className="text-xs font-bold text-slate-600">ObservaÃ§Ãµes</label>
+            <label className="text-xs font-bold text-slate-600">Observações</label>
             <textarea
               rows={2}
               className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm uppercase focus:ring-2 focus:ring-orange-300 outline-none resize-none"
-              placeholder="InformaÃ§Ãµes adicionais..."
+              placeholder="Informações adicionais..."
               value={observacoes}
               onChange={e => setObservacoes(e.target.value.toUpperCase())}
             />
@@ -913,7 +913,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
           >
             {(emitir.isPending || editar.isPending)
               ? <><Loader2 size={15} className="animate-spin" /> {editMode ? 'Salvando...' : 'Emitindo...'}</>
-              : <><ShoppingCart size={15} /> {editMode ? 'Salvar AlteraÃ§Ãµes' : 'Emitir Pedido Direto'}</>}
+              : <><ShoppingCart size={15} /> {editMode ? 'Salvar Alterações' : 'Emitir Pedido Direto'}</>}
           </button>
         </div>
       </div>
