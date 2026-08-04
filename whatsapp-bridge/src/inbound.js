@@ -195,6 +195,15 @@ async function processMessage({ raw, digits, name, body, mediaInfo, msgId, efeit
       ? await db.findRecentOpenTicketForRequester(solicitanteId, sinceISO)
       : await db.findRecentOpenTicketForPhone(telKey, sinceISO)
   }
+  // Fora da janela normal, ainda reancora em chamado 'aguardando_usuario':
+  // esse status é literalmente "a equipe espera a resposta do solicitante", e
+  // ela costuma vir horas/dias depois do aviso — sem isso viraria chamado novo.
+  if (!ticket) {
+    const aguardandoISO = new Date(Date.now() - config.aguardandoJanelaMin * 60 * 1000).toISOString()
+    ticket = known
+      ? await db.findAguardandoTicketForRequester(solicitanteId, aguardandoISO)
+      : await db.findAguardandoTicketForPhone(telKey, aguardandoISO)
+  }
 
   if (ticket) {
     efeitos.commit = true // primeira escrita a seguir — claim definitivo

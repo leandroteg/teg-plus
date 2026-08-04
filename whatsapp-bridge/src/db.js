@@ -180,6 +180,74 @@ export async function getOutboundReplies(sinceISO) {
   return { out, lastSeen: rows.length ? rows[rows.length - 1].created_at : null }
 }
 
+// ─── Saída: mudanças de status → WhatsApp do solicitante ─────────────────────
+// O trigger do banco grava cada troca em ti_chamado_atividades
+// (tipo='status', meta={de,para}). Mesmo padrão do getOutboundReplies:
+// devolve lastSeen p/ o cursor avançar mesmo sobre linhas filtradas.
+export async function getStatusChanges(sinceISO) {
+  const { data, error } = await supabase.from('ti_chamado_atividades')
+    .select(`id, meta, created_at, chamado_id,
+      chamado:ti_chamados!ti_chamado_atividades_chamado_id_fkey(
+        numero, contato_externo,
+        solicitante:sys_perfis!ti_chamados_solicitante_id_fkey(telefone)
+      )`)
+    .eq('tipo', 'status').gt('created_at', sinceISO)
+    .order('created_at', { ascending: true })
+    .limit(200)
+  if (error) throw error
+  const rows = data ?? []
+
+  // Só processa chamados "esfriados": o agrupamento abaixo enxerga apenas o
+  // lote deste poll, então uma cadeia de arrastos mais longa que o intervalo
+  // viraria mensagens contraditórias ("em atendimento" → "voltou pra fila").
+  // Corta o lote no primeiro chamado mexido há menos de statusSettleMs — ele
+  // e os posteriores (junto com o cursor) ficam para o próximo ciclo.
+  const ultimaDoChamado = new Map()
+  for (const a of rows) ultimaDoChamado.set(a.chamado_id, a.created_at)
+  const agora = Date.now()
+  let corte = rows.length
+  for (let i = 0; i < rows.length; i++) {
+    const ultima = new Date(ultimaDoChamado.get(rows[i].chamado_id)).getTime()
+    if (agora - ultima < config.statusSettleMs) { corte = i; break }
+  }
+  const maduras = rows.slice(0, corte)
+
+  // Agrupa por chamado: o solicitante recebe UMA mensagem, com o status final.
+  // Ida-e-volta (termina onde começou) não notifica nada.
+  const porChamado = new Map()
+  for (const a of maduras) {
+    const ch = Array.isArray(a.chamado) ? a.chamado[0] : a.chamado
+    if (!ch) continue
+    const sol = Array.isArray(ch.solicitante) ? ch.solicitante[0] : ch.solicitante
+    const tel = (ch.contato_externo && ch.contato_externo.telefone) || (sol && sol.telefone)
+    if (!tel) continue
+    const atual = porChamado.get(a.chamado_id)
+    if (atual) { atual.para = a.meta?.para; atual.createdAt = a.created_at }
+    else porChamado.set(a.chamado_id, { to: tel, numero: ch.numero, de: a.meta?.de, para: a.meta?.para, createdAt: a.created_at })
+  }
+  const out = [...porChamado.values()].filter((s) => s.para && s.para !== s.de)
+  return { out, lastSeen: maduras.length ? maduras[maduras.length - 1].created_at : null }
+}
+
+// Chamado em 'aguardando_usuario' desse telefone (janela longa — é justamente
+// o status em que a equipe está esperando ele responder).
+export async function findAguardandoTicketForPhone(key, sinceISO) {
+  if (!key) return null
+  const { data, error } = await supabase.from('ti_chamados').select('id, numero, updated_at')
+    .eq('contato_externo->>telefone_key', key).eq('status', 'aguardando_usuario').gte('updated_at', sinceISO)
+    .order('updated_at', { ascending: false }).limit(1).maybeSingle()
+  if (error) throw error
+  return data ? { id: data.id, numero: data.numero } : null
+}
+
+export async function findAguardandoTicketForRequester(solicitanteId, sinceISO) {
+  const { data, error } = await supabase.from('ti_chamados').select('id, numero, updated_at')
+    .eq('solicitante_id', solicitanteId).eq('status', 'aguardando_usuario').gte('updated_at', sinceISO)
+    .order('updated_at', { ascending: false }).limit(1).maybeSingle()
+  if (error) throw error
+  return data ? { id: data.id, numero: data.numero } : null
+}
+
 // ─── Controle/status do canal (tabela ti_whatsapp, singleton id=1) ───────────
 export async function syncStatus(patch) {
   const { error } = await supabase.from('ti_whatsapp')

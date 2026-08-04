@@ -15,6 +15,9 @@ function setLocal(patch) { local = { ...local, ...patch } }
 
 // Só espelha respostas criadas A PARTIR de agora (não reenvia histórico no boot).
 let outboundCursor = new Date().toISOString()
+let statusCursor = outboundCursor
+let statusFalhas = 0 // ciclos consecutivos segurando o cursor por falha de envio
+const STATUS_MAX_RETRIES = 5
 let stopped = false
 
 function sleep(ms) { return new Promise((res) => setTimeout(res, ms)) }
@@ -148,6 +151,45 @@ async function loopSaida() {
   }
 }
 
+// Avisa o solicitante quando a equipe move o chamado no Quadro (ou muda o
+// status na tela do chamado). Textos curtos, no tom do canal.
+// Mesma régua do canal de e-mail do produto (pages/ti/email.ts): volta para
+// 'aberto' NÃO avisa — quase sempre é a equipe corrigindo o quadro, não
+// reabertura de verdade.
+const TEXTO_STATUS = {
+  em_atendimento: (n) => `🔧 Seu chamado *CH-${n}* está em *atendimento* — nossa equipe de T.I. já está cuidando dele.`,
+  aguardando_usuario: (n) => `⏳ Seu chamado *CH-${n}* está *aguardando sua resposta*. É só responder por aqui (se demorar, cite *CH-${n}* na mensagem).`,
+  resolvido: (n) => `✅ Seu chamado *CH-${n}* foi *resolvido*. Se o problema voltar, responda citando *CH-${n}*.`,
+  fechado: (n) => `🔒 Seu chamado *CH-${n}* foi *encerrado*. Obrigado! 🙌`,
+}
+
+async function loopStatus() {
+  while (!stopped) {
+    try {
+      const { out: mudancas, lastSeen } = await db.getStatusChanges(statusCursor)
+      let falhou = false
+      for (const m of mudancas) {
+        const texto = TEXTO_STATUS[m.para]
+        if (!texto) continue // status sem mensagem definida → não avisa
+        const ok = await evo.sendWhatsApp({ to: m.to, text: texto(String(m.numero).padStart(4, '0')) })
+        if (!ok) { err(`status CH-${m.numero}: envio falhou — segurando cursor p/ nova tentativa`); falhou = true; break }
+        log(`status CH-${m.numero}: ${m.de} → ${m.para} (avisado ${m.to})`)
+      }
+      // Falha de envio NÃO avança o cursor: o aviso é retentado no próximo
+      // ciclo (perder um 'aguardando_usuario' travaria o chamado). Após
+      // statusMaxRetries ciclos seguidos, desiste e segue — senão o cursor
+      // ficaria preso para sempre num destinatário inválido.
+      if (falhou && statusFalhas < STATUS_MAX_RETRIES) statusFalhas += 1
+      else {
+        if (falhou) err('status: desistindo do aviso após', STATUS_MAX_RETRIES, 'tentativas')
+        statusFalhas = 0
+        if (lastSeen && lastSeen > statusCursor) statusCursor = lastSeen
+      }
+    } catch (e) { err('loopStatus', e.message) }
+    await sleep(config.pollSaidaMs)
+  }
+}
+
 async function loopReconcile() {
   while (!stopped) {
     await reconcile()
@@ -175,6 +217,7 @@ async function main() {
 
   loopComandos()
   loopSaida()
+  loopStatus()
   loopReconcile()
   loopLimpeza()
 }

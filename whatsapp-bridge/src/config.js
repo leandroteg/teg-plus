@@ -24,4 +24,11 @@ export const config = {
   bucket: process.env.WHATSAPP_BUCKET ?? 'ti-chamados',
   pollComandoMs: Number(process.env.WHATSAPP_POLL_COMANDO_MS ?? 4000),
   pollSaidaMs: Number(process.env.WHATSAPP_POLL_SAIDA_MS ?? 10000),
+  // Arrastar o card por várias colunas gera N trocas de status em segundos:
+  // só avisa o solicitante após este tempo de silêncio no chamado, p/ a cadeia
+  // inteira virar UMA mensagem (com o status final).
+  statusSettleMs: Number(process.env.WHATSAPP_STATUS_SETTLE_MS ?? 60000),
+  // Chamado em 'aguardando_usuario' espera resposta do solicitante — aceita
+  // mensagem solta (sem citar CH-xxxx) por bem mais tempo que a janela normal.
+  aguardandoJanelaMin: Number(process.env.WHATSAPP_AGUARDANDO_JANELA_MIN ?? 4320), // 3 dias
 }
