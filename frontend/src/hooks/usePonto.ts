@@ -522,3 +522,30 @@ export function usePontoHorasExtrasIntervalo(ini: string, fim: string) {
     },
   })
 }
+
+// ── Agregado por base ONDE A PESSOA BATEU ────────────────────────────────────
+// Os gráficos "por base" do painel usavam a base do CADASTRO. Quem está lotado
+// num canteiro e trabalha em outro ia parar na coluna errada — em julho isso
+// tirava 1.600h de Ituiutaba e punha em Paracatu. Aqui a base vem do relógio de
+// cada dia (caindo para a do cadastro quando a batida é manual e não tem
+// equipamento, caso do Frutal, que não tem relógio).
+export interface PontoBaseAgg {
+  base_id: string | null
+  base_nome: string | null
+  dias_batidos: number
+  dias_em_aberto: number
+  hh_trabalhada: string | null
+  extras_validos: string | null
+}
+
+export function usePontoPorBaseIntervalo(ini: string, fim: string) {
+  return useQuery<PontoBaseAgg[]>({
+    queryKey: ['ponto-por-base', ini, fim],
+    enabled: !!ini && !!fim,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('rh_ponto_por_base_intervalo', { p_ini: ini, p_fim: fim })
+      if (error) { console.error('usePontoPorBaseIntervalo:', error); return [] }
+      return (data ?? []) as PontoBaseAgg[]
+    },
+  })
+}

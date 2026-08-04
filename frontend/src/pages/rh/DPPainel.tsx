@@ -11,7 +11,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
-import { usePontoResumoIntervalo, usePontoColabAtivos, janelaPadrao } from '../../hooks/usePonto'
+import { usePontoResumoIntervalo, usePontoPorBaseIntervalo, usePontoColabAtivos, janelaPadrao } from '../../hooks/usePonto'
 import { intervalToMin } from '../../lib/ponto'
 import { SpotlightMetric, MiniInfoCard } from '../../components/rh/DPPainelCards'
 import DPFolhaPainel from './DPFolhaPainel'
@@ -48,6 +48,7 @@ export default function DPPainel() {
   const [ate, setAte] = useState(() => padrao().fim)
 
   const { data: resumo = [], isLoading } = usePontoResumoIntervalo(de, ate)
+  const { data: porBase = [] } = usePontoPorBaseIntervalo(de, ate)
   const { data: ativos } = usePontoColabAtivos()
   const pico = ativos?.pico ?? 0
   const headcount = ativos?.headcount ?? 0
@@ -56,7 +57,6 @@ export default function DPPainel() {
     let hhMin = 0, exMin = 0, hhPagavel = 0, emAberto = 0, foraHorario = 0
     let diasBatidos = 0, diasRetif = 0, faltasMin = 0, cargaMin = 0
     const ccMap = new Map<string, { nome: string; min: number }>()
-    const baseMap = new Map<string, { nome: string; emAberto: number; diasBatidos: number; exMin: number; hhMin: number }>()
     const comBatida = new Set<string>(), comApur = new Set<string>()
     for (const r of resumo) {
       // HH e extras TOTAIS. Os campos _real descartavam o dia inteiro quando a
@@ -85,35 +85,40 @@ export default function DPPainel() {
       const ck = r.cc_codigo || r.cc_nome || '—'
       const cc = ccMap.get(ck) || { nome: r.cc_nome || r.cc_codigo || 'Sem CC', min: 0 }
       cc.min += hh; ccMap.set(ck, cc)
-      const bk = r.base_id ?? r.base_nome ?? '—'
-      const b = baseMap.get(bk) || { nome: r.base_nome ?? 'Sem base', emAberto: 0, diasBatidos: 0, exMin: 0, hhMin: 0 }
-      b.emAberto += r.dias_em_aberto_real || 0
-      b.diasBatidos += r.dias_batidos_real || 0
-      b.exMin += exV
-      b.hhMin += hh
-      baseMap.set(bk, b)
     }
     const porCC = [...ccMap.values()].filter(c => c.min > 0).sort((a, b) => b.min - a.min)
-    const bases = [...baseMap.values()]
-    // em aberto: todas as bases (independe de banco de horas)
-    const abertoPorBase = bases
-      .map(b => ({ nome: b.nome, abs: b.emAberto, pct: b.diasBatidos > 0 ? (b.emAberto / b.diasBatidos) * 100 : 0 }))
-      .filter(b => b.abs > 0).sort((a, b) => b.pct - a.pct)
-    // horas extras a pagar: exclui banco de horas
-    const extraPorBase = bases
-      .filter(b => !ehBanco(b.nome))
-      .map(b => ({ nome: b.nome, absMin: b.exMin, pct: b.hhMin > 0 ? (b.exMin / b.hhMin) * 100 : 0 }))
-      .filter(b => b.absMin > 0).sort((a, b) => b.pct - a.pct)
     const pctRetif = diasBatidos > 0 ? (diasRetif / diasBatidos) * 100 : 0
     const pctFaltas = cargaMin > 0 ? (faltasMin / cargaMin) * 100 : 0
-    return { hhMin, exMin, hhPagavel, emAberto, foraHorario, porCC, abertoPorBase, extraPorBase,
+    return { hhMin, exMin, hhPagavel, emAberto, foraHorario, porCC,
       comBatida: comBatida.size, comApur: comApur.size,
       diasBatidos, diasRetif, faltasMin, cargaMin, pctRetif, pctFaltas }
   }, [resumo])
 
+  // Os dois gráficos por base olham ONDE A PESSOA BATEU, não onde ela está
+  // lotada — quem está cadastrado num canteiro e trabalha em outro entrava na
+  // coluna errada. Vem pronto do banco, agregado por dia.
+  const porBaseView = useMemo(() => {
+    const rows = porBase.map(b => ({
+      nome: b.base_nome ?? 'Sem base',
+      emAberto: b.dias_em_aberto || 0,
+      diasBatidos: b.dias_batidos || 0,
+      exMin: intervalToMin(b.extras_validos),
+      hhMin: intervalToMin(b.hh_trabalhada),
+    }))
+    const abertoPorBase = rows
+      .map(b => ({ nome: b.nome, abs: b.emAberto, pct: b.diasBatidos > 0 ? (b.emAberto / b.diasBatidos) * 100 : 0 }))
+      .filter(b => b.abs > 0).sort((a, b) => b.pct - a.pct)
+    // horas extras a pagar: exclui banco de horas
+    const extraPorBase = rows
+      .filter(b => !ehBanco(b.nome))
+      .map(b => ({ nome: b.nome, absMin: b.exMin, pct: b.hhMin > 0 ? (b.exMin / b.hhMin) * 100 : 0 }))
+      .filter(b => b.absMin > 0).sort((a, b) => b.pct - a.pct)
+    return { abertoPorBase, extraPorBase }
+  }, [porBase])
+
   const maxCC = Math.max(...agg.porCC.map(c => c.min), 1)
-  const maxAbertoPct = Math.max(...agg.abertoPorBase.map(b => b.pct), 1)
-  const maxExtraPct = Math.max(...agg.extraPorBase.map(b => b.pct), 1)
+  const maxAbertoPct = Math.max(...porBaseView.abertoPorBase.map(b => b.pct), 1)
+  const maxExtraPct = Math.max(...porBaseView.extraPorBase.map(b => b.pct), 1)
   const pctExtra = agg.hhPagavel > 0 ? Math.round((agg.exMin / agg.hhPagavel) * 100) : null
   const pctAtivos = headcount > 0 ? Math.round((pico / headcount) * 100) : 0
 
@@ -239,18 +244,18 @@ export default function DPPainel() {
               <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                 <Fingerprint size={14} className="text-blue-500" /> Pontos em Aberto por Base
               </h2>
-              <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>abs · % sobre dias batidos · ordenado por %</p>
+              <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>abs · % sobre dias batidos · base do relógio onde bateu</p>
             </div>
             <button onClick={() => nav('/rh/dp/ponto')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold shrink-0">Ponto <ChevronRight size={11} /></button>
           </div>
-          {agg.abertoPorBase.length === 0 ? (
+          {porBaseView.abertoPorBase.length === 0 ? (
             <div className="py-10 text-center">
               <Clock size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-300'}`} />
               <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem pontos em aberto</p>
             </div>
           ) : (
             <ul className="px-2 py-1.5">
-              {agg.abertoPorBase.map(b => (
+              {porBaseView.abertoPorBase.map(b => (
                 <li key={b.nome} className="flex items-center gap-2.5 px-2 py-1.5">
                   <span title={b.nome}
                     className={`w-[104px] sm:w-[170px] shrink-0 text-[11px] font-semibold leading-tight ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{b.nome}</span>
@@ -271,18 +276,18 @@ export default function DPPainel() {
               <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                 <Timer size={14} className="text-orange-500" /> Horas Extras por Base
               </h2>
-              <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>a pagar · exclui dia em aberto e banco de horas · ord. por %</p>
+              <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>a pagar · base do relógio onde bateu · exclui dia em aberto e banco de horas</p>
             </div>
             <button onClick={() => nav('/rh/dp/ponto')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold shrink-0">Ponto <ChevronRight size={11} /></button>
           </div>
-          {agg.extraPorBase.length === 0 ? (
+          {porBaseView.extraPorBase.length === 0 ? (
             <div className="py-10 text-center">
               <Timer size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-300'}`} />
               <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem horas extras no período</p>
             </div>
           ) : (
             <ul className="px-2 py-1.5">
-              {agg.extraPorBase.map(b => (
+              {porBaseView.extraPorBase.map(b => (
                 <li key={b.nome} className="flex items-center gap-2.5 px-2 py-1.5">
                   <span title={b.nome}
                     className={`w-[104px] sm:w-[170px] shrink-0 text-[11px] font-semibold leading-tight ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{b.nome}</span>
