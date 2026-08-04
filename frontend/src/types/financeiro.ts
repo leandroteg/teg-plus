@@ -126,12 +126,18 @@ export const ORIGEM_CP_LABEL: Record<string, { label: string; curto: string }> =
  */
 export interface DadosPagamento {
   favorecido?: string
+  /** PF ou PJ do favorecido — define se o documento (e a chave PIX) é CPF ou CNPJ */
+  favorecido_tipo?: TipoPessoaFavorecido
+  /** CPF (PF) ou CNPJ (PJ) de quem recebe, com máscara */
+  favorecido_documento?: string
   banco_nome?: string
   agencia?: string
   conta?: string
   pix_tipo?: string
   pix_chave?: string
 }
+
+export type TipoPessoaFavorecido = 'pf' | 'pj'
 
 export interface ContaPagar {
   id: string

@@ -62,7 +62,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useDecisaoGenerica } from '../../hooks/useAprovacoes'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
-import type { ContaPagar, Fornecedor, LotePagamento, StatusCP, StatusLote } from '../../types/financeiro'
+import type { ContaPagar, Fornecedor, LotePagamento, StatusCP, StatusLote, TipoPessoaFavorecido } from '../../types/financeiro'
 import { CP_PIPELINE_STAGES, ORIGEM_CP_LABEL, valorAPagarCP, temAjusteCP } from '../../types/financeiro'
 import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
@@ -234,6 +234,44 @@ function isUrgentExtraordinary(cp: ContaPagar) {
   return cp.origem === 'manual' && cp.natureza === 'extraordinario'
 }
 
+// ══ PF/PJ do favorecido × chave PIX ═════════════════════════════
+// Chave PIX de documento é o próprio CPF/CNPJ de quem recebe. Sem saber se o
+// favorecido é PF ou PJ o Financeiro digitava CPF em chave marcada como CNPJ
+// (e vice-versa) — a remessa só voltava do banco recusada.
+
+type TipoPessoa = '' | TipoPessoaFavorecido
+
+const tipoPessoaPorDocumento = (documento?: string | null): TipoPessoa => {
+  const len = normalizeDigits(documento).length
+  if (len === 11) return 'pf'
+  if (len === 14) return 'pj'
+  return ''
+}
+
+const pixEhDocumento = (pixTipo?: string | null) => pixTipo === 'cpf' || pixTipo === 'cnpj'
+const pixTipoDoDocumento = (tipo: TipoPessoa) => (tipo === 'pf' ? 'cpf' : tipo === 'pj' ? 'cnpj' : '')
+const labelDocumento = (tipo: TipoPessoa) =>
+  tipo === 'pf' ? 'CPF do favorecido' : tipo === 'pj' ? 'CNPJ do favorecido' : 'CPF/CNPJ do favorecido'
+const placeholderDocumento = (tipo: TipoPessoa) =>
+  tipo === 'pf' ? '000.000.000-00' : tipo === 'pj' ? '00.000.000/0000-00' : 'CPF ou CNPJ de quem recebe'
+
+/** Máscara do documento, cortando no tamanho de um CNPJ. */
+const mascararDocumento = (valor: string) => formatCpfCnpj(normalizeDigits(valor).slice(0, 14))
+
+/** Opções de Tipo PIX: PF não oferece CNPJ e PJ não oferece CPF. */
+function OpcoesTipoPix({ tipoPessoa }: { tipoPessoa: TipoPessoa }) {
+  return (
+    <>
+      <option value="">Selecione...</option>
+      {tipoPessoa !== 'pj' && <option value="cpf">CPF</option>}
+      {tipoPessoa !== 'pf' && <option value="cnpj">CNPJ</option>}
+      <option value="email">E-mail</option>
+      <option value="telefone">Telefone</option>
+      <option value="aleatoria">Chave aleatória</option>
+    </>
+  )
+}
+
 type NovaSolicitacaoExtraForm = {
   descricao: string
   justificativa: string
@@ -278,6 +316,8 @@ type NovaPrevisaoPagamentoForm = {
   impostoDeduzir: boolean
   /** Dados para pagamento (mig 215) — vêm do cadastro do beneficiário e são editáveis */
   favorecido: string
+  favorecido_tipo: TipoPessoa
+  favorecido_documento: string
   banco_nome: string
   agencia: string
   conta: string
@@ -330,6 +370,8 @@ const EMPTY_PREVISAO_FORM: NovaPrevisaoPagamentoForm = {
   impostoValor: '',
   impostoDeduzir: false,
   favorecido: '',
+  favorecido_tipo: '',
+  favorecido_documento: '',
   banco_nome: '',
   agencia: '',
   conta: '',
@@ -886,17 +928,21 @@ function NovaSolicitacaoExtraordinariaModal({
 
   const preencherFornecedor = useCallback((fornecedor: Fornecedor) => {
     setFornecedorSelecionado(fornecedor)
+    const documento = formatCpfCnpj(fornecedor.cnpj)
+    const tipoPessoa = tipoPessoaPorDocumento(fornecedor.cnpj)
+    const pixTipo = fornecedor.pix_tipo ?? ''
     setForm(prev => ({
       ...prev,
       fornecedor_id: fornecedor.id,
-      fornecedor_cnpj: formatCpfCnpj(fornecedor.cnpj),
+      fornecedor_cnpj: documento,
       // Favorecido do pagamento = NOME EMPRESARIAL (razão social do cartão CNPJ)
       favorecido: fornecedor.razao_social?.trim() || fornecedor.nome_fantasia?.trim() || prev.favorecido,
       banco_nome: fornecedor.banco_nome ?? '',
       agencia: fornecedor.agencia ?? '',
       conta: fornecedor.conta ?? '',
-      pix_tipo: fornecedor.pix_tipo ?? '',
-      pix_chave: fornecedor.pix_chave ?? '',
+      // PIX de documento acompanha o CPF/CNPJ do favorecido, não a chave solta do cadastro
+      pix_tipo: pixEhDocumento(pixTipo) && tipoPessoa ? pixTipoDoDocumento(tipoPessoa) : pixTipo,
+      pix_chave: pixEhDocumento(pixTipo) ? documento : (fornecedor.pix_chave ?? ''),
     }))
   }, [])
 
@@ -909,6 +955,19 @@ function NovaSolicitacaoExtraordinariaModal({
   }, []))
 
   const cnpjDigits = useMemo(() => normalizeDigits(form.fornecedor_cnpj), [form.fornecedor_cnpj])
+  // Aqui o PF/PJ sai do próprio documento do favorecido, que já é obrigatório
+  const tipoPessoaExtra = useMemo(() => tipoPessoaPorDocumento(cnpjDigits), [cnpjDigits])
+
+  const aplicarTipoPixExtra = (valor: string) => {
+    setForm(prev => ({
+      ...prev,
+      pix_tipo: valor,
+      // Chave de documento é o CPF/CNPJ do favorecido; trocar para outro tipo limpa
+      pix_chave: pixEhDocumento(valor)
+        ? formatCpfCnpj(prev.fornecedor_cnpj)
+        : pixEhDocumento(prev.pix_tipo) ? '' : prev.pix_chave,
+    }))
+  }
 
   const handleFornecedorLookup = useCallback(async (cnpjValue: string) => {
     const digits = normalizeDigits(cnpjValue)
@@ -999,11 +1058,13 @@ function NovaSolicitacaoExtraordinariaModal({
         dataVencimento: form.data_vencimento,
         dadosBancarios: {
           favorecido: form.favorecido || undefined,
+          favorecido_tipo: tipoPessoaExtra || undefined,
+          favorecido_documento: formatCpfCnpj(form.fornecedor_cnpj) || undefined,
           banco_nome: form.banco_nome || undefined,
           agencia: form.agencia || undefined,
           conta: form.conta || undefined,
           pix_tipo: form.pix_tipo || undefined,
-          pix_chave: form.pix_chave || undefined,
+          pix_chave: (pixEhDocumento(form.pix_tipo) ? formatCpfCnpj(form.fornecedor_cnpj) : form.pix_chave) || undefined,
         },
         arquivos,
       })
@@ -1212,6 +1273,12 @@ function NovaSolicitacaoExtraordinariaModal({
                       ...prev,
                       fornecedor_cnpj: value,
                       fornecedor_id: '',
+                      // Chave PIX de CPF/CNPJ é o próprio documento — segue junto,
+                      // e o tipo se corrige sozinho quando o documento muda de PF p/ PJ
+                      pix_chave: pixEhDocumento(prev.pix_tipo) ? value : prev.pix_chave,
+                      pix_tipo: pixEhDocumento(prev.pix_tipo) && tipoPessoaPorDocumento(value)
+                        ? pixTipoDoDocumento(tipoPessoaPorDocumento(value))
+                        : prev.pix_tipo,
                     }))
                     if (!isCpfOuCnpj(value)) {
                       setFornecedorSelecionado(null)
@@ -1286,18 +1353,25 @@ function NovaSolicitacaoExtraordinariaModal({
               </div>
               <div>
                 <label className={labelCls}>Tipo PIX</label>
-                <select value={form.pix_tipo} onChange={e => setField('pix_tipo', e.target.value)} className={inputCls}>
-                  <option value="">Selecione...</option>
-                  <option value="cpf">CPF</option>
-                  <option value="cnpj">CNPJ</option>
-                  <option value="email">E-mail</option>
-                  <option value="telefone">Telefone</option>
-                  <option value="aleatoria">Chave aleatória</option>
+                {/* PF só oferece CPF e PJ só CNPJ — o tipo vem do documento do favorecido */}
+                <select value={form.pix_tipo} onChange={e => aplicarTipoPixExtra(e.target.value)} className={inputCls}>
+                  <OpcoesTipoPix tipoPessoa={tipoPessoaExtra} />
                 </select>
               </div>
               <div>
                 <label className={labelCls}>Chave PIX</label>
-                <UpperInput value={form.pix_chave} onChange={e => setField('pix_chave', e.target.value)} className={inputCls} placeholder="Informe a chave PIX" />
+                {pixEhDocumento(form.pix_tipo) ? (
+                  <>
+                    <div className={`${inputCls} flex items-center ${form.fornecedor_cnpj ? '' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {form.fornecedor_cnpj || placeholderDocumento(tipoPessoaExtra)}
+                    </div>
+                    <p className={`mt-1 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Usa o {tipoPessoaExtra === 'pf' ? 'CPF' : 'CNPJ'} do favorecido informado acima.
+                    </p>
+                  </>
+                ) : (
+                  <UpperInput value={form.pix_chave} onChange={e => setField('pix_chave', e.target.value)} className={inputCls} placeholder="Informe a chave PIX" />
+                )}
               </div>
             </div>
           </div>
@@ -1424,6 +1498,9 @@ function NovaPrevisaoPagamentoModal({
     setForm({
       ...EMPTY_PREVISAO_FORM,
       favorecido: pgto.favorecido ?? '',
+      // Títulos anteriores à PF/PJ só têm o documento (ou nem isso) — deduz do tamanho
+      favorecido_tipo: pgto.favorecido_tipo ?? tipoPessoaPorDocumento(pgto.favorecido_documento),
+      favorecido_documento: pgto.favorecido_documento ?? '',
       banco_nome: pgto.banco_nome ?? '',
       agencia: pgto.agencia ?? '',
       conta: pgto.conta ?? '',
@@ -1474,6 +1551,11 @@ function NovaPrevisaoPagamentoModal({
   // Escolher o beneficiário já traz os dados para pagamento do cadastro — quem
   // lança só confere (ou sobrescreve, quando o pagamento vai por outra conta).
   const selecionarBeneficiario = (f: Fornecedor) => {
+    // PF/PJ sai do próprio documento do cadastro (cmp_fornecedores.cnpj guarda
+    // CPF de pessoa física no mesmo campo)
+    const documento = formatCpfCnpj(f.cnpj)
+    const tipoPessoa = tipoPessoaPorDocumento(f.cnpj)
+    const pixTipo = f.pix_tipo ?? ''
     setForm(prev => ({
       ...prev,
       fornecedor_id: f.id,
@@ -1481,14 +1563,62 @@ function NovaPrevisaoPagamentoModal({
       // CNPJ) — a fantasia fica só como apoio visual na busca.
       fornecedor_nome: f.razao_social || f.nome_fantasia || '',
       favorecido: f.razao_social || f.nome_fantasia || '',
+      favorecido_tipo: tipoPessoa,
+      favorecido_documento: documento,
       banco_nome: f.banco_nome ?? '',
       agencia: f.agencia ?? '',
       conta: f.conta ?? '',
-      pix_tipo: f.pix_tipo ?? '',
-      pix_chave: f.pix_chave ?? '',
+      pix_tipo: pixEhDocumento(pixTipo) && tipoPessoa ? pixTipoDoDocumento(tipoPessoa) : pixTipo,
+      pix_chave: pixEhDocumento(pixTipo) ? documento : (f.pix_chave ?? ''),
     }))
     setFornBusca('')
     setFornOpen(false)
+  }
+
+  // PF/PJ, documento e chave PIX andam juntos: trocar um reajusta os outros
+  const aplicarTipoPessoa = (tipo: TipoPessoa) => {
+    setForm(prev => {
+      // Documento do tipo errado (CPF marcado como PJ) não serve mais
+      const documento = tipo && tipoPessoaPorDocumento(prev.favorecido_documento) !== tipo
+        ? ''
+        : prev.favorecido_documento
+      const pixTipo = pixEhDocumento(prev.pix_tipo) && tipo ? pixTipoDoDocumento(tipo) : prev.pix_tipo
+      return {
+        ...prev,
+        favorecido_tipo: tipo,
+        favorecido_documento: documento,
+        pix_tipo: pixTipo,
+        pix_chave: pixEhDocumento(pixTipo) ? documento : prev.pix_chave,
+      }
+    })
+  }
+
+  const aplicarDocumento = (valor: string) => {
+    setForm(prev => {
+      const documento = mascararDocumento(valor)
+      // Documento completo manda no PF/PJ (11 dígitos = CPF, 14 = CNPJ); enquanto
+      // está pela metade mantém o que já estava marcado
+      const tipo = tipoPessoaPorDocumento(documento) || prev.favorecido_tipo
+      return {
+        ...prev,
+        favorecido_documento: documento,
+        favorecido_tipo: tipo,
+        // Chave PIX de documento é o mesmo número — não deixa divergir
+        pix_chave: pixEhDocumento(prev.pix_tipo) ? documento : prev.pix_chave,
+        pix_tipo: pixEhDocumento(prev.pix_tipo) && tipo ? pixTipoDoDocumento(tipo) : prev.pix_tipo,
+      }
+    })
+  }
+
+  const aplicarTipoPix = (valor: string) => {
+    setForm(prev => {
+      if (!pixEhDocumento(valor)) {
+        return { ...prev, pix_tipo: valor, pix_chave: pixEhDocumento(prev.pix_tipo) ? '' : prev.pix_chave }
+      }
+      const tipo: TipoPessoa = valor === 'cpf' ? 'pf' : 'pj'
+      const documento = tipoPessoaPorDocumento(prev.favorecido_documento) === tipo ? prev.favorecido_documento : ''
+      return { ...prev, pix_tipo: valor, favorecido_tipo: tipo, favorecido_documento: documento, pix_chave: documento }
+    })
   }
 
   // Valor a pagar = valor − desconto + juros/multa − imposto retido
@@ -1535,6 +1665,12 @@ function NovaPrevisaoPagamentoModal({
     if (!form.classe_financeira) faltando.push('Natureza Orçamentária Financeira')
     if (!form.empresa_id) faltando.push('Filial pagadora')
     if (form.recorrente && !form.recorrenciaFim) faltando.push('Até quando termina')
+    // Documento pela metade vira remessa recusada — e chave PIX de CPF/CNPJ é o documento
+    if (form.favorecido_documento && !isCpfOuCnpj(form.favorecido_documento)) {
+      faltando.push(`${labelDocumento(form.favorecido_tipo)} (incompleto)`)
+    } else if (pixEhDocumento(form.pix_tipo) && !isCpfOuCnpj(form.favorecido_documento)) {
+      faltando.push(`${labelDocumento(form.favorecido_tipo)} (chave PIX)`)
+    }
     return faltando
   }, [form, editMode])
 
@@ -1557,11 +1693,14 @@ function NovaPrevisaoPagamentoModal({
       : undefined
     const dadosPagamento = {
       favorecido: form.favorecido,
+      favorecido_tipo: form.favorecido_tipo || undefined,
+      favorecido_documento: form.favorecido_documento,
       banco_nome: form.banco_nome,
       agencia: form.agencia,
       conta: form.conta,
       pix_tipo: form.pix_tipo,
-      pix_chave: form.pix_chave,
+      // Chave de documento sempre grava o CPF/CNPJ informado, nunca um resto antigo
+      pix_chave: pixEhDocumento(form.pix_tipo) ? form.favorecido_documento : form.pix_chave,
     }
     try {
       if (editMode && previsao) {
@@ -1672,7 +1811,8 @@ function NovaPrevisaoPagamentoModal({
                     setForm(prev => ({
                       ...prev,
                       fornecedor_id: '', fornecedor_nome: '',
-                      favorecido: '', banco_nome: '', agencia: '', conta: '', pix_tipo: '', pix_chave: '',
+                      favorecido: '', favorecido_tipo: '', favorecido_documento: '',
+                      banco_nome: '', agencia: '', conta: '', pix_tipo: '', pix_chave: '',
                     }))
                     setFornBusca('')
                   }}
@@ -1898,6 +2038,25 @@ function NovaPrevisaoPagamentoModal({
                 <UpperInput value={form.favorecido} onChange={e => setField('favorecido', e.target.value)} className={inputCls} placeholder="Nome de quem recebe" />
               </div>
               <div>
+                <label className={labelCls}>Favorecido é</label>
+                <select value={form.favorecido_tipo} onChange={e => aplicarTipoPessoa(e.target.value as TipoPessoa)} className={inputCls}>
+                  <option value="">Selecione...</option>
+                  <option value="pf">Pessoa Física (CPF)</option>
+                  <option value="pj">Pessoa Jurídica (CNPJ)</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>{labelDocumento(form.favorecido_tipo)}</label>
+                <input
+                  value={form.favorecido_documento}
+                  onChange={e => aplicarDocumento(e.target.value)}
+                  className={inputCls}
+                  inputMode="numeric"
+                  maxLength={18}
+                  placeholder={placeholderDocumento(form.favorecido_tipo)}
+                />
+              </div>
+              <div>
                 <label className={labelCls}>Banco</label>
                 <UpperInput value={form.banco_nome} onChange={e => setField('banco_nome', e.target.value)} className={inputCls} placeholder="Nome do banco" />
               </div>
@@ -1911,18 +2070,30 @@ function NovaPrevisaoPagamentoModal({
               </div>
               <div>
                 <label className={labelCls}>Tipo PIX</label>
-                <select value={form.pix_tipo} onChange={e => setField('pix_tipo', e.target.value)} className={inputCls}>
-                  <option value="">Selecione...</option>
-                  <option value="cpf">CPF</option>
-                  <option value="cnpj">CNPJ</option>
-                  <option value="email">E-mail</option>
-                  <option value="telefone">Telefone</option>
-                  <option value="aleatoria">Chave aleatória</option>
+                <select value={form.pix_tipo} onChange={e => aplicarTipoPix(e.target.value)} className={inputCls}>
+                  <OpcoesTipoPix tipoPessoa={form.favorecido_tipo} />
                 </select>
               </div>
               <div className="sm:col-span-2">
                 <label className={labelCls}>Chave PIX</label>
-                <UpperInput value={form.pix_chave} onChange={e => setField('pix_chave', e.target.value)} className={inputCls} placeholder="Informe a chave PIX" />
+                {pixEhDocumento(form.pix_tipo) ? (
+                  <>
+                    {/* Chave de documento não se digita duas vezes: é o CPF/CNPJ acima */}
+                    <input
+                      value={form.favorecido_documento}
+                      onChange={e => aplicarDocumento(e.target.value)}
+                      className={inputCls}
+                      inputMode="numeric"
+                      maxLength={18}
+                      placeholder={placeholderDocumento(form.favorecido_tipo)}
+                    />
+                    <p className={`mt-1 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Mesma coisa que o {form.favorecido_tipo === 'pj' ? 'CNPJ' : 'CPF'} do favorecido — editar aqui atualiza os dois campos.
+                    </p>
+                  </>
+                ) : (
+                  <UpperInput value={form.pix_chave} onChange={e => setField('pix_chave', e.target.value)} className={inputCls} placeholder="Informe a chave PIX" />
+                )}
               </div>
             </div>
           </div>
@@ -3019,6 +3190,12 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                 {bankInfo.favorecido && <div><span className="text-slate-400">Favorecido:</span> <span className="font-semibold">{bankInfo.favorecido}</span></div>}
+                {bankInfo.favorecido_documento && (
+                  <div>
+                    <span className="text-slate-400">{bankInfo.favorecido_tipo === 'pf' ? 'CPF' : bankInfo.favorecido_tipo === 'pj' ? 'CNPJ' : 'CPF/CNPJ'}:</span>{' '}
+                    <span className="font-semibold font-mono">{bankInfo.favorecido_documento}</span>
+                  </div>
+                )}
                 {bankInfo.banco_nome && <div><span className="text-slate-400">Banco:</span> <span className="font-semibold">{bankInfo.banco_nome}</span></div>}
                 {bankInfo.agencia && <div><span className="text-slate-400">Agência:</span> <span className="font-semibold">{bankInfo.agencia}</span></div>}
                 {bankInfo.conta && <div><span className="text-slate-400">Conta:</span> <span className="font-semibold">{bankInfo.conta}</span></div>}
