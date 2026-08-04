@@ -67,7 +67,10 @@ type FavorecidoOption = SelectOption & {
 
 export default function DespesasAdiantamentos() {
   const { dark } = useTheme()
-  const { perfil } = useAuth()
+  const { perfil, isAdmin } = useAuth()
+  // Solicitar EM NOME DE OUTRO: só comprador (setor de Compras) e admin.
+  // Os demais continuam pedindo apenas para si — favorecido travado no próprio nome.
+  const podeLancarParaOutros = isAdmin || Boolean((perfil as any)?.comprador)
   const { data: adiantamentos = [], error: adiantamentosError } = useAdiantamentosDespesa()
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
@@ -154,15 +157,26 @@ export default function DespesasAdiantamentos() {
     if (!showModal || form.favorecido_key) return
 
     const colaboradorAtual = colaboradoresAtivos.find(colaborador => colaborador.perfil_id === perfil?.id)
-    if (!colaboradorAtual) return
+    if (colaboradorAtual) {
+      setForm(prev => ({
+        ...prev,
+        favorecido_key: `colaborador:${colaboradorAtual.id}`,
+        favorecido_nome: colaboradorAtual.nome,
+        favorecido_email: colaboradorAtual.email || '',
+      }))
+      return
+    }
 
-    setForm(prev => ({
-      ...prev,
-      favorecido_key: `colaborador:${colaboradorAtual.id}`,
-      favorecido_nome: colaboradorAtual.nome,
-      favorecido_email: colaboradorAtual.email || '',
-    }))
-  }, [showModal, form.favorecido_key, colaboradoresAtivos, perfil?.id])
+    // Sem cadastro no RH: quem não pode escolher outro favorecido ainda precisa
+    // conseguir pedir p/ si — usa o próprio perfil (campo fica travado na tela).
+    if (!podeLancarParaOutros && perfil?.nome) {
+      setForm(prev => ({
+        ...prev,
+        favorecido_nome: perfil.nome,
+        favorecido_email: perfil.email || '',
+      }))
+    }
+  }, [showModal, form.favorecido_key, colaboradoresAtivos, perfil?.id, perfil?.nome, perfil?.email, podeLancarParaOutros])
 
   useEffect(() => {
     if (!form.data_pagamento) {
@@ -390,23 +404,34 @@ export default function DespesasAdiantamentos() {
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Favorecido</label>
-                <SearchableSelect
-                  options={favorecidoOptions}
-                  value={form.favorecido_key}
-                  onChange={value => {
-                    const selected = favorecidoOptions.find(option => option.value === value)
-                    setForm(prev => ({
-                      ...prev,
-                      favorecido_key: value,
-                      favorecido_nome: selected?.label || '',
-                      favorecido_email: selected?.email || '',
-                    }))
-                  }}
-                  placeholder="Buscar funcionário ativo ou PJ..."
-                />
-                <p className={`mt-1 text-[11px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Funcionários ativos e PJs cadastrados ficam disponíveis nesta busca.
-                </p>
+                {podeLancarParaOutros ? (
+                  <>
+                    <SearchableSelect
+                      options={favorecidoOptions}
+                      value={form.favorecido_key}
+                      onChange={value => {
+                        const selected = favorecidoOptions.find(option => option.value === value)
+                        setForm(prev => ({
+                          ...prev,
+                          favorecido_key: value,
+                          favorecido_nome: selected?.label || '',
+                          favorecido_email: selected?.email || '',
+                        }))
+                      }}
+                      placeholder="Buscar funcionário ativo ou PJ..."
+                    />
+                    <p className={`mt-1 text-[11px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Você pode solicitar em nome de outra pessoa: a aprovação vai para o gestor do favorecido.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <input value={form.favorecido_nome || perfil?.nome || ''} disabled className={`${inputCls} opacity-70`} />
+                    <p className={`mt-1 text-[11px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Solicitação em nome de outra pessoa é feita pelo setor de Compras.
+                    </p>
+                  </>
+                )}
               </div>
               <div className="md:col-span-2">
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Finalidade</label>

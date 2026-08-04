@@ -67,6 +67,10 @@ export function useCriarSolicitacaoAdiantamento() {
       }
 
       // ── Resolver aprovador ──────────────────────────────────────────────────
+      // O roteamento segue o FAVORECIDO (quem recebe o adiantamento), não quem
+      // digitou: o comprador lança em nome de terceiros e a aprovação precisa
+      // cair no gestor/UF de quem vai receber. Sem colaborador correspondente
+      // (favorecido fornecedor PJ, p.ex.), volta a usar o solicitante.
       // Regras de roteamento (em ordem de prioridade):
       //   1. UF da obra onde o colaborador está lotado:
       //      MG → Welton Aparecido Pereira
@@ -75,13 +79,50 @@ export function useCriarSolicitacaoAdiantamento() {
       //   3. Gestor direto cadastrado no RH
       //   4. Fallback: Leandro Maia Mallet
 
-      const { data: colaborador, error: colaboradorError } = await supabase
-        .from('rh_colaboradores')
-        .select('id, nome, email, gestor_id, uf, obra_id, local_trabalho_uf')
-        .eq('perfil_id', perfil.id)
-        .maybeSingle()
+      const COLAB_FIELDS = 'id, nome, email, gestor_id, uf, obra_id, local_trabalho_uf'
+      type ColaboradorRota = {
+        id: string
+        nome: string
+        email: string | null
+        gestor_id: string | null
+        uf: string | null
+        obra_id: string | null
+        local_trabalho_uf: string | null
+      }
 
-      if (colaboradorError) throw colaboradorError
+      let colaborador: ColaboradorRota | null = null
+
+      const favorecidoEmail = payload.favorecido_email?.trim()
+      if (favorecidoEmail) {
+        const { data } = await supabase
+          .from('rh_colaboradores')
+          .select(COLAB_FIELDS)
+          .ilike('email', favorecidoEmail)
+          .limit(1)
+          .maybeSingle()
+        colaborador = (data as ColaboradorRota | null) ?? null
+      }
+
+      if (!colaborador && payload.favorecido_nome?.trim()) {
+        const { data } = await supabase
+          .from('rh_colaboradores')
+          .select(COLAB_FIELDS)
+          .ilike('nome', payload.favorecido_nome.trim())
+          .limit(1)
+          .maybeSingle()
+        colaborador = (data as ColaboradorRota | null) ?? null
+      }
+
+      if (!colaborador) {
+        const { data, error: colaboradorError } = await supabase
+          .from('rh_colaboradores')
+          .select(COLAB_FIELDS)
+          .eq('perfil_id', perfil.id)
+          .limit(1)
+          .maybeSingle()
+        if (colaboradorError) throw colaboradorError
+        colaborador = (data as ColaboradorRota | null) ?? null
+      }
 
       // Determinar UF efetiva (prioridade: campo explícito > obra > endereço)
       let ufEfetiva: string | null = null
