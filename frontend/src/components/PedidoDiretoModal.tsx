@@ -87,6 +87,9 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
   const [bancoAgencia, setBancoAgencia] = useState('')
   const [bancoConta, setBancoConta] = useState('')
   const [dataPrevistaEntrega, setDataPrevistaEntrega] = useState('')
+  // Vencimento explícito (boleto com data fechada). Preenchido, manda na frente
+  // da condição de pagamento e gera uma única parcela nessa data.
+  const [dataVencimento, setDataVencimento] = useState('')
   const [valorDesconto, setValorDesconto] = useState(0)
   const [justificativa, setJustificativa] = useState('')
   const [observacoes, setObservacoes] = useState('')
@@ -119,15 +122,18 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
     // Forma de pagamento/cartão vivem na parcela do Contas a Pagar
     supabase
       .from('fin_contas_pagar')
-      .select('forma_pagamento, cartao_id')
+      .select('forma_pagamento, cartao_id, data_vencimento')
       .eq('pedido_id', pedido.id)
       .in('status', ['previsto', 'confirmado'])
       .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
       .then(({ data }) => {
-        setFormaPagamento((data?.forma_pagamento as FormaPagamentoPedido) ?? '')
-        setCartaoId(data?.cartao_id ?? '')
+        const primeira = data?.[0]
+        setFormaPagamento((primeira?.forma_pagamento as FormaPagamentoPedido) ?? '')
+        setCartaoId(primeira?.cartao_id ?? '')
+        // Só reexibe como vencimento explícito quando é parcela única sem condição
+        // — com condição preenchida, quem manda continua sendo ela.
+        const semCondicao = !(pedido.condicao_pagamento ?? '').trim()
+        setDataVencimento(semCondicao && data?.length === 1 ? (primeira?.data_vencimento ?? '') : '')
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, pedido?.id])
@@ -276,6 +282,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
           classeFinanceiraId: classeId || undefined,
           condicaoPagamento: condicaoPagamento || undefined,
           dataPrevistaEntrega: dataPrevistaEntrega || undefined,
+          dataVencimento: dataVencimento || undefined,
           justificativaSemCotacao: toUpperNorm(justificativa),
           observacoes: observacoes ? toUpperNorm(observacoes) : undefined,
           empresaId: empresaId || undefined,
@@ -319,6 +326,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
         classeFinanceiraId: classeId || undefined,
         condicaoPagamento: condicaoPagamento || undefined,
         dataPrevistaEntrega: dataPrevistaEntrega || undefined,
+        dataVencimento: dataVencimento || undefined,
         justificativaSemCotacao: toUpperNorm(justificativa),
         observacoes: observacoes ? toUpperNorm(observacoes) : undefined,
         compradorId: perfil?.id,
@@ -567,15 +575,26 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
             </div>
           </div>
 
-          {/* Condição e Data */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Condição e Datas */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-bold text-slate-600">Cond. Pagamento</label>
               <input
-                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm uppercase focus:ring-2 focus:ring-orange-300 outline-none"
+                className={`mt-1 w-full border rounded-xl px-3 py-2 text-sm uppercase focus:ring-2 focus:ring-orange-300 outline-none ${
+                  dataVencimento ? 'border-slate-200 bg-slate-50 text-slate-400' : 'border-slate-200'
+                }`}
                 placeholder="Ex: 30 DDL"
                 value={condicaoPagamento}
                 onChange={e => setCondicaoPagamento(e.target.value.toUpperCase())}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-600">Data de Vencimento</label>
+              <input
+                type="date"
+                className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-orange-300 outline-none"
+                value={dataVencimento}
+                onChange={e => setDataVencimento(e.target.value)}
               />
             </div>
             <div>
@@ -589,6 +608,11 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
               />
             </div>
           </div>
+          <p className="-mt-2 text-[11px] text-slate-400">
+            {dataVencimento
+              ? 'Vencimento informado: gera uma única parcela nessa data (a condição de pagamento fica só como referência).'
+              : 'Sem data de vencimento, as parcelas saem da condição de pagamento contada a partir da previsão de entrega.'}
+          </p>
 
           {/* Meio de pagamento */}
           <div className="grid grid-cols-2 gap-3">

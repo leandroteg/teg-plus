@@ -696,6 +696,31 @@ export interface PedidoDiretoPayload {
   formaPagamento?: string
   cartaoId?: string
   valorDesconto?: number
+  /** Vencimento explícito. Quando informado, manda na frente da condição de pagamento. */
+  dataVencimento?: string
+}
+
+/**
+ * Parcelas do Pedido Extraordinário. Uma data de vencimento explícita vence a
+ * condição de pagamento — nem toda compra avulsa cabe em "30 DDL"; boleto de
+ * fornecedor costuma vir com data fechada.
+ */
+function resolverParcelasDireto(
+  valorTotal: number,
+  condicaoPagamento: string | undefined,
+  dataVencimento: string | undefined,
+  dataPrevistaEntrega: string | undefined,
+  hoje: string,
+) {
+  if (dataVencimento) {
+    return [{
+      numero: 1,
+      valor: Math.round(valorTotal * 100) / 100,
+      data_vencimento: dataVencimento,
+      descricao: condicaoPagamento || 'Vencimento informado',
+    }]
+  }
+  return gerarPreviaParcelas(valorTotal, condicaoPagamento || '', dataPrevistaEntrega || hoje)
 }
 
 export function useEmitirPedidoDireto() {
@@ -745,10 +770,12 @@ export function useEmitirPedidoDireto() {
       }
       const numeroPedido = `${prefix}-${String(nextSeq).padStart(5, '0')}`
 
-      const parcelasResolvidas = gerarPreviaParcelas(
+      const parcelasResolvidas = resolverParcelasDireto(
         payload.valorTotal,
-        payload.condicaoPagamento || '',
-        payload.dataPrevistaEntrega || now.toISOString().split('T')[0],
+        payload.condicaoPagamento,
+        payload.dataVencimento,
+        payload.dataPrevistaEntrega,
+        now.toISOString().split('T')[0],
       )
 
       const { data: pedido, error } = await supabase
@@ -761,6 +788,7 @@ export function useEmitirPedidoDireto() {
           status: 'emitido',
           data_pedido: now.toISOString().split('T')[0],
           data_prevista_entrega: payload.dataPrevistaEntrega || null,
+          data_vencimento: payload.dataVencimento || null,
           condicao_pagamento: payload.condicaoPagamento || null,
           centro_custo: payload.centroCusto || null,
           centro_custo_id: payload.centroCustoId || null,
@@ -874,6 +902,8 @@ export interface PedidoDiretoEdicaoPayload {
   formaPagamento?: string
   cartaoId?: string
   valorDesconto?: number
+  /** Vencimento explícito. Quando informado, manda na frente da condição de pagamento. */
+  dataVencimento?: string
 }
 
 /**
@@ -910,10 +940,12 @@ export function useEditarPedidoDireto() {
         throw new Error('Uma parcela deste pedido já está em lote/pagamento — ajuste pelo Financeiro.')
       }
 
-      const parcelasResolvidas = gerarPreviaParcelas(
+      const parcelasResolvidas = resolverParcelasDireto(
         payload.valorTotal,
-        payload.condicaoPagamento || '',
-        payload.dataPrevistaEntrega || now.toISOString().split('T')[0],
+        payload.condicaoPagamento,
+        payload.dataVencimento,
+        payload.dataPrevistaEntrega,
+        now.toISOString().split('T')[0],
       )
 
       const { error: updErr } = await supabase
@@ -921,6 +953,7 @@ export function useEditarPedidoDireto() {
         .update({
           valor_total: payload.valorTotal,
           data_prevista_entrega: payload.dataPrevistaEntrega || null,
+          data_vencimento: payload.dataVencimento || null,
           condicao_pagamento: payload.condicaoPagamento || null,
           centro_custo: payload.centroCusto || null,
           centro_custo_id: payload.centroCustoId || null,
