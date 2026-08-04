@@ -25,6 +25,10 @@ import {
   useResolverDevolucaoCP,
   useDocumentosCP,
   useRemoverDocumentoFin,
+  useAbatimentosCP,
+  useAdiantamentosDisponiveis,
+  useAbaterAdiantamento,
+  useDesfazerAbatimento,
   useObras,
   useExtratoCandidatos,
   useAplicarConciliacaoAuto,
@@ -2110,6 +2114,128 @@ function NovaPrevisaoPagamentoModal({
 // ── Seção de Imposto editável (Confirmados) ──────────────────────────────────
 const CP_IMPOSTO_TIPOS = ['IPI', 'ISS', 'INSS', 'IRRF', 'PIS+COFINS+CSLL', 'Outro']
 
+/**
+ * Adiantamento a fornecedor × título da nota (mig 218).
+ *
+ * O adiantamento foi pago antes da NF; quando ela chega, o título cheio não
+ * pode ser pago de novo. Aqui o Financeiro amarra os dois: o abatimento entra
+ * no valor a pagar e some do saldo do adiantamento.
+ */
+function CPAdiantamentoFornecedor({ cp, isDark }: { cp: ContaPagar; isDark: boolean }) {
+  const ehAdiantamento = cp.natureza === 'adiantamento'
+  const { data: abatimentos = [] } = useAbatimentosCP(cp.id)
+  const { data: disponiveis = [] } = useAdiantamentosDisponiveis({
+    fornecedorNome: cp.fornecedor_nome,
+    empresaId: cp.empresa_id,
+    cpId: cp.id,
+    enabled: !ehAdiantamento && !['pago', 'conciliado', 'cancelado'].includes(cp.status),
+  })
+  const abater = useAbaterAdiantamento()
+  const desfazer = useDesfazerAbatimento()
+  const [erro, setErro] = useState<string | null>(null)
+
+  const jaAbatido = Number(cp.valor_adiantamento_abatido ?? 0) || 0
+  const vinculos = abatimentos.filter(a => a.papel === (ehAdiantamento ? 'origem' : 'destino'))
+
+  // Adiantamento sem uso nenhum: nada a mostrar até alguém abater.
+  if (!ehAdiantamento && disponiveis.length === 0 && vinculos.length === 0) return null
+  if (ehAdiantamento && vinculos.length === 0) {
+    return (
+      <div className={`rounded-xl border px-3 py-2.5 text-xs ${isDark ? 'border-sky-500/20 bg-sky-500/[0.06]' : 'border-sky-200 bg-sky-50/60'}`}>
+        <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${isDark ? 'text-sky-400' : 'text-sky-600'}`}>
+          <Banknote size={10} /> Adiantamento a fornecedor
+        </p>
+        <p className={`mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          Saldo disponível de <b>{fmt(valorAPagarCP(cp))}</b> para abater quando {cp.fornecedor_nome} emitir a nota.
+        </p>
+      </div>
+    )
+  }
+
+  const saldoAdiantado = ehAdiantamento
+    ? Math.max(0, valorAPagarCP(cp) - vinculos.reduce((s, v) => s + Number(v.valor || 0), 0))
+    : 0
+
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 space-y-2 text-xs ${isDark ? 'border-sky-500/20 bg-sky-500/[0.06]' : 'border-sky-200 bg-sky-50/60'}`}>
+      <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${isDark ? 'text-sky-400' : 'text-sky-600'}`}>
+        <Banknote size={10} /> Adiantamento a fornecedor
+      </p>
+
+      {vinculos.length > 0 && (
+        <div className="space-y-1">
+          {vinculos.map(v => (
+            <div key={v.id} className="flex items-center gap-2">
+              <span className="truncate flex-1" title={v.outra_descricao ?? ''}>
+                {v.outro_pedido ? <b className="mr-1">{v.outro_pedido}</b> : null}
+                {v.outra_descricao ?? '—'}
+              </span>
+              <span className={`font-semibold shrink-0 ${ehAdiantamento ? 'text-sky-600' : 'text-emerald-600'}`}>
+                {ehAdiantamento ? '' : '− '}{fmt(Number(v.valor))}
+              </span>
+              {!['pago', 'conciliado'].includes(cp.status) && !ehAdiantamento && (
+                <button
+                  onClick={() => {
+                    setErro(null)
+                    desfazer.mutate(v.id, { onError: (e: any) => setErro(e?.message ?? 'Erro ao desfazer.') })
+                  }}
+                  disabled={desfazer.isPending}
+                  title="Desfazer este abatimento"
+                  className="shrink-0 p-0.5 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-40"
+                >
+                  <X size={10} />
+                </button>
+              )}
+            </div>
+          ))}
+          {ehAdiantamento && (
+            <p className={`pt-1 border-t ${isDark ? 'border-white/10 text-slate-400' : 'border-sky-100 text-slate-500'}`}>
+              Saldo restante: <b>{fmt(saldoAdiantado)}</b>
+            </p>
+          )}
+          {!ehAdiantamento && jaAbatido > 0 && (
+            <p className={`pt-1 border-t flex justify-between font-bold ${isDark ? 'border-white/10' : 'border-sky-100'}`}>
+              <span>A pagar após abatimento</span>
+              <span className="text-emerald-600">{fmt(valorAPagarCP(cp))}</span>
+            </p>
+          )}
+        </div>
+      )}
+
+      {!ehAdiantamento && disponiveis.length > 0 && (
+        <div className="space-y-1">
+          <p className={isDark ? 'text-slate-400' : 'text-slate-500'}>
+            {disponiveis.length === 1 ? 'Há 1 adiantamento' : `Há ${disponiveis.length} adiantamentos`} com saldo para {cp.fornecedor_nome}:
+          </p>
+          {disponiveis.map(a => (
+            <div key={a.cp_id} className="flex items-center gap-2">
+              <span className="truncate flex-1" title={a.descricao ?? ''}>
+                {a.numero_pedido ? <b className="mr-1">{a.numero_pedido}</b> : null}
+                saldo {fmt(Number(a.saldo))}
+              </span>
+              <button
+                onClick={() => {
+                  setErro(null)
+                  abater.mutate(
+                    { adiantamentoCpId: a.cp_id, destinoCpId: cp.id },
+                    { onError: (e: any) => setErro(e?.message ?? 'Erro ao abater.') },
+                  )
+                }}
+                disabled={abater.isPending}
+                className="shrink-0 px-2 py-0.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white text-[10px] font-bold disabled:opacity-50"
+              >
+                {abater.isPending ? 'Abatendo…' : 'Abater'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {erro && <p className="text-[11px] text-red-500">{erro}</p>}
+    </div>
+  )
+}
+
 type CPItemTaxState = {
   descricao:        string
   valor_item:       number
@@ -2816,6 +2942,8 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               </div>
             ) : null}
           </div>
+
+          {cp.fornecedor_nome && <CPAdiantamentoFornecedor cp={cp} isDark={isDark} />}
 
           {(cp.fornecedor_id || cp.fornecedor_nome) && (
             <FornecedorBankInfo

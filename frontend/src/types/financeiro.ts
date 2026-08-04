@@ -73,35 +73,36 @@ export interface Fornecedor {
 
 export type OrigemCP = 'compras' | 'logistica' | 'manual' | 'cartao_fatura' | 'locacao' | 'despesas' | 'frotas' | 'rh'
 
-/**
- * Valor que sai do caixa: original − desconto + juros/multa − imposto retido.
- * O `valor_original` é só a face do título; quem fecha o dia é este número.
- * Mesma conta do formulário de Previsão de Pagamento.
- */
-export function valorAPagarCP(cp: {
+/** O que entra na conta do valor a pagar. */
+export interface ValoresCP {
   valor_original?: number | null
   valor_desconto?: number | null
   valor_juros_multa?: number | null
   imposto_valor?: number | null
   imposto_deduzir?: boolean | null
-}): number {
+  /** Parte do título já coberta por adiantamento ao fornecedor (mig 218). */
+  valor_adiantamento_abatido?: number | null
+}
+
+/**
+ * Valor que sai do caixa:
+ *   original − desconto + juros/multa − imposto retido − adiantamento abatido.
+ * O `valor_original` é só a face do título; quem fecha o dia é este número.
+ * Mesma conta do formulário de Previsão de Pagamento.
+ */
+export function valorAPagarCP(cp: ValoresCP): number {
   const n = (v: number | null | undefined) => Number(v ?? 0) || 0
   return Math.max(0, Math.round((
     n(cp.valor_original)
     - n(cp.valor_desconto)
     + n(cp.valor_juros_multa)
     - (cp.imposto_deduzir ? n(cp.imposto_valor) : 0)
+    - n(cp.valor_adiantamento_abatido)
   ) * 100) / 100)
 }
 
-/** true quando desconto/juros/imposto mexem no valor — vale mostrar os dois números. */
-export function temAjusteCP(cp: {
-  valor_original?: number | null
-  valor_desconto?: number | null
-  valor_juros_multa?: number | null
-  imposto_valor?: number | null
-  imposto_deduzir?: boolean | null
-}): boolean {
+/** true quando desconto/juros/imposto/adiantamento mexem no valor — vale mostrar os dois números. */
+export function temAjusteCP(cp: ValoresCP): boolean {
   return valorAPagarCP(cp) !== (Number(cp.valor_original ?? 0) || 0)
 }
 
@@ -153,6 +154,8 @@ export interface ContaPagar {
   valor_desconto?: number
   /** Juros/multa pagos na baixa por atraso (mig 203). */
   valor_juros_multa?: number
+  /** Parte do título coberta por adiantamento ao fornecedor (mig 218). */
+  valor_adiantamento_abatido?: number
   data_emissao: string
   data_vencimento: string
   data_vencimento_orig: string

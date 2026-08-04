@@ -465,6 +465,113 @@ export function useDocumentosCP(cpId?: string) {
   })
 }
 
+// ══ Adiantamento a fornecedor × título da nota (mig 218) ═══════════════════
+
+export interface AdiantamentoDisponivel {
+  cp_id: string
+  numero_pedido?: string | null
+  descricao?: string | null
+  data_emissao?: string | null
+  status: string
+  valor: number
+  ja_abatido: number
+  saldo: number
+}
+
+export interface AbatimentoCP {
+  id: string
+  /** 'destino' = adiantamento que abate ESTE título · 'origem' = este adiantamento cobriu outro título */
+  papel: 'destino' | 'origem'
+  outra_cp_id: string
+  outra_descricao?: string | null
+  outro_pedido?: string | null
+  valor: number
+  criado_por_nome?: string | null
+  created_at: string
+}
+
+/** Adiantamentos com saldo do mesmo fornecedor, para abater no título da nota. */
+export function useAdiantamentosDisponiveis(args?: {
+  fornecedorNome?: string | null
+  empresaId?: string | null
+  cpId?: string | null
+  enabled?: boolean
+}) {
+  const { fornecedorNome, empresaId, cpId, enabled = true } = args ?? {}
+  return useQuery<AdiantamentoDisponivel[]>({
+    queryKey: ['fin-adiantamentos-disponiveis', fornecedorNome, empresaId, cpId],
+    enabled: enabled && !!fornecedorNome,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('fin_adiantamentos_disponiveis', {
+        p_fornecedor_nome: fornecedorNome,
+        p_empresa_id: empresaId ?? null,
+        p_excluir_cp_id: cpId ?? null,
+      })
+      if (error) return []
+      return (data ?? []) as AdiantamentoDisponivel[]
+    },
+    staleTime: 30_000,
+  })
+}
+
+/** Vínculos já feitos, nos dois sentidos (o título que recebeu e o adiantamento que deu). */
+export function useAbatimentosCP(cpId?: string) {
+  return useQuery<AbatimentoCP[]>({
+    queryKey: ['fin-abatimentos', cpId],
+    enabled: !!cpId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('fin_abatimentos_da_cp', { p_cp_id: cpId })
+      if (error) return []
+      return (data ?? []) as AbatimentoCP[]
+    },
+    staleTime: 30_000,
+  })
+}
+
+function invalidarAbatimento(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['fin-abatimentos'] })
+  qc.invalidateQueries({ queryKey: ['fin-adiantamentos-disponiveis'] })
+  qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+}
+
+export function useAbaterAdiantamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ adiantamentoCpId, destinoCpId, valor }: {
+      adiantamentoCpId: string
+      destinoCpId: string
+      valor?: number
+    }) => {
+      const { data, error } = await supabase.rpc('fin_adiantamento_abater', {
+        p_adiantamento_cp_id: adiantamentoCpId,
+        p_destino_cp_id: destinoCpId,
+        p_valor: valor ?? null,
+      })
+      if (error) throw new Error(error.message)
+      const r = data as { ok: boolean; erro?: string; valor?: number; saldo_restante?: number }
+      if (!r?.ok) throw new Error(r?.erro ?? 'Não foi possível abater o adiantamento.')
+      return r
+    },
+    onSuccess: () => invalidarAbatimento(qc),
+  })
+}
+
+export function useDesfazerAbatimento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (abatimentoId: string) => {
+      const { data, error } = await supabase.rpc('fin_adiantamento_desfazer_abatimento', {
+        p_abatimento_id: abatimentoId,
+      })
+      if (error) throw new Error(error.message)
+      const r = data as { ok: boolean; erro?: string }
+      if (!r?.ok) throw new Error(r?.erro ?? 'Não foi possível desfazer o abatimento.')
+      return r
+    },
+    onSuccess: () => invalidarAbatimento(qc),
+  })
+}
+
 /**
  * Remove um documento anexado por engano (NF do pedido errado, boleto trocado).
  * Apaga o registro e, em seguida, tenta apagar o arquivo do bucket — se o
