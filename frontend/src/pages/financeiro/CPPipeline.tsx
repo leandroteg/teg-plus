@@ -241,7 +241,10 @@ type NovaSolicitacaoExtraForm = {
 type NovaSolicitacaoKind = 'extraordinario' | 'previsao'
 
 type NovaPrevisaoPagamentoForm = {
+  /** Descrição do que é a despesa ("Aluguel sala 3", "Licença Totvs") */
   nome: string
+  fornecedor_id: string
+  fornecedor_nome: string
   valor: string
   centro_custo: string
   classe_financeira: string
@@ -280,6 +283,8 @@ const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
 
 const EMPTY_PREVISAO_FORM: NovaPrevisaoPagamentoForm = {
   nome: '',
+  fornecedor_id: '',
+  fornecedor_nome: '',
   valor: '',
   centro_custo: '',
   classe_financeira: '',
@@ -1278,6 +1283,23 @@ function NovaPrevisaoPagamentoModal({
   const [arquivos, setArquivos] = useState<ArquivoPrevisao[]>([])
   const [tipoAnexo, setTipoAnexo] = useState<TipoDocPrevisao>('nota_fiscal')
   const fileRef = useRef<HTMLInputElement>(null)
+  const { data: fornecedores = [] } = useCadFornecedores({ ativo: true })
+  const [fornBusca, setFornBusca] = useState('')
+  const [fornOpen, setFornOpen] = useState(false)
+  const [showFornecedorCadastro, setShowFornecedorCadastro] = useState(false)
+
+  // Fornecedor sai do cadastro (busca por nome ou CNPJ) — nada de digitar
+  // nome livre, que gerava CP sem vínculo com o catálogo.
+  const soDigitosBusca = fornBusca.replace(/\D/g, '')
+  const fornecedoresFiltrados = fornecedores
+    .filter(f => {
+      const termo = fornBusca.trim().toLowerCase()
+      if (!termo) return false
+      const porNome = `${f.nome_fantasia ?? ''} ${f.razao_social ?? ''}`.toLowerCase().includes(termo)
+      const porCnpj = soDigitosBusca.length >= 3 && (f.cnpj ?? '').replace(/\D/g, '').includes(soDigitosBusca)
+      return porNome || porCnpj
+    })
+    .slice(0, 12)
 
   const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
     isDark
@@ -1319,6 +1341,7 @@ function NovaPrevisaoPagamentoModal({
   const classeSelecionada = classesFinanceiras.find(classe => getLookupValue(classe.codigo, classe.descricao) === form.classe_financeira)
 
   const canSubmit = form.nome.trim().length > 0
+    && form.fornecedor_id.length > 0
     && form.centro_custo.length > 0
     && form.classe_financeira.length > 0
     && Number(form.valor) > 0
@@ -1335,6 +1358,8 @@ function NovaPrevisaoPagamentoModal({
     try {
       await criarPrevisaoMut.mutateAsync({
         nome: form.nome,
+        fornecedorId: form.fornecedor_id,
+        fornecedorNome: form.fornecedor_nome,
         valor: Number(form.valor),
         centro_custo: form.centro_custo,
         classe_financeira: form.classe_financeira,
@@ -1380,8 +1405,69 @@ function NovaPrevisaoPagamentoModal({
             <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Use esta tela para antecipar despesas esperadas e montar o pipeline financeiro com antecedência.</p>
           </div>
 
+          {/* Fornecedor: só do cadastro (busca por nome ou CNPJ) */}
+          <div className="relative">
+            <label className={labelCls}>Fornecedor *</label>
+            {form.fornecedor_id ? (
+              <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 border ${isDark ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-emerald-200 bg-emerald-50'}`}>
+                <span className={`text-sm font-semibold truncate ${isDark ? 'text-emerald-200' : 'text-emerald-800'}`}>
+                  {form.fornecedor_nome}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { setField('fornecedor_id', ''); setField('fornecedor_nome', ''); setFornBusca('') }}
+                  className="text-slate-400 hover:text-slate-600 shrink-0"
+                  title="Trocar fornecedor"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <input
+                  value={fornBusca}
+                  onChange={e => { setFornBusca(e.target.value.toUpperCase()); setFornOpen(true) }}
+                  onFocus={() => setFornOpen(true)}
+                  onBlur={() => setTimeout(() => setFornOpen(false), 150)}
+                  className={inputCls}
+                  placeholder="Buscar por nome ou CNPJ..."
+                />
+                {fornOpen && fornBusca.trim() && (
+                  <div className={`absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-2xl border shadow-xl ${isDark ? 'border-white/[0.08] bg-slate-950' : 'border-slate-200 bg-white'}`}>
+                    {fornecedoresFiltrados.map(f => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onMouseDown={() => {
+                          setField('fornecedor_id', f.id)
+                          setField('fornecedor_nome', f.nome_fantasia || f.razao_social || '')
+                          setFornBusca('')
+                          setFornOpen(false)
+                        }}
+                        className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${isDark ? 'text-slate-200 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
+                      >
+                        <span className="truncate font-medium">{f.nome_fantasia || f.razao_social}</span>
+                        {f.cnpj && <span className="text-[11px] text-slate-400 shrink-0 font-mono">{formatCNPJ(f.cnpj)}</span>}
+                      </button>
+                    ))}
+                    {fornecedoresFiltrados.length === 0 && (
+                      <p className="px-3 py-2 text-[11px] text-slate-400">Nenhum fornecedor encontrado.</p>
+                    )}
+                    <button
+                      type="button"
+                      onMouseDown={() => { setFornOpen(false); setShowFornecedorCadastro(true) }}
+                      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold border-t ${isDark ? 'border-white/[0.06] text-emerald-300 hover:bg-white/[0.04]' : 'border-slate-100 text-emerald-600 hover:bg-emerald-50'}`}
+                    >
+                      <Plus size={13} /> Cadastrar novo fornecedor
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           <div>
-            <label className={labelCls}>Nome *</label>
+            <label className={labelCls}>Descrição *</label>
             <UpperInput value={form.nome} onChange={e => setField('nome', e.target.value)} className={inputCls} placeholder="Ex.: Aluguel, licença, consultoria, condomínio" />
           </div>
 

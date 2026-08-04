@@ -449,8 +449,12 @@ export function useCriarPrevisaoPagamentoCP() {
       desconto,
       imposto,
       arquivos,
+      fornecedorId,
+      fornecedorNome,
     }: {
       nome: string
+      fornecedorId?: string
+      fornecedorNome?: string
       valor: number
       centro_custo: string
       classe_financeira: string
@@ -472,7 +476,8 @@ export function useCriarPrevisaoPagamentoCP() {
       const { data, error } = await supabase
         .from('fin_contas_pagar')
         .insert({
-          fornecedor_nome: nome.trim(),
+          fornecedor_id: fornecedorId || null,
+          fornecedor_nome: (fornecedorNome || nome).trim(),
           origem: 'manual',
           valor_original: valor,
           valor_pago: 0,
