@@ -350,7 +350,12 @@ export default function EmitirPedidoModal({
   const obraSelecionada = obras.find((item) => item.id === requisicao?.obra_id)
   const fornecedorDB = data?.fornecedorDB ?? null
   const cartaoSelecionado = cartoes.find((cartao) => cartao.id === cartaoId)
-  const bankingIncomplete = !!fornecedorDB && !fornecedorDB.boleto && !fornecedorDB.cartao && !fornecedorDB.pix_chave && (!fornecedorDB.banco_nome || !fornecedorDB.conta)
+  const bankingIncompleteBase = !!fornecedorDB && !fornecedorDB.boleto && !fornecedorDB.cartao && !fornecedorDB.pix_chave && (!fornecedorDB.banco_nome || !fornecedorDB.conta)
+  // Cadastro pode ter UM meio e o pedido sair por OUTRO (ex.: só boleto, pagamento
+  // por Pix) — aí a chave precisa ser pedida aqui, senão não há onde informar.
+  const faltaPix = formaPagamento === 'pix' && !fornecedorDB?.pix_chave
+  const faltaBanco = formaPagamento === 'transferencia' && (!fornecedorDB?.banco_nome || !fornecedorDB?.conta)
+  const bankingIncomplete = !!fornecedorDB && (bankingIncompleteBase || faltaPix || faltaBanco)
   const bankingProvided = bancoBoleto || bancoCartao || bancoPix.trim() || (bancoBancoNome.trim() && bancoConta.trim())
   // Frete/desconto vêm da proposta vencedora e podem ser renegociados aqui no
   // fechamento. O total do pedido é sempre produtos + frete − desconto.
@@ -707,9 +712,15 @@ export default function EmitirPedidoModal({
                       <Landmark size={14} className="text-violet-600" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-violet-700">Dados bancários do fornecedor incompletos</p>
+                      <p className="text-xs font-bold text-violet-700">
+                        {faltaPix ? 'Fornecedor sem chave PIX cadastrada'
+                          : faltaBanco ? 'Fornecedor sem dados bancários cadastrados'
+                          : 'Dados bancários do fornecedor incompletos'}
+                      </p>
                       <p className="text-[11px] text-violet-500 mt-0.5">
-                        Preencha abaixo para agilizar o pagamento. Os dados serão salvos no cadastro do fornecedor.
+                        {faltaPix ? 'Informe a chave PIX para pagar por Pix — será salva no cadastro do fornecedor.'
+                          : faltaBanco ? 'Informe banco, agência e conta para a transferência — será salvo no cadastro.'
+                          : 'Preencha abaixo para agilizar o pagamento. Os dados serão salvos no cadastro do fornecedor.'}
                       </p>
                     </div>
                   </div>
