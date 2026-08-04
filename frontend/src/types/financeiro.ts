@@ -73,6 +73,20 @@ export interface Fornecedor {
 
 export type OrigemCP = 'compras' | 'logistica' | 'manual' | 'cartao_fatura' | 'locacao'
 
+/**
+ * Dados para pagamento gravados no próprio lançamento (mig 222).
+ * Na CP são os dados de quem recebe (beneficiário); na CR, os dados bancários
+ * do cliente que está pagando.
+ */
+export interface DadosPagamento {
+  favorecido?: string
+  banco_nome?: string
+  agencia?: string
+  conta?: string
+  pix_tipo?: string
+  pix_chave?: string
+}
+
 export interface ContaPagar {
   id: string
   pedido_id?: string
@@ -124,6 +138,8 @@ export interface ContaPagar {
   remessa_erro?: string
   descricao?: string
   observacoes?: string
+  /** Dados para pagamento do beneficiário (mig 222) */
+  dados_pagamento?: DadosPagamento | null
   created_at: string
   updated_at?: string
   criado_por_nome?: string | null
@@ -189,6 +205,8 @@ export interface ContaReceber {
   email_compartilhado_para?: string
   descricao?: string
   observacoes?: string
+  /** Dados bancários do cliente pagador (mig 222) */
+  dados_pagamento?: DadosPagamento | null
   created_at: string
   updated_at?: string
   criado_por_nome?: string | null

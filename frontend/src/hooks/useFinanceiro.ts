@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { gerarNomeAmigavelAnexo } from '../utils/nomeAmigavelAnexo'
+import type { ArquivoFinanceiro } from '../types/documentosFin'
 import type {
   ContaPagar, ContaReceber, Fornecedor, DadosPagamento,
   FinanceiroDashboardData, FinanceiroKPIs,
@@ -325,7 +326,8 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       fornecedorNome?: string
       fornecedorCnpj?: string
       dadosBancarios?: DadosPagamento
-      arquivos?: File[]
+      /** File puro = compat com chamadas antigas (entra como 'outro') */
+      arquivos?: Array<File | ArquivoFinanceiro>
     }) => {
       const hoje = new Date().toISOString().split('T')[0]
       const vencimento = dataVencimento?.trim() || hoje
@@ -363,7 +365,10 @@ export function useCriarSolicitacaoExtraordinariaCP() {
         .single()
       if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao criar solicita\u00e7\u00e3o extraordin\u00e1ria'))
 
-      for (const arquivo of arquivos ?? []) {
+      for (const item of arquivos ?? []) {
+        // Compat: chamadas antigas mandavam File puro (sem tipo) — vira 'outro'.
+        const arquivo = item instanceof File ? item : item.file
+        const tipoDoc = item instanceof File ? 'outro' : item.tipo
         const ext = arquivo.name.split('.').pop()?.toLowerCase() || 'bin'
         // bucket financeiro-docs (mig 207) — antes apontava p/ 'tesouraria-extratos',
         // que nunca existiu: todo anexo falhava em silêncio.
@@ -376,21 +381,26 @@ export function useCriarSolicitacaoExtraordinariaCP() {
           continue
         }
         const { data: urlData } = supabase.storage.from('financeiro-docs').getPublicUrl(path)
-        uploadedArquivos.push({ nome: arquivo.name, url: urlData.publicUrl })
+
+        // NF/boleto ganham nome legível, mesma regra dos anexos de Pedido
+        let nomeExibicao = arquivo.name
+        try {
+          nomeExibicao = await gerarNomeAmigavelAnexo(arquivo, tipoDoc, fornecedorNome)
+        } catch { /* mantém o nome original */ }
+        uploadedArquivos.push({ nome: nomeExibicao, url: urlData.publicUrl })
 
         // Registra também em fin_documentos — é de lá que o AprovAí e demais
         // telas listam os anexos da CP (o texto em observacoes é só um espelho).
-        await supabase.from('fin_documentos').insert({
+        const { error: docErr } = await supabase.from('fin_documentos').insert({
           entity_type: 'cp',
           entity_id: data.id,
-          tipo: 'comprovante',
-          nome_arquivo: arquivo.name,
+          tipo: tipoDoc,
+          nome_arquivo: nomeExibicao,
           arquivo_url: urlData.publicUrl,
           mime_type: arquivo.type || null,
           tamanho_bytes: arquivo.size || null,
-        }).then(({ error: docErr }) => {
-          if (docErr) console.warn('Aviso: anexo não registrado em fin_documentos:', docErr.message)
         })
+        if (docErr) uploadFalhas.push(`${arquivo.name}: ${docErr.message}`)
       }
 
       if (dadosBancarios || uploadedArquivos.length > 0 || uploadFalhas.length > 0) {
@@ -488,7 +498,7 @@ export function useCriarPrevisaoPagamentoCP() {
       jurosMulta?: number
       empresaId?: string
       imposto?: { tipo: string; aliquota: number; valor: number; deduzir: boolean }
-      arquivos?: Array<{ file: File; tipo: 'nota_fiscal' | 'boleto' | 'outro' }>
+      arquivos?: ArquivoFinanceiro[]
     }) => {
       const observacoes = [
         'Previsão de pagamento registrada manualmente.',
@@ -603,7 +613,7 @@ export function useEditarPrevisaoPagamentoCP() {
       jurosMulta?: number
       empresaId?: string
       imposto?: { tipo: string; aliquota: number; valor: number; deduzir: boolean }
-      arquivos?: Array<{ file: File; tipo: 'nota_fiscal' | 'boleto' | 'outro' }>
+      arquivos?: ArquivoFinanceiro[]
     }) => {
       const { data: atual, error: readErr } = await supabase
         .from('fin_contas_pagar')
@@ -1301,8 +1311,10 @@ export function useLancarNFRecebimento() {
       /** mig 215 — dados bancários do cliente pagador */
       dados_pagamento?: DadosPagamento
       danfeFile?: File
+      /** NF/boleto/recibo/outros anexados no lançamento → fin_documentos (entity_type='cr') */
+      anexos?: ArquivoFinanceiro[]
     }) => {
-      const { danfeFile, dados_pagamento, ...campos } = v
+      const { danfeFile, dados_pagamento, anexos, ...campos } = v
       const { data, error } = await supabase.from('fin_contas_receber')
         .insert({
           ...campos,
@@ -1326,11 +1338,45 @@ export function useLancarNFRecebimento() {
           await supabase.from('fin_contas_receber').update({ danfe_url: publicUrl }).eq('id', crId)
         }
       }
+
+      // Demais documentos (recibo, boleto, outros) → financeiro-docs + fin_documentos.
+      // Best-effort como a DANFE: falha aqui não desfaz a CR já criada.
+      const falhasAnexo: string[] = []
+      for (const item of anexos ?? []) {
+        const ext = item.file.name.split('.').pop()?.toLowerCase() || 'bin'
+        const path = `cr/${crId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        const up = await supabase.storage.from('financeiro-docs').upload(path, item.file, {
+          contentType: item.file.type || undefined,
+        })
+        if (up.error) { falhasAnexo.push(`${item.file.name}: ${up.error.message}`); continue }
+        const { data: urlData } = supabase.storage.from('financeiro-docs').getPublicUrl(path)
+
+        let nomeExibicao = item.file.name
+        try {
+          nomeExibicao = await gerarNomeAmigavelAnexo(item.file, item.tipo, v.cliente_nome)
+        } catch { /* mantém o nome original */ }
+
+        const { error: docErr } = await supabase.from('fin_documentos').insert({
+          entity_type: 'cr',
+          entity_id: crId,
+          tipo: item.tipo,
+          nome_arquivo: nomeExibicao,
+          arquivo_url: urlData.publicUrl,
+          mime_type: item.file.type || null,
+          tamanho_bytes: item.file.size || null,
+        })
+        if (docErr) falhasAnexo.push(`${item.file.name}: ${docErr.message}`)
+      }
+      if (falhasAnexo.length > 0) {
+        throw new Error(`NF lançada, mas houve falha nos anexos: ${falhasAnexo.join(' | ')}`)
+      }
+
       return crId
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contas-receber'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['fin-documentos'] })
     },
   })
 }

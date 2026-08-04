@@ -43,6 +43,10 @@ import { useCadFornecedores } from '../../hooks/useCadastros'
 import { formatCNPJ, formatCpfCnpj, isCpfOuCnpj, normalizeDigits } from '../../hooks/useFornecedorVinculo'
 import CancelamentoDocControl from '../../components/financeiro/CancelamentoDocControl'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras, useLookupEmpresas } from '../../hooks/useLookups'
+import {
+  TIPOS_DOC_FINANCEIRO, rotuloCurtoDocFin,
+  type TipoDocFinanceiro, type ArquivoFinanceiro,
+} from '../../types/documentosFin'
 import SearchableSelect from '../../components/SearchableSelect'
 import { AnexoReferencia } from '../../components/AnexoReferencia'
 import type { SelectOption } from '../../components/SearchableSelect'
@@ -276,8 +280,9 @@ type NovaPrevisaoPagamentoForm = {
 }
 
 /** Tipos de documento aceitos na previsão (espelham fin_documentos.tipo) */
-type TipoDocPrevisao = 'nota_fiscal' | 'boleto' | 'outro'
-type ArquivoPrevisao = { file: File; tipo: TipoDocPrevisao }
+/** @deprecated use TipoDocFinanceiro (types/documentosFin) — mantido p/ compat local */
+type TipoDocPrevisao = TipoDocFinanceiro
+type ArquivoPrevisao = ArquivoFinanceiro
 
 const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
   descricao: '',
@@ -813,7 +818,8 @@ function NovaSolicitacaoExtraordinariaModal({
   const { data: fornecedores = [] } = useCadFornecedores({ ativo: true })
   const criarSolicitacaoMut = useCriarSolicitacaoExtraordinariaCP()
   const [form, setForm] = useState<NovaSolicitacaoExtraForm>(EMPTY_EXTRA_FORM)
-  const [arquivos, setArquivos] = useState<File[]>([])
+  const [arquivos, setArquivos] = useState<ArquivoFinanceiro[]>([])
+  const [tipoAnexoExtra, setTipoAnexoExtra] = useState<TipoDocFinanceiro>('nota_fiscal')
   const [erro, setErro] = useState('')
   const [ccBusca, setCcBusca] = useState('')
   const [classeBusca, setClasseBusca] = useState('')
@@ -1278,21 +1284,36 @@ function NovaSolicitacaoExtraordinariaModal({
           </div>
 
           <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
-            <div>
-              <p className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Anexos</p>
-              <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Envie comprovantes, boletos, ordens de pagamento ou outros arquivos de suporte.</p>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Anexos</p>
+                <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>NF, boleto, recibo ou outros arquivos de suporte.</p>
+              </div>
+              <select value={tipoAnexoExtra} onChange={e => setTipoAnexoExtra(e.target.value as TipoDocFinanceiro)} className={`${inputCls} w-auto`}>
+                {TIPOS_DOC_FINANCEIRO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
             </div>
             <input
               type="file"
               multiple
-              onChange={e => setArquivos(Array.from(e.target.files ?? []))}
+              onChange={e => {
+                const novos = Array.from(e.target.files ?? []).map(file => ({ file, tipo: tipoAnexoExtra }))
+                if (novos.length) setArquivos(prev => [...prev, ...novos])
+                e.target.value = ''
+              }}
               className={`block w-full text-xs ${isDark ? 'text-slate-300 file:bg-white/[0.08] file:text-slate-200' : 'text-slate-600 file:bg-white file:text-slate-700'} file:mr-3 file:rounded-xl file:border-0 file:px-3 file:py-2`}
             />
             {arquivos.length > 0 && (
               <div className="space-y-1">
-                {arquivos.map(file => (
-                  <div key={`${file.name}-${file.size}`} className={`rounded-lg px-3 py-2 text-[11px] ${isDark ? 'bg-white/[0.04] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'}`}>
-                    {file.name}
+                {arquivos.map((a, i) => (
+                  <div key={`${a.file.name}-${i}`} className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[11px] ${isDark ? 'bg-white/[0.04] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'}`}>
+                    <span className="truncate">
+                      <span className={`font-semibold mr-1 ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>{rotuloCurtoDocFin(a.tipo)}</span>
+                      {a.file.name}
+                    </span>
+                    <button type="button" onClick={() => setArquivos(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-red-500 shrink-0">
+                      <X size={12} />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1920,12 +1941,10 @@ function NovaPrevisaoPagamentoModal({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Documentos</p>
-                <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>NF, boleto ou outros anexos desta previsão.</p>
+                <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>NF, boleto, recibo ou outros anexos desta previsão.</p>
               </div>
               <select value={tipoAnexo} onChange={e => setTipoAnexo(e.target.value as TipoDocPrevisao)} className={`${inputCls} w-auto`}>
-                <option value="nota_fiscal">Nota Fiscal</option>
-                <option value="boleto">Boleto</option>
-                <option value="outro">Outro</option>
+                {TIPOS_DOC_FINANCEIRO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <input
@@ -1955,7 +1974,7 @@ function NovaPrevisaoPagamentoModal({
                   <li key={i} className={`flex items-center justify-between gap-2 text-[11px] rounded-lg px-2 py-1.5 ${isDark ? 'bg-white/[0.04] text-slate-300' : 'bg-white text-slate-600'}`}>
                     <span className="truncate">
                       <span className={`font-semibold mr-1 ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
-                        {a.tipo === 'nota_fiscal' ? 'NF' : a.tipo === 'boleto' ? 'Boleto' : 'Outro'}
+                        {rotuloCurtoDocFin(a.tipo)}
                       </span>
                       {a.file.name}
                     </span>
@@ -2806,9 +2825,10 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                     <span className={`font-bold shrink-0 px-1.5 py-0.5 rounded ${
                       doc.tipo === 'nota_fiscal' ? 'bg-amber-100 text-amber-700'
                         : doc.tipo === 'boleto' ? 'bg-cyan-100 text-cyan-700'
+                        : doc.tipo === 'recibo' ? 'bg-violet-100 text-violet-700'
                         : 'bg-slate-100 text-slate-500'
                     }`}>
-                      {doc.tipo === 'nota_fiscal' ? 'NF' : doc.tipo === 'boleto' ? 'Boleto' : 'Doc'}
+                      {rotuloCurtoDocFin(doc.tipo)}
                     </span>
                     <span className="truncate text-slate-600 font-medium">{doc.nome_arquivo}</span>
                     <ExternalLink size={8} className="text-slate-300 group-hover:text-slate-500 shrink-0 ml-auto" />

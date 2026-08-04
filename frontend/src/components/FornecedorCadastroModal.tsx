@@ -75,8 +75,16 @@ export default function FornecedorCadastroModal({
     if (errorMessage) erroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [errorMessage])
 
+  // initialData é SEMENTE, não estado: hidrata uma vez por abertura.
+  // Antes o efeito dependia do objeto inteiro, e a maioria das telas passa um
+  // literal inline (`initialData={{ ... }}`) — identidade nova a cada render do
+  // pai. Resultado: qualquer re-render da tela de trás (clique, refetch, o
+  // próprio digitar em outro campo) apagava tudo que já tinha sido preenchido.
+  const hidratado = useRef(false)
   useEffect(() => {
-    if (!open) return
+    if (!open) { hidratado.current = false; return }
+    if (hidratado.current) return
+    hidratado.current = true
     setForm({ ...EMPTY_FORM, ...initialData })
     setErrorMessage(null)
     setStaged([])
@@ -96,13 +104,16 @@ export default function FornecedorCadastroModal({
     }))
   }, []))
 
+  // Depende de `consultar` (estável via useCallback), não do objeto do hook —
+  // ele muda de identidade a cada render e refazia este efeito à toa.
+  const { consultar: consultarCnpj } = cnpjLookup
   useEffect(() => {
     if (!open) return
     const cnpj = normalizeDigits(initialData.cnpj)
     if (cnpj.length === 14) {
-      void cnpjLookup.consultar(cnpj)
+      void consultarCnpj(cnpj)
     }
-  }, [open, initialData.cnpj, cnpjLookup])
+  }, [open, initialData.cnpj, consultarCnpj])
 
   const bg = dark ? 'bg-[#0f172a]' : 'bg-white'
   const border = dark ? 'border-white/10' : 'border-slate-200'

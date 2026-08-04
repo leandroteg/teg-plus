@@ -13,6 +13,11 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLancarNFRecebimento, useOscsParaNF } from '../../hooks/useFinanceiro'
 import { useLookupEmpresas } from '../../hooks/useLookups'
+import { UpperInput } from '../UpperInput'
+import {
+  TIPOS_DOC_FINANCEIRO, rotuloCurtoDocFin,
+  type TipoDocFinanceiro, type ArquivoFinanceiro,
+} from '../../types/documentosFin'
 
 const CEMIG = { nome: 'CEMIG DISTRIBUIÇÃO S.A.', cnpj: '06.981.180/0001-16' }
 /** prazo padrão da CEMIG — confirmado nas NFs de junho e julho/26 */
@@ -59,7 +64,17 @@ export default function LancarNFModal({ onClose, onCriado }: { onClose: () => vo
   const [empresaId, setEmpresaId] = useState('')
   const [obs, setObs] = useState('')
   const [danfe, setDanfe] = useState<File | null>(null)
+  const [anexos, setAnexos] = useState<ArquivoFinanceiro[]>([])
+  const [tipoAnexo, setTipoAnexo] = useState<TipoDocFinanceiro>('recibo')
   const [erro, setErro] = useState<string | null>(null)
+  // Dados bancários do cliente pagador (mig 222) — de onde o dinheiro vem,
+  // usado na conciliação do extrato e em eventual devolução.
+  const [favorecido, setFavorecido] = useState('')
+  const [bancoNome, setBancoNome] = useState('')
+  const [agencia, setAgencia] = useState('')
+  const [conta, setConta] = useState('')
+  const [pixTipo, setPixTipo] = useState('')
+  const [pixChave, setPixChave] = useState('')
 
   // vencimento acompanha a emissão até alguém editar à mão
   useEffect(() => { if (!vencManual) setVenc(somaDias(emissao, PRAZO_DIAS)) }, [emissao, vencManual])
@@ -77,6 +92,8 @@ export default function LancarNFModal({ onClose, onCriado }: { onClose: () => vo
   const valorReceber = Math.max(0, Math.round((valorNum - descontoNum + jurosNum) * 100) / 100)
   const podeSalvar = !!nf.trim() && valorNum > 0 && !!emissao && !!venc && !!empresaId && !lancar.isPending
 
+  const temDadosBanco = [bancoNome, agencia, conta, pixChave].some(v => v.trim())
+
   async function salvar() {
     setErro(null)
     try {
@@ -92,7 +109,15 @@ export default function LancarNFModal({ onClose, onCriado }: { onClose: () => vo
         descricao: osc ? `${osc.obra_nome ?? ''} · ${osc.numero_os}`.trim() : undefined,
         observacoes: obs.trim() || undefined,
         criado_por_nome: quem,
+        dados_pagamento: {
+          // Sem favorecido digitado, o titular é o próprio cliente da NF
+          favorecido: favorecido.trim() || (temDadosBanco ? cliente.trim() : ''),
+          banco_nome: bancoNome.trim(),
+          agencia: agencia.trim(), conta: conta.trim(),
+          pix_tipo: pixTipo, pix_chave: pixChave.trim(),
+        },
         danfeFile: danfe ?? undefined,
+        anexos,
       })
       onCriado?.(); onClose()
     } catch (e) { setErro((e as Error).message) }
@@ -198,6 +223,38 @@ export default function LancarNFModal({ onClose, onCriado }: { onClose: () => vo
             </select>
           </div>
 
+          {/* Dados bancários do cliente pagador (mig 222) */}
+          <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-slate-50/70'}`}>
+            <div>
+              <p className={`text-xs font-bold ${txt}`}>Dados para pagamento do cliente</p>
+              <p className={`text-[11px] ${sub}`}>De onde o pagamento vem — ajuda na conciliação do extrato. Opcional.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="sm:col-span-2">
+                <label className={lab}>Favorecido / titular da conta</label>
+                <UpperInput value={favorecido} onChange={e => setFavorecido(e.target.value)} className={inp} placeholder={cliente || 'Titular da conta'} />
+              </div>
+              <div><label className={lab}>Banco</label><UpperInput value={bancoNome} onChange={e => setBancoNome(e.target.value)} className={inp} placeholder="Nome do banco" /></div>
+              <div><label className={lab}>Agência</label><UpperInput value={agencia} onChange={e => setAgencia(e.target.value)} className={inp} placeholder="0001" /></div>
+              <div><label className={lab}>Conta</label><UpperInput value={conta} onChange={e => setConta(e.target.value)} className={inp} placeholder="12345-6" /></div>
+              <div>
+                <label className={lab}>Tipo PIX</label>
+                <select value={pixTipo} onChange={e => setPixTipo(e.target.value)} className={inp}>
+                  <option value="">Selecione...</option>
+                  <option value="cpf">CPF</option>
+                  <option value="cnpj">CNPJ</option>
+                  <option value="email">E-mail</option>
+                  <option value="telefone">Telefone</option>
+                  <option value="aleatoria">Chave aleatória</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className={lab}>Chave PIX</label>
+                <UpperInput value={pixChave} onChange={e => setPixChave(e.target.value)} className={inp} placeholder="Informe a chave PIX" />
+              </div>
+            </div>
+          </div>
+
           <div>
             <label className={lab}>Observações</label>
             <textarea value={obs} onChange={e => setObs(e.target.value)} rows={2} className={inp}
@@ -213,6 +270,42 @@ export default function LancarNFModal({ onClose, onCriado }: { onClose: () => vo
               <input type="file" accept="application/pdf" className="hidden"
                 onChange={e => setDanfe(e.target.files?.[0] ?? null)} />
             </label>
+          </div>
+
+          {/* Outros documentos da NF: recibo, boleto, comprovantes */}
+          <div>
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <label className={lab}>Outros documentos</label>
+              <select value={tipoAnexo} onChange={e => setTipoAnexo(e.target.value as TipoDocFinanceiro)}
+                className={`${inp} w-auto py-1 text-xs`}>
+                {TIPOS_DOC_FINANCEIRO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer text-sm ${
+              isDark ? 'bg-white/[0.04] border-white/10 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
+              <Upload size={14} className={sub} />
+              <span className="truncate">Anexar {TIPOS_DOC_FINANCEIRO.find(t => t.value === tipoAnexo)?.label.toLowerCase()}…</span>
+              <input type="file" multiple className="hidden"
+                onChange={e => {
+                  const novos = Array.from(e.target.files ?? []).map(file => ({ file, tipo: tipoAnexo }))
+                  if (novos.length) setAnexos(prev => [...prev, ...novos])
+                  e.target.value = ''
+                }} />
+            </label>
+            {anexos.length > 0 && (
+              <ul className="mt-1 space-y-1">
+                {anexos.map((a, i) => (
+                  <li key={i} className={`flex items-center justify-between gap-2 text-[11px] rounded-lg px-2 py-1.5 ${isDark ? 'bg-white/[0.04] text-slate-300' : 'bg-slate-50 text-slate-600'}`}>
+                    <span className="truncate">
+                      <span className="font-semibold text-emerald-600 mr-1">{rotuloCurtoDocFin(a.tipo)}</span>
+                      {a.file.name}
+                    </span>
+                    <button type="button" onClick={() => setAnexos(prev => prev.filter((_, idx) => idx !== i))}
+                      className="text-slate-400 hover:text-red-500 shrink-0"><X size={12} /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {erro && <p className="text-xs text-rose-500">{erro}</p>}

@@ -20,6 +20,10 @@ import { UpperInput } from '../../components/UpperInput'
 import ConciliarComExtratoModal, { type ConciliarItem } from '../../components/ConciliarComExtratoModal'
 import AuditoriaCard from '../../components/AuditoriaCard'
 import LancarNFModal from '../../components/financeiro/LancarNFModal'
+import VencimentoFilterBar, {
+  filterByVencimento, VENC_RANGE_VAZIO,
+  type VencFilterId, type VencRange,
+} from '../../components/financeiro/VencimentoFilterBar'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { useEspelhosDaOSC, getEspelhoUrl } from '../../hooks/usePMO'
 import { supabase } from '../../services/supabase'
@@ -84,8 +88,11 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 
 // ── Urgency helper ──────────────────────────────────────────────────────────
 
+// titulo ja baixado nao conta como vencido/hoje/7 dias
+const crBaixado = (cr: ContaReceber) => ['recebido', 'conciliado', 'cancelado'].includes(cr.status)
+
 function getUrgency(cr: ContaReceber): 'overdue' | 'today' | 'week' | 'normal' {
-  if (['recebido', 'conciliado', 'cancelado'].includes(cr.status)) return 'normal'
+  if (crBaixado(cr)) return 'normal'
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const venc = new Date(cr.data_vencimento + 'T00:00:00')
@@ -636,6 +643,21 @@ function CRDetailModal({ cr, onClose, onAction, onOpenMedicao, isDark }: {
             </div>
           )}
 
+          {/* Dados bancários do cliente pagador (mig 222) */}
+          {cr.dados_pagamento && Object.values(cr.dados_pagamento).some(Boolean) && (
+            <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-emerald-50/70'}`}>
+              <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mb-2">Dados para pagamento do cliente</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                {cr.dados_pagamento.favorecido && <div><span className="text-slate-400">Favorecido:</span> <span className="font-semibold">{cr.dados_pagamento.favorecido}</span></div>}
+                {cr.dados_pagamento.banco_nome && <div><span className="text-slate-400">Banco:</span> <span className="font-semibold">{cr.dados_pagamento.banco_nome}</span></div>}
+                {cr.dados_pagamento.agencia && <div><span className="text-slate-400">Agência:</span> <span className="font-semibold">{cr.dados_pagamento.agencia}</span></div>}
+                {cr.dados_pagamento.conta && <div><span className="text-slate-400">Conta:</span> <span className="font-semibold">{cr.dados_pagamento.conta}</span></div>}
+                {cr.dados_pagamento.pix_tipo && <div><span className="text-slate-400">Tipo PIX:</span> <span className="font-semibold capitalize">{cr.dados_pagamento.pix_tipo}</span></div>}
+                {cr.dados_pagamento.pix_chave && <div className="col-span-2"><span className="text-slate-400">Chave PIX:</span> <span className="font-semibold break-all">{cr.dados_pagamento.pix_chave}</span></div>}
+              </div>
+            </div>
+          )}
+
           {/* DANFE / XML links */}
           {(cr.danfe_url || cr.xml_url) && (
             <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-violet-50/60'}`}>
@@ -971,6 +993,10 @@ export default function ContasReceber() {
   const [sortField, setSortField] = useState<SortField>('vencimento')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  // Filtro por data de vencimento (atalhos + periodo De/Ate). Vale para lista,
+  // contadores, totais e CSV; e mantido ao trocar de aba.
+  const [vencFilter, setVencFilter] = useState<VencFilterId>('all')
+  const [vencRange, setVencRange] = useState<VencRange>(VENC_RANGE_VAZIO)
 
   // Data
   const { data: contas = [], isLoading } = useContasReceber()
@@ -1019,23 +1045,27 @@ export default function ContasReceber() {
     return map
   }, [contas])
 
-  // Filter active tab by search, then sort
-  const activeCRs = useMemo(() => {
-    let crs = [...(grouped.get(activeTab) || [])]
+  // Aba filtrada so pela busca — universo dos contadores da barra de vencimento
+  const searchedCRs = useMemo(() => {
+    const crs = grouped.get(activeTab) || []
+    if (!busca) return crs
+    const q = busca.toLowerCase()
+    return crs.filter(cr =>
+      cr.cliente_nome.toLowerCase().includes(q)
+      || cr.descricao?.toLowerCase().includes(q)
+      || cr.numero_nf?.toLowerCase().includes(q)
+      || cr.centro_custo?.toLowerCase().includes(q)
+      || cr.classe_financeira?.toLowerCase().includes(q)
+      || cr.natureza?.toLowerCase().includes(q)
+      || cr.cliente_cnpj?.toLowerCase().includes(q)
+    )
+  }, [grouped, activeTab, busca])
 
-    // Search filter
-    if (busca) {
-      const q = busca.toLowerCase()
-      crs = crs.filter(cr =>
-        cr.cliente_nome.toLowerCase().includes(q)
-        || cr.descricao?.toLowerCase().includes(q)
-        || cr.numero_nf?.toLowerCase().includes(q)
-        || cr.centro_custo?.toLowerCase().includes(q)
-        || cr.classe_financeira?.toLowerCase().includes(q)
-        || cr.natureza?.toLowerCase().includes(q)
-        || cr.cliente_cnpj?.toLowerCase().includes(q)
-      )
-    }
+  // Filtro de vencimento, depois ordenacao
+  const activeCRs = useMemo(() => {
+    const crs = [...filterByVencimento(
+      searchedCRs, vencFilter, vencRange, cr => cr.data_vencimento, crBaixado,
+    )]
 
     // Sort
     crs.sort((a, b) => {
@@ -1050,7 +1080,7 @@ export default function ContasReceber() {
     })
 
     return crs
-  }, [grouped, activeTab, busca, sortField, sortDir])
+  }, [searchedCRs, vencFilter, vencRange, sortField, sortDir])
 
   // Tab totals
   const tabTotal = useMemo(() => activeCRs.reduce((s, cr) => s + cr.valor_original, 0), [activeCRs])
@@ -1367,6 +1397,20 @@ export default function ContasReceber() {
               </span>
             )}
           </div>
+        </div>
+
+        {/* Filtro por data de vencimento */}
+        <div className={`px-4 py-2 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          <VencimentoFilterBar
+            items={searchedCRs}
+            value={vencFilter}
+            onChange={setVencFilter}
+            range={vencRange}
+            onRangeChange={setVencRange}
+            getVencimento={cr => cr.data_vencimento}
+            isSettled={crBaixado}
+            isDark={isDark}
+          />
         </div>
 
         {/* Select all + bulk action bar */}
