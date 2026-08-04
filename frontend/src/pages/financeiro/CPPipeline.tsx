@@ -38,6 +38,7 @@ import {
   useLotesPagamento,
   useLoteById,
   useCriarLote,
+  useAdicionarItensLote,
   useEnviarLoteAprovacao,
   useRegistrarPagamentoBatch,
   useEnviarRemessaPagamentoBatch,
@@ -4338,6 +4339,8 @@ export default function CPPipeline() {
   const [activeTab, setActiveTab] = useState<PipelineStageId>('previsto')
   const [busca, setBusca] = useState('')
   const [detailCP, setDetailCP] = useState<ContaPagar | null>(null)
+  // Títulos aguardando a escolha do destino: lote novo ou um já em montagem
+  const [destinoLoteIds, setDestinoLoteIds] = useState<string[] | null>(null)
   // Pagamento previsto aberto p/ edição (só quem tem sys_perfis.edita_previsao_fin)
   const [previsaoEmEdicao, setPrevisaoEmEdicao] = useState<ContaPagar | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -4418,6 +4421,7 @@ export default function CPPipeline() {
   // Mutations
   const conciliarMut = useConciliarCPBatch()
   const criarLoteMut = useCriarLote()
+  const adicionarItensLoteMut = useAdicionarItensLote()
   const enviarLoteMut = useEnviarLoteAprovacao()
   const registrarBatchMut = useRegistrarPagamentoBatch()
   const uploadComprovante = useUploadAnexo()
@@ -4431,6 +4435,13 @@ export default function CPPipeline() {
 
   const lotesById = useMemo(
     () => new Map(lotes.map(lote => [lote.id, lote])),
+    [lotes],
+  )
+
+  // Lote em aprovação não entra: incluir título sob os olhos do aprovador
+  // invalidaria a pendência do AprovAí — o caminho lá é devolver p/ edição.
+  const lotesEmMontagem = useMemo(
+    () => lotes.filter(lote => lote.status === 'montando'),
     [lotes],
   )
 
@@ -4717,12 +4728,40 @@ export default function CPPipeline() {
     } catch { showToast('error', 'Erro ao confirmar') }
   }
 
-  const handleCriarLote = async (ids: string[]) => {
+  // Confirmados → lote. Com lote em montagem aberto, pergunta antes: criar outro
+  // ou juntar ao que já está montado. Antes só criava lote novo, e quem quisesse
+  // incluir um título tinha que ir até o detalhe do lote.
+  const handleCriarLote = (ids: string[]) => {
+    if (lotesEmMontagem.length > 0) {
+      setDestinoLoteIds(ids)
+      return
+    }
+    void criarLoteNovo(ids)
+  }
+
+  const criarLoteNovo = async (ids: string[]) => {
     try {
       await criarLoteMut.mutateAsync({ cpIds: ids, criadoPor: 'Financeiro' })
       showToast('success', `Lote criado com ${ids.length} itens`)
       setSelectedIds(new Set())
+      setDestinoLoteIds(null)
     } catch { showToast('error', 'Erro ao criar lote') }
+  }
+
+  const adicionarAoLote = async (loteId: string, ids: string[]) => {
+    // Objeto inteiro, não só o valor de face: valorAPagarCP desconta imposto,
+    // adiantamento e desconto comercial ao gravar o item do lote.
+    const cps = ids
+      .map(id => contasById.get(id))
+      .filter((cp): cp is ContaPagar => !!cp)
+    if (cps.length === 0) return
+    try {
+      await adicionarItensLoteMut.mutateAsync({ loteId, cps })
+      const lote = lotesById.get(loteId)
+      showToast('success', `${cps.length} título(s) incluído(s) no lote ${lote?.numero_lote ?? ''}`.trim())
+      setSelectedIds(new Set())
+      setDestinoLoteIds(null)
+    } catch { showToast('error', 'Erro ao incluir no lote') }
   }
 
   const handlePagar = (ids: string[]) => {
@@ -5593,6 +5632,63 @@ export default function CPPipeline() {
             }}
           />
         )
+      )}
+
+      {/* Destino dos títulos: lote novo ou um já em montagem */}
+      {destinoLoteIds && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setDestinoLoteIds(null)}>
+          <div
+            onClick={e => e.stopPropagation()}
+            className={`w-full max-w-md rounded-2xl shadow-xl overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white'}`}
+          >
+            <div className={`px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+              <p className={`text-sm font-bold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
+                {destinoLoteIds.length} título(s) selecionado(s)
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Criar um lote novo ou incluir num lote em montagem?</p>
+            </div>
+
+            <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
+              <button
+                type="button"
+                disabled={criarLoteMut.isPending || adicionarItensLoteMut.isPending}
+                onClick={() => criarLoteNovo(destinoLoteIds)}
+                className="w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+              >
+                <Layers size={15} /> Criar lote novo
+              </button>
+
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pt-2">Lotes em montagem</p>
+              {lotesEmMontagem.map(lote => (
+                <button
+                  key={lote.id}
+                  type="button"
+                  disabled={criarLoteMut.isPending || adicionarItensLoteMut.isPending}
+                  onClick={() => adicionarAoLote(lote.id, destinoLoteIds)}
+                  className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-left transition-colors disabled:opacity-60 ${
+                    isDark ? 'border-white/[0.08] hover:bg-white/[0.04]' : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="min-w-0">
+                    <span className={`block text-sm font-semibold truncate ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{lote.numero_lote}</span>
+                    <span className="block text-[11px] text-slate-400">{lote.qtd_itens} título(s)</span>
+                  </span>
+                  <span className="text-sm font-bold text-indigo-500 shrink-0">{fmtFull(lote.valor_total)}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className={`px-5 py-3 flex justify-end border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+              <button
+                type="button"
+                onClick={() => setDestinoLoteIds(null)}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Detail Modal */}
