@@ -24,6 +24,7 @@ import {
   useDevolverCPCorrecao,
   useResolverDevolucaoCP,
   useDocumentosCP,
+  useRemoverDocumentoFin,
   useObras,
   useExtratoCandidatos,
   useAplicarConciliacaoAuto,
@@ -57,7 +58,7 @@ import { useDecisaoGenerica } from '../../hooks/useAprovacoes'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar, Fornecedor, LotePagamento, StatusCP, StatusLote } from '../../types/financeiro'
-import { CP_PIPELINE_STAGES, ORIGEM_CP_LABEL } from '../../types/financeiro'
+import { CP_PIPELINE_STAGES, ORIGEM_CP_LABEL, valorAPagarCP, temAjusteCP } from '../../types/financeiro'
 import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 // ══ Formatters ══════════════════════════════════════════════════
@@ -631,16 +632,22 @@ function PipelineRail({
 // ══ Export CSV ══════════════════════════════════════════════════
 
 function exportCSV(cps: ContaPagar[], stageName: string) {
-  const headers = ['Fornecedor', 'Valor', 'Vencimento', `Emiss\u00e3o`, 'Documento', 'Centro Custo', 'Natureza Orçamentária Financeira', 'Obra', 'Pedido', `Descri\u00e7\u00e3o`, 'Status']
+  const headers = ['Fornecedor', 'Título', 'Desconto', 'Juros/Multa', 'Imposto Retido', 'Valor a Pagar', 'Vencimento', `Emiss\u00e3o`, 'Documento', 'Centro Custo', 'Natureza Orçamentária Financeira', 'Obra', 'Origem', 'Pedido', `Descri\u00e7\u00e3o`, 'Status']
+  const num = (v: number | null | undefined) => (Number(v ?? 0) || 0).toFixed(2).replace('.', ',')
   const rows = cps.map(cp => [
     cp.fornecedor_nome,
-    cp.valor_original.toFixed(2).replace('.', ','),
+    num(cp.valor_original),
+    num(cp.valor_desconto),
+    num(cp.valor_juros_multa),
+    num(cp.imposto_deduzir ? cp.imposto_valor : 0),
+    num(valorAPagarCP(cp)),
     fmtDataFull(cp.data_vencimento),
     fmtDataFull(cp.data_emissao),
     cp.numero_documento || '',
     cp.centro_custo || '',
     cp.classe_financeira || '',
     cp.requisicao?.obra_nome || '',
+    ORIGEM_CP_LABEL[cp.origem ?? 'manual']?.label ?? cp.origem ?? '',
     cp.pedido?.numero_pedido || '',
     cp.descricao || '',
     cp.status,
@@ -2561,6 +2568,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
     : undefined
   const manualAttachments = Array.isArray(manualRequest?.anexos) ? manualRequest?.anexos as Array<{ nome: string; url: string }> : []
   const { data: docsCP = [] } = useDocumentosCP(cp.id)
+  const removerDoc = useRemoverDocumentoFin()
   // mig 215: dados_pagamento é a fonte estruturada. O fallback cobre as CPs
   // antigas em que o extraordinário só deixou o rastro em remessa_payload.
   const bankInfo = (cp.dados_pagamento && Object.keys(cp.dados_pagamento).length > 0)
@@ -2845,25 +2853,45 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1"><Paperclip size={10} /> Documentos</p>
               <div className="space-y-1">
                 {docsCP.map(doc => (
-                  <a
+                  <div
                     key={doc.id}
-                    href={doc.arquivo_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-200 hover:border-slate-300 text-[10px] group"
                   >
-                    <Paperclip size={9} className="text-slate-400 shrink-0" />
-                    <span className={`font-bold shrink-0 px-1.5 py-0.5 rounded ${
-                      doc.tipo === 'nota_fiscal' ? 'bg-amber-100 text-amber-700'
-                        : doc.tipo === 'boleto' ? 'bg-cyan-100 text-cyan-700'
-                        : doc.tipo === 'recibo' ? 'bg-violet-100 text-violet-700'
-                        : 'bg-slate-100 text-slate-500'
-                    }`}>
-                      {rotuloCurtoDocFin(doc.tipo)}
-                    </span>
-                    <span className="truncate text-slate-600 font-medium">{doc.nome_arquivo}</span>
-                    <ExternalLink size={8} className="text-slate-300 group-hover:text-slate-500 shrink-0 ml-auto" />
-                  </a>
+                    <a
+                      href={doc.arquivo_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 min-w-0 flex-1"
+                    >
+                      <Paperclip size={9} className="text-slate-400 shrink-0" />
+                      <span className={`font-bold shrink-0 px-1.5 py-0.5 rounded ${
+                        doc.tipo === 'nota_fiscal' ? 'bg-amber-100 text-amber-700'
+                          : doc.tipo === 'boleto' ? 'bg-cyan-100 text-cyan-700'
+                          : doc.tipo === 'recibo' ? 'bg-violet-100 text-violet-700'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {rotuloCurtoDocFin(doc.tipo)}
+                      </span>
+                      <span className="truncate text-slate-600 font-medium">{doc.nome_arquivo}</span>
+                      <ExternalLink size={8} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
+                    </a>
+                    {/* Anexo errado: remove antes que vire base de pagamento */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!confirm(`Remover "${doc.nome_arquivo}"? O arquivo sai do sistema.`)) return
+                        removerDoc.mutate(
+                          { docId: doc.id, arquivoUrl: doc.arquivo_url },
+                          { onError: (e: any) => alert(e?.message ?? 'Erro ao remover o documento.') },
+                        )
+                      }}
+                      disabled={removerDoc.isPending}
+                      title="Remover anexo (documento incorreto)"
+                      className="shrink-0 p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -3437,10 +3465,16 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
         {cp.status === 'pago' && cp.data_pagamento ? fmtData(cp.data_pagamento) : fmtData(cp.data_vencimento)}
       </span>
 
-      <span className={`text-xs font-bold text-right ${
-        urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'
-      }`}>
-        {fmt(cp.valor_original)}
+      <span
+        className={`text-xs font-bold text-right ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}
+        title={temAjusteCP(cp) ? `Título ${fmt(cp.valor_original)} · desconto ${fmt(cp.valor_desconto ?? 0)} · juros/multa ${fmt(cp.valor_juros_multa ?? 0)}${cp.imposto_deduzir ? ` · imposto retido ${fmt(cp.imposto_valor ?? 0)}` : ''}` : undefined}
+      >
+        {temAjusteCP(cp) ? (
+          <span className="inline-flex flex-col items-end leading-tight">
+            <span className="text-[9px] font-medium line-through text-slate-400">{fmt(cp.valor_original)}</span>
+            <span>{fmt(valorAPagarCP(cp))}</span>
+          </span>
+        ) : fmt(cp.valor_original)}
       </span>
     </div>
   )
@@ -3504,7 +3538,10 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
           <span className="text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded-full shrink-0">URGENTE</span>
         )}
         <p className={`text-sm font-extrabold shrink-0 ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}>
-          {fmt(cp.valor_original)}
+          {temAjusteCP(cp) && (
+            <span className="mr-1 text-[10px] font-medium line-through text-slate-400">{fmt(cp.valor_original)}</span>
+          )}
+          {fmt(valorAPagarCP(cp))}
         </p>
       </div>
 
@@ -4075,7 +4112,7 @@ export default function CPPipeline() {
       switch (sortField) {
         case 'vencimento': cmp = a.data_vencimento.localeCompare(b.data_vencimento); break
         case 'emissao':    cmp = a.data_emissao.localeCompare(b.data_emissao); break
-        case 'valor':      cmp = a.valor_original - b.valor_original; break
+        case 'valor':      cmp = valorAPagarCP(a) - valorAPagarCP(b); break
         case 'fornecedor': cmp = a.fornecedor_nome.localeCompare(b.fornecedor_nome); break
       }
       return sortDir === 'asc' ? cmp : -cmp
@@ -4157,8 +4194,8 @@ export default function CPPipeline() {
         ? (uniqueSuppliers[0] || 'Lote sem fornecedor')
         : `${uniqueSuppliers.length} fornecedores no lote`
       const workLabel = summarizeNames(allItems.map(cp => cp.requisicao?.obra_nome || cp.centro_custo || ''), 'Múltiplas obras e centros')
-      const totalValue = lote?.valor_total ?? allItems.reduce((sum, cp) => sum + cp.valor_original, 0)
-      const visibleValue = currentItems.reduce((sum, cp) => sum + cp.valor_original, 0)
+      const totalValue = lote?.valor_total ?? allItems.reduce((sum, cp) => sum + valorAPagarCP(cp), 0)
+      const visibleValue = currentItems.reduce((sum, cp) => sum + valorAPagarCP(cp), 0)
       const loteDate = new Date((lote?.created_at ?? currentItems[0]?.created_at ?? new Date().toISOString())).toLocaleDateString('pt-BR')
       const loteValue = totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
       const headerLabel = `${lote?.numero_lote ?? `Lote ${loteId.slice(0, 8)}`} • ${loteDate} • ${loteValue}`
@@ -4193,7 +4230,7 @@ export default function CPPipeline() {
   }, [activeCPs, activeTab, contasByLoteId, isLoteStageTab, lotesById])
 
   // Tab totals
-  const tabTotal = useMemo(() => activeCPs.reduce((s, cp) => s + cp.valor_original, 0), [activeCPs])
+  const tabTotal = useMemo(() => activeCPs.reduce((s, cp) => s + valorAPagarCP(cp), 0), [activeCPs])
 
   // Toast helper
   const showToast = (type: 'success' | 'error', msg: string) => {
@@ -4537,7 +4574,7 @@ export default function CPPipeline() {
 
   // Summary stats
   const overdueCt = activeCPs.filter(cp => getUrgency(cp) === 'overdue').length
-  const overdueTotal = activeCPs.filter(cp => getUrgency(cp) === 'overdue').reduce((s, c) => s + c.valor_original, 0)
+  const overdueTotal = activeCPs.filter(cp => getUrgency(cp) === 'overdue').reduce((s, c) => s + valorAPagarCP(c), 0)
   const hasFilteredView = busca.length > 0 || quickFilter !== 'all'
   const quickFilters = [
     { id: 'all' as QuickFilterId, label: 'Tudo', enabled: true, count: stageCPs.length },
@@ -4664,7 +4701,7 @@ export default function CPPipeline() {
             Contas a Pagar
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {contasVisiveis.length} títulos · {fmt(contasVisiveis.reduce((s, c) => s + c.valor_original, 0))}
+            {contasVisiveis.length} títulos · {fmt(contasVisiveis.reduce((s, c) => s + valorAPagarCP(c), 0))}
           </p>
         </div>
         <button
@@ -4952,7 +4989,7 @@ export default function CPPipeline() {
               <span className="tabular-nums">{selectedInTab.length}</span>
               <span className="font-normal opacity-70">selecionado{selectedInTab.length > 1 ? 's' : ''}</span>
               <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold tabular-nums ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
-                {fmt(selectedInTab.reduce((s, cp) => s + cp.valor_original, 0))}
+                {fmt(selectedInTab.reduce((s, cp) => s + valorAPagarCP(cp), 0))}
               </span>
             </div>
             <div className="flex items-center gap-2 ml-auto">

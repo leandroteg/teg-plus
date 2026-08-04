@@ -73,6 +73,38 @@ export interface Fornecedor {
 
 export type OrigemCP = 'compras' | 'logistica' | 'manual' | 'cartao_fatura' | 'locacao' | 'despesas' | 'frotas' | 'rh'
 
+/**
+ * Valor que sai do caixa: original − desconto + juros/multa − imposto retido.
+ * O `valor_original` é só a face do título; quem fecha o dia é este número.
+ * Mesma conta do formulário de Previsão de Pagamento.
+ */
+export function valorAPagarCP(cp: {
+  valor_original?: number | null
+  valor_desconto?: number | null
+  valor_juros_multa?: number | null
+  imposto_valor?: number | null
+  imposto_deduzir?: boolean | null
+}): number {
+  const n = (v: number | null | undefined) => Number(v ?? 0) || 0
+  return Math.max(0, Math.round((
+    n(cp.valor_original)
+    - n(cp.valor_desconto)
+    + n(cp.valor_juros_multa)
+    - (cp.imposto_deduzir ? n(cp.imposto_valor) : 0)
+  ) * 100) / 100)
+}
+
+/** true quando desconto/juros/imposto mexem no valor — vale mostrar os dois números. */
+export function temAjusteCP(cp: {
+  valor_original?: number | null
+  valor_desconto?: number | null
+  valor_juros_multa?: number | null
+  imposto_valor?: number | null
+  imposto_deduzir?: boolean | null
+}): boolean {
+  return valorAPagarCP(cp) !== (Number(cp.valor_original ?? 0) || 0)
+}
+
 /** Qual módulo gerou o lançamento — mostrado na coluna Origem do Contas a Pagar. */
 export const ORIGEM_CP_LABEL: Record<string, { label: string; curto: string }> = {
   compras:       { label: 'Compras',           curto: 'Compras' },

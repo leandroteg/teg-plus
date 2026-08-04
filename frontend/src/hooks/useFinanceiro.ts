@@ -459,6 +459,30 @@ export function useDocumentosCP(cpId?: string) {
   })
 }
 
+/**
+ * Remove um documento anexado por engano (NF do pedido errado, boleto trocado).
+ * Apaga o registro e, em seguida, tenta apagar o arquivo do bucket — se o
+ * storage recusar, o registro já saiu e o arquivo vira órfão inofensivo.
+ */
+export function useRemoverDocumentoFin() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ docId, arquivoUrl }: { docId: string; arquivoUrl?: string | null }) => {
+      const { error } = await supabase.from('fin_documentos').delete().eq('id', docId)
+      if (error) throw new Error(`Não foi possível remover o documento: ${error.message}`)
+
+      // .../object/public/<bucket>/<path...>  →  bucket + path
+      const m = arquivoUrl?.match(/\/object\/(?:public|sign)\/([^/]+)\/(.+?)(?:\?|$)/)
+      if (m) {
+        await supabase.storage.from(m[1]).remove([decodeURIComponent(m[2])])
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fin-documentos'] })
+    },
+  })
+}
+
 export function useCriarPrevisaoPagamentoCP() {
   const qc = useQueryClient()
   return useMutation({
