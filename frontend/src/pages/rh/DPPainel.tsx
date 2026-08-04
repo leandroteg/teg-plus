@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react'
 import {
   Timer, Fingerprint, TrendingUp, ChevronRight, Zap, Clock, AlertTriangle,
-  AlarmClock, Activity, Loader2,
+  AlarmClock, Activity, Loader2, Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -102,9 +102,13 @@ export default function DPPainel() {
       nome: b.base_nome ?? 'Sem base',
       emAberto: b.dias_em_aberto || 0,
       diasBatidos: b.dias_batidos || 0,
+      diasAtivos: b.dias_com_atividade || 0,
       exMin: intervalToMin(b.extras_validos),
       hhMin: intervalToMin(b.hh_trabalhada),
       m50: intervalToMin(b.ex50), m70: intervalToMin(b.ex70), m100: intervalToMin(b.ex100),
+      // efetivo médio: pessoas-dia ÷ dias em que a base operou. Dividir por dia
+      // corrido achataria quem não trabalha no fim de semana.
+      efetivo: (b.dias_com_atividade || 0) > 0 ? (b.dias_batidos || 0) / (b.dias_com_atividade || 1) : 0,
     }))
     const abertoPorBase = rows
       .map(b => ({ nome: b.nome, abs: b.emAberto, pct: b.diasBatidos > 0 ? (b.emAberto / b.diasBatidos) * 100 : 0 }))
@@ -115,10 +119,14 @@ export default function DPPainel() {
       .map(b => ({ nome: b.nome, absMin: b.exMin, m50: b.m50, m70: b.m70, m100: b.m100,
         pct: b.hhMin > 0 ? (b.exMin / b.hhMin) * 100 : 0 }))
       .filter(b => b.absMin > 0).sort((a, b) => b.absMin - a.absMin)
-    return { abertoPorBase, extraPorBase }
+    const efetivoPorBase = rows
+      .map(b => ({ nome: b.nome, efetivo: b.efetivo, diasAtivos: b.diasAtivos }))
+      .filter(b => b.efetivo > 0).sort((a, b) => b.efetivo - a.efetivo)
+    return { abertoPorBase, extraPorBase, efetivoPorBase }
   }, [porBase])
 
   const maxCC = Math.max(...agg.porCC.map(c => c.min), 1)
+  const maxEfetivo = Math.max(...porBaseView.efetivoPorBase.map(b => b.efetivo), 1)
   const maxAbertoPct = Math.max(...porBaseView.abertoPorBase.map(b => b.pct), 1)
   const maxExtraMin = Math.max(...porBaseView.extraPorBase.map(b => b.absMin), 1)
   const pctExtra = agg.hhPagavel > 0 ? Math.round((agg.exMin / agg.hhPagavel) * 100) : null
@@ -208,8 +216,9 @@ export default function DPPainel() {
         </section>
       </div>
 
-      {/* Pulso: HHt por centro de custo */}
-      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+      {/* Centro de custo (2/3) + efetivo médio por base (1/3) na mesma linha */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <section className={`lg:col-span-2 rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
         <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <TrendingUp size={14} className="text-violet-500" /> HHt por Centro de Custo
@@ -224,7 +233,8 @@ export default function DPPainel() {
             <div className="space-y-2.5">
               {agg.porCC.slice(0, 8).map(cc => (
                 <div key={cc.nome} className="flex items-center gap-3">
-                  <p className={`text-[11px] font-semibold text-right shrink-0 w-[110px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.nome}</p>
+                  <p title={cc.nome}
+                    className={`text-[11px] font-semibold text-right shrink-0 w-[120px] sm:w-[190px] leading-tight ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.nome}</p>
                   <div className="flex-1 relative">
                     <div className={`h-6 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
                       <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-violet-600 transition-all duration-500" style={{ width: `${Math.max((cc.min / maxCC) * 100, 4)}%` }} />
@@ -237,6 +247,40 @@ export default function DPPainel() {
           )}
         </div>
       </section>
+
+      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+        <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Users size={14} className="text-sky-500" /> Efetivo Médio por Base
+          </h2>
+          <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>pessoas por dia operado · relógio onde bateu</p>
+        </div>
+        <div className="px-4 py-3">
+          {porBaseView.efetivoPorBase.length === 0 ? (
+            <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+              Sem ponto no período
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {porBaseView.efetivoPorBase.map(b => (
+                <div key={b.nome} className="flex items-center gap-2">
+                  <p title={b.nome}
+                    className={`text-[11px] font-semibold shrink-0 w-[96px] leading-tight ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{b.nome}</p>
+                  <div className={`flex-1 h-6 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                    <div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-sky-600 transition-all duration-500"
+                      style={{ width: `${Math.max((b.efetivo / maxEfetivo) * 100, 4)}%` }} />
+                  </div>
+                  <p title={`${b.diasAtivos} dias com atividade no período`}
+                    className={`text-[11px] font-extrabold shrink-0 w-[38px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    {b.efetivo.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+      </div>
 
       {/* Por base: pontos em aberto + horas extras (absoluto + %, ordenado por % desc) */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">

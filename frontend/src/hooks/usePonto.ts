@@ -534,6 +534,8 @@ export interface PontoBaseAgg {
   base_nome: string | null
   dias_batidos: number
   dias_em_aberto: number
+  /** dias em que a base teve alguém batendo — denominador do efetivo médio */
+  dias_com_atividade: number
   hh_trabalhada: string | null
   extras_validos: string | null
   /** a hora extra separada por alíquota — 100% (domingo/feriado) é a que custa o dobro */
