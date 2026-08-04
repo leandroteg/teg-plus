@@ -17,7 +17,7 @@ export function usePedidos(status?: string) {
           nf_numero, observacoes, created_at, updated_at, criado_por_nome, atualizado_por_nome,
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id, empresa_id,
-          condicao_pagamento, parcelas_preview, sem_cotacao, justificativa_sem_cotacao, itens_direto,
+          condicao_pagamento, parcelas_preview, sem_cotacao, tipo_pedido, justificativa_sem_cotacao, itens_direto,
           valor_frete, valor_desconto,
           docs_conferidos, docs_conferidos_por_nome, docs_conferidos_em,
           requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, arquivo_url, base_destino_id, base_destino:est_bases!base_destino_id(nome), itens:cmp_requisicao_itens(id, descricao, descricao_complementar, quantidade, unidade, valor_unitario_estimado, natureza)),
@@ -698,6 +698,16 @@ export interface PedidoDiretoPayload {
   valorDesconto?: number
   /** Vencimento explícito. Quando informado, manda na frente da condição de pagamento. */
   dataVencimento?: string
+  /** Sabor do pedido sem cotação — muda a natureza do gasto, não os campos. */
+  tipoPedido?: TipoPedidoDireto
+}
+
+/** 'extraordinario' = emergência/sem cotação · 'adiantamento_fornecedor' = pagamento antecipado */
+export type TipoPedidoDireto = 'extraordinario' | 'adiantamento_fornecedor'
+
+export const TIPO_PEDIDO_DIRETO_LABEL: Record<TipoPedidoDireto, string> = {
+  extraordinario: 'Pedido Extraordinário',
+  adiantamento_fornecedor: 'Adiantamento a Fornecedor',
 }
 
 /**
@@ -801,6 +811,7 @@ export function useEmitirPedidoDireto() {
           parcelas_preview: parcelasResolvidas,
           sem_cotacao: true,
           justificativa_sem_cotacao: payload.justificativaSemCotacao,
+          tipo_pedido: payload.tipoPedido ?? 'extraordinario',
           itens_direto: payload.itens.length > 0 ? payload.itens : null,
         })
         .select('id, numero_pedido')
@@ -839,13 +850,18 @@ export function useEmitirPedidoDireto() {
         data_vencimento: parcela.data_vencimento,
         data_vencimento_orig: parcela.data_vencimento,
         // Extraordinário fica fora do Financeiro até o Compras conferir os
-        // documentos e liberar (mig 212). Adiantamento segue confirmado.
-        status: parcela.status_inicial === 'confirmado' ? 'confirmado' : 'aguardando_conferencia',
+        // documentos e liberar (mig 212). Adiantamento a fornecedor é pagamento
+        // ANTECIPADO — não há documento de entrega para conferir, vai direto.
+        status: (payload.tipoPedido === 'adiantamento_fornecedor' || parcela.status_inicial === 'confirmado')
+          ? 'confirmado'
+          : 'aguardando_conferencia',
         centro_custo: payload.centroCusto || null,
         classe_financeira: payload.classeFinanceira || null,
         empresa_id: payload.empresaId || null,
-        descricao: `Pedido Direto ${numeroPedido}${parcelasDoPedido.length > 1 ? ` — Parcela ${parcela.numero || index + 1}/${parcelasDoPedido.length}` : ''}`,
-        natureza: 'material',
+        descricao: payload.tipoPedido === 'adiantamento_fornecedor'
+          ? `Adiantamento a Fornecedor ${numeroPedido}${parcelasDoPedido.length > 1 ? ` — Parcela ${parcela.numero || index + 1}/${parcelasDoPedido.length}` : ''}`
+          : `Pedido Direto ${numeroPedido}${parcelasDoPedido.length > 1 ? ` — Parcela ${parcela.numero || index + 1}/${parcelasDoPedido.length}` : ''}`,
+        natureza: payload.tipoPedido === 'adiantamento_fornecedor' ? 'adiantamento' : 'material',
         forma_pagamento: payload.formaPagamento || null,
         cartao_id: payload.formaPagamento === 'cartao' ? payload.cartaoId || null : null,
         observacoes: payload.condicaoPagamento ? `Condição: ${payload.condicaoPagamento}` : null,

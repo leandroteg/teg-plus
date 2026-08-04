@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { X, PlusCircle, Trash2, Loader2, AlertTriangle, ShoppingCart, Search, UserPlus, CheckCircle2, Landmark } from 'lucide-react'
-import { useEmitirPedidoDireto, useEditarPedidoDireto } from '../hooks/usePedidos'
+import { useEmitirPedidoDireto, useEditarPedidoDireto, type TipoPedidoDireto } from '../hooks/usePedidos'
 import { useCadFornecedores, useCadClasses, useSalvarFornecedor } from '../hooks/useCadastros'
 import { useLookupObras, useLookupEmpresas } from '../hooks/useLookups'
 import { useCartoesCredito } from '../hooks/useCartoes'
@@ -46,13 +46,36 @@ interface Props {
   onSuccess?: (numeroPedido: string) => void
   /** Modo edição: pedido extraordinário já emitido. Todos os campos editáveis, exceto fornecedor. */
   pedido?: any
+  /** Mesmos campos, naturezas diferentes: compra emergencial x pagamento antecipado. */
+  tipo?: TipoPedidoDireto
 }
 
-export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: Props) {
+/** Só muda o texto — a mecânica do pedido sem cotação é idêntica nos dois casos. */
+const TEXTOS: Record<TipoPedidoDireto, {
+  titulo: string; subtitulo: string; labelJustificativa: string; placeholderJustificativa: string
+}> = {
+  extraordinario: {
+    titulo: 'Pedido Direto',
+    subtitulo: 'Sem Requisição nem Cotação',
+    labelJustificativa: 'Justificativa para dispensa de RC/Cotação *',
+    placeholderJustificativa: 'Ex: COMPRA DE EMERGÊNCIA, FORNECEDOR ÚNICO, VALOR ABAIXO DO LIMITE...',
+  },
+  adiantamento_fornecedor: {
+    titulo: 'Adiantamento a Fornecedor',
+    subtitulo: 'Pagamento antecipado, sem Requisição nem Cotação',
+    labelJustificativa: 'Justificativa do adiantamento *',
+    placeholderJustificativa: 'Ex: SINAL DE 50% EXIGIDO PELO FORNECEDOR, PAGAMENTO ANTECIPADO PARA INÍCIO DA FABRICAÇÃO...',
+  },
+}
+
+export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, tipo }: Props) {
   const { perfil } = useAuth()
   const emitir = useEmitirPedidoDireto()
   const editar = useEditarPedidoDireto()
   const editMode = !!pedido
+  // Na edição manda o que está gravado; na criação, o atalho que abriu o modal.
+  const tipoPedido: TipoPedidoDireto = (pedido?.tipo_pedido as TipoPedidoDireto) || tipo || 'extraordinario'
+  const txt = TEXTOS[tipoPedido] ?? TEXTOS.extraordinario
 
   const { data: fornecedores = [] } = useCadFornecedores()
   const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
@@ -264,7 +287,11 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
     setErro(null)
     if (!fornecedorNome.trim()) return setErro('Informe o fornecedor.')
     if (itens.every(i => !i.descricao.trim())) return setErro('Adicione ao menos 1 item com descrição.')
-    if (!justificativa.trim()) return setErro('Informe a justificativa para dispensar Requisição/Cotação.')
+    if (!justificativa.trim()) return setErro(
+      tipoPedido === 'adiantamento_fornecedor'
+        ? 'Informe a justificativa do adiantamento.'
+        : 'Informe a justificativa para dispensar Requisição/Cotação.'
+    )
     if (formaPagamento === 'cartao' && !cartaoId) return setErro('Selecione qual cartão corporativo será usado.')
 
     const itensFiltrados = itens.filter(i => i.descricao.trim())
@@ -330,6 +357,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
         justificativaSemCotacao: toUpperNorm(justificativa),
         observacoes: observacoes ? toUpperNorm(observacoes) : undefined,
         compradorId: perfil?.id,
+        tipoPedido,
         empresaId: empresaId || undefined,
         formaPagamento: formaPagamento || undefined,
         cartaoId: formaPagamento === 'cartao' ? cartaoId || undefined : undefined,
@@ -352,8 +380,8 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
               <ShoppingCart size={16} className="text-orange-600" />
             </div>
             <div>
-              <h2 className="text-sm font-extrabold text-slate-800">{editMode ? `Editar ${pedido?.numero_pedido ?? 'Pedido Direto'}` : 'Pedido Direto'}</h2>
-              <p className="text-[11px] text-slate-400">{editMode ? 'Todos os campos editáveis, exceto o fornecedor' : 'Sem Requisição nem Cotação'}</p>
+              <h2 className="text-sm font-extrabold text-slate-800">{editMode ? `Editar ${pedido?.numero_pedido ?? txt.titulo}` : txt.titulo}</h2>
+              <p className="text-[11px] text-slate-400">{editMode ? 'Todos os campos editáveis, exceto o fornecedor' : txt.subtitulo}</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
@@ -824,12 +852,12 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido }: 
           {/* Justificativa (obrigatória) */}
           <div>
             <label className="text-xs font-bold text-slate-600">
-              Justificativa para dispensa de RC/Cotação *
+              {txt.labelJustificativa}
             </label>
             <textarea
               rows={3}
               className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2 text-sm uppercase focus:ring-2 focus:ring-orange-300 outline-none resize-none"
-              placeholder="Ex: COMPRA DE EMERGÊNCIA, FORNECEDOR ÚNICO, VALOR ABAIXO DO LIMITE..."
+              placeholder={txt.placeholderJustificativa}
               value={justificativa}
               onChange={e => setJustificativa(e.target.value.toUpperCase())}
             />

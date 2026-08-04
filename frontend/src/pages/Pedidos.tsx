@@ -1795,11 +1795,15 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
               <span className={`text-[10px] font-mono ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
                 {getDisplayNumber(pedido)}
               </span>
-              {pedido.sem_cotacao && (
+              {pedido.sem_cotacao && ((pedido as any).tipo_pedido === 'adiantamento_fornecedor' ? (
+                <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold rounded-full px-1.5 py-0.5 ${dark ? 'bg-sky-500/15 text-sky-400' : 'bg-sky-50 text-sky-600'}`}>
+                  <ShoppingCart size={8} />ADIANTAMENTO
+                </span>
+              ) : (
                 <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold rounded-full px-1.5 py-0.5 ${dark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-50 text-orange-600'}`}>
                   <ShoppingCart size={8} />SEM COTAÇÃO
                 </span>
-              )}
+              ))}
               {pedido.requisicao?.numero && (
                 <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold rounded-full px-1.5 py-0.5 ${dark ? 'bg-indigo-500/15 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
                   <Hash size={8} />{pedido.requisicao.numero}
@@ -3278,11 +3282,15 @@ export default function Pedidos() {
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${dark ? st2.bgDark + ' ' + st2.textDark : st2.bg + ' ' + st2.text}`}>
                           {st2.label}
                         </span>
-                        {p.sem_cotacao && (
+                        {p.sem_cotacao && ((p as any).tipo_pedido === 'adiantamento_fornecedor' ? (
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${dark ? 'bg-sky-500/15 text-sky-400' : 'bg-sky-50 text-sky-600'}`}>
+                            ADIANT.
+                          </span>
+                        ) : (
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${dark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-50 text-orange-600'}`}>
                             S/ COT.
                           </span>
-                        )}
+                        ))}
                       </div>
                     </td>
                     <td className={`px-3 py-2.5 ${atr ? 'text-red-500 font-semibold' : dark ? 'text-slate-400' : 'text-slate-500'}`}>

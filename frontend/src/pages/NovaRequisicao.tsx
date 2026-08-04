@@ -4,7 +4,7 @@ import {
   Sparkles, Send, PlusCircle, Trash2, ChevronLeft, ChevronRight,
   AlertCircle, Check, Layers, FileText, Search, Upload, FileUp,
   ChevronDown, X, FileImage, Eye, Pencil, CheckCircle2, Loader2,
-  Package, MapPin, Zap, Save, ExternalLink, Download,
+  Package, MapPin, Zap, Save, ExternalLink, Download, HandCoins,
 } from 'lucide-react'
 import { useCriarRequisicao, useAtualizarRequisicao, useRequisicao, useReenviarAposDevolucao, useReenviarEsclarecimento } from '../hooks/useRequisicoes'
 import { podeAprovarCompras } from '../hooks/useAprovacoes'
@@ -16,6 +16,7 @@ import CategoryCard from '../components/CategoryCard'
 import NumericInput from '../components/NumericInput'
 import ItemAutocomplete from '../components/ItemAutocomplete'
 import PedidoDiretoModal from '../components/PedidoDiretoModal'
+import type { TipoPedidoDireto } from '../hooks/usePedidos'
 import { toUpperNorm, UpperTextarea } from '../components/UpperInput'
 import type { RequisicaoItem, Urgencia, AiParseResult, CategoriaMaterial } from '../types'
 import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
@@ -140,7 +141,8 @@ export default function NovaRequisicao() {
   const referenciaInputRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep]                 = useState(1)
-  const [showPedidoDireto, setShowPedidoDireto] = useState(false)
+  // null = fechado; o valor guarda qual atalho abriu (extraordinário x adiantamento)
+  const [showPedidoDireto, setShowPedidoDireto] = useState<TipoPedidoDireto | null>(null)
   const [searchCat, setSearchCat]       = useState('')
   const [showAiHelper, setShowAiHelper] = useState(false)
   const [textoAi, setTextoAi]           = useState('')
@@ -563,25 +565,46 @@ export default function NovaRequisicao() {
     <div className="space-y-5">
       <Stepper step={1} />
 
-      {/* ── Pedido Extraordinário (atalho) ────────────────────────────────── */}
+      {/* ── Pedidos sem cotação (atalhos) ─────────────────────────────────── */}
       {!isEditMode && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-start gap-2.5 min-w-0">
-            <Zap size={16} className="text-amber-600 mt-0.5 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-amber-800">Pedido Extraordinário</p>
-              <p className="text-[11px] text-amber-700 leading-snug">
-                Emergência ou compra sem cotação? Emita direto ao fornecedor, com justificativa.
-              </p>
+        <div className="space-y-2.5">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <Zap size={16} className="text-amber-600 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-amber-800">Pedido Extraordinário</p>
+                <p className="text-[11px] text-amber-700 leading-snug">
+                  Emergência ou compra sem cotação? Emita direto ao fornecedor, com justificativa.
+                </p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowPedidoDireto('extraordinario')}
+              className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors"
+            >
+              Abrir
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowPedidoDireto(true)}
-            className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors"
-          >
-            Abrir
-          </button>
+
+          <div className="bg-sky-50 border border-sky-200 rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <HandCoins size={16} className="text-sky-600 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-sky-800">Adiantamento a Fornecedor</p>
+                <p className="text-[11px] text-sky-700 leading-snug">
+                  Sinal ou pagamento antecipado ao fornecedor. Vai direto ao Contas a Pagar.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPedidoDireto('adiantamento_fornecedor')}
+              className="shrink-0 bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors"
+            >
+              Abrir
+            </button>
+          </div>
         </div>
       )}
 
@@ -680,9 +703,11 @@ export default function NovaRequisicao() {
       </button>
 
       <PedidoDiretoModal
-        open={showPedidoDireto}
-        onClose={() => setShowPedidoDireto(false)}
-        onSuccess={() => { setShowPedidoDireto(false); nav('/pedidos') }}
+        key={showPedidoDireto ?? 'fechado'}
+        open={!!showPedidoDireto}
+        tipo={showPedidoDireto ?? undefined}
+        onClose={() => setShowPedidoDireto(null)}
+        onSuccess={() => { setShowPedidoDireto(null); nav('/pedidos') }}
       />
     </div>
   )

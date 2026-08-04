@@ -410,9 +410,12 @@ export function useFaturas(filtros?: { imovel_id?: string; status?: StatusFatura
 export function useCriarFatura() {
   const qc = useQueryClient()
   return useMutation({
+    // Devolve a linha criada: quem lança a conta já com o boleto na mão precisa
+    // do id para subir o anexo em seguida.
     mutationFn: async (payload: Partial<LocFatura>) => {
-      const { error } = await supabase.from('loc_faturas').insert(payload)
+      const { data, error } = await supabase.from('loc_faturas').insert(payload).select().single()
       if (error) throw error
+      return data as LocFatura
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.faturas() })

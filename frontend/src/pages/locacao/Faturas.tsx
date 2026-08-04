@@ -147,36 +147,55 @@ function InlineEditForm({
   // nenhuma (foi o que a mig 191 teve que reparar em 9 faturas).
   const statusTravado = isEdit && ['enviado_pagamento', 'pago'].includes(fatura!.status)
 
-  const saving = criarFatura.isPending || atualizarFatura.isPending
+  // Anexo na própria linha: quem lança Energia/Água já está com o boleto na mão.
+  const [arquivo, setArquivo] = useState<File | null>(null)
+  const [subindo, setSubindo] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const anexoRef = useRef<HTMLInputElement>(null)
 
-  const handleSave = () => {
+  const saving = criarFatura.isPending || atualizarFatura.isPending || subindo
+
+  const handleSave = async () => {
+    setErro(null)
     const parsedValor = valor ? parseFloat(valor) : undefined
-    if (isEdit) {
-      atualizarFatura.mutate(
-        {
+    const comp = (vencimento ? vencimento.slice(0, 7) : competencia)
+    try {
+      if (isEdit) {
+        await atualizarFatura.mutateAsync({
           id: fatura!.id,
           vencimento: vencimento || undefined,
           valor_previsto: parsedValor,
           valor_confirmado: status === 'pago' ? parsedValor : undefined,
           status,
-        },
-        { onSuccess: onClose },
-      )
-    } else {
-      criarFatura.mutate(
-        {
+        })
+        if (arquivo) {
+          setSubindo(true)
+          const path = await uploadFaturaAnexo(imovel.id, comp, arquivo)
+          await atualizarFatura.mutateAsync({ id: fatura!.id, boleto_url: path } as never)
+        }
+      } else {
+        const nova = await criarFatura.mutateAsync({
           imovel_id: imovel.id,
           tipo,
           // o mes navegado e o de REFERENCIA; a competencia segue o vencimento,
           // que e como o financeiro agrupa
           mes_referencia: competencia + '-01',
-          competencia: (vencimento ? vencimento.slice(0, 7) : competencia) + '-01',
+          competencia: comp + '-01',
           vencimento: vencimento || undefined,
           valor_previsto: parsedValor,
           status,
-        },
-        { onSuccess: onClose },
-      )
+        })
+        if (arquivo && nova?.id) {
+          setSubindo(true)
+          const path = await uploadFaturaAnexo(imovel.id, comp, arquivo)
+          await atualizarFatura.mutateAsync({ id: nova.id, boleto_url: path } as never)
+        }
+      }
+      onClose()
+    } catch (e: any) {
+      setErro(e?.message ?? 'Erro ao salvar a conta.')
+    } finally {
+      setSubindo(false)
     }
   }
 
@@ -220,13 +239,38 @@ function InlineEditForm({
               )}
             </select>
           </div>
+          <div className="flex-1 min-w-[140px]">
+            <label className={`text-[10px] font-semibold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Anexo (boleto/conta)
+            </label>
+            <input
+              ref={anexoRef}
+              type="file"
+              accept="application/pdf,image/*"
+              className="hidden"
+              onChange={e => setArquivo(e.target.files?.[0] ?? null)}
+            />
+            <button
+              type="button"
+              onClick={() => anexoRef.current?.click()}
+              className={`${inputCls} flex items-center gap-1.5 text-left truncate ${
+                isDark ? 'hover:bg-white/[0.08]' : 'hover:bg-slate-50'
+              }`}
+              title={arquivo?.name ?? (fatura?.boleto_url ? 'Já tem anexo — escolha outro para substituir' : 'Anexar boleto/conta')}
+            >
+              <Paperclip size={11} className="shrink-0" />
+              <span className="truncate">
+                {arquivo?.name ?? (fatura?.boleto_url ? 'Substituir anexo' : 'Escolher arquivo')}
+              </span>
+            </button>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={handleSave}
               disabled={saving}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Salvando...' : 'Salvar'}
+              {saving ? (subindo ? 'Anexando...' : 'Salvando...') : 'Salvar'}
             </button>
             <button
               onClick={onClose}
@@ -255,6 +299,7 @@ function InlineEditForm({
             )}
           </div>
         </div>
+        {erro && <p className="mt-2 text-[11px] text-red-500">{erro}</p>}
       </td>
     </tr>
   )
