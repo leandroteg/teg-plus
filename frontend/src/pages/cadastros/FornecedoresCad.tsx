@@ -1,8 +1,9 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import {
   Building2, Plus, Search, ChevronRight, CheckCircle2, AlertCircle,
-  Phone, Mail, Loader2, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2, ChevronDown } from 'lucide-react'
+  Phone, Mail, Loader2, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2, ChevronDown, ShieldCheck } from 'lucide-react'
 import { UpperInput } from '../../components/UpperInput'
+import AuditoriaReceitaModal from '../../components/cadastros/AuditoriaReceitaModal'
 import { useCadFornecedores, useSalvarFornecedor, useAiCadastroParse } from '../../hooks/useCadastros'
 import { useConsultaCNPJ, useConsultaCEP } from '../../hooks/useConsultas'
 import { supabase } from '../../services/supabase'
@@ -67,6 +68,7 @@ type FornecedoresCadProps = { segmentos?: string[]; titulo?: string; extra?: Rea
 
 export default function FornecedoresCad({ segmentos, titulo, extra }: FornecedoresCadProps = {}) {
   const [busca, setBusca] = useState('')
+  const [showAuditoria, setShowAuditoria] = useState(false)
   const [showInactive, setShowInactive] = useState(false)
   // Segmento é texto livre no banco: as opções vêm do que já existe + a lista base.
   const [fSegmentos, setFSegmentos] = useState<Set<string> | null>(null)
@@ -420,12 +422,20 @@ export default function FornecedoresCad({ segmentos, titulo, extra }: Fornecedor
           </button>
         </div>
         {extra}
+        <button onClick={() => setShowAuditoria(true)}
+          title="Conferir cadastros com o cartão CNPJ da Receita Federal"
+          className="shrink-0 flex items-center gap-1.5 border-2 border-violet-200 text-violet-700 hover:bg-violet-50
+            text-sm font-semibold px-3 py-2 rounded-xl transition-colors">
+          <ShieldCheck size={15} /> Conferir Receita
+        </button>
         <button onClick={openNew}
           className="shrink-0 flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white
             text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
           <Plus size={15} /> Novo Fornecedor
         </button>
       </div>
+
+      {showAuditoria && <AuditoriaReceitaModal onClose={() => setShowAuditoria(false)} />}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
