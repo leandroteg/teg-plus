@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Building2, CheckCircle2, Loader2, X } from 'lucide-react'
 import { UpperInput } from './UpperInput'
 import { useSalvarFornecedor } from '../hooks/useCadastros'
@@ -68,6 +68,12 @@ export default function FornecedorCadastroModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [staged, setStaged] = useState<StagedDoc[]>([])
   const { data: anexosExistentes = [] } = useFornecedorAnexos(form.id)
+  // Sem isso o erro renderiza no fim de um modal rolável e o clique em Salvar
+  // parece não fazer nada ("cliquei em cadastrar e não cadastrou").
+  const erroRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (errorMessage) erroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [errorMessage])
 
   useEffect(() => {
     if (!open) return
@@ -344,7 +350,11 @@ export default function FornecedorCadastroModal({
             Pessoa física: informe o CPF no campo CPF/CNPJ — o Cartão CNPJ não é exigido.
           </div>
 
-          {errorMessage && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{errorMessage}</div>}
+          {errorMessage && (
+            <div ref={erroRef} className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {errorMessage}
+            </div>
+          )}
         </div>
 
         <div className={`px-6 py-4 border-t ${border} flex items-center justify-end gap-2`}>
