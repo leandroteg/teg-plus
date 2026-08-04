@@ -71,7 +71,20 @@ export interface Fornecedor {
   created_at: string
 }
 
-export type OrigemCP = 'compras' | 'logistica' | 'manual' | 'cartao_fatura' | 'locacao'
+export type OrigemCP = 'compras' | 'logistica' | 'manual' | 'cartao_fatura' | 'locacao' | 'despesas' | 'frotas' | 'rh'
+
+/** Qual módulo gerou o lançamento — mostrado na coluna Origem do Contas a Pagar. */
+export const ORIGEM_CP_LABEL: Record<string, { label: string; curto: string }> = {
+  compras:       { label: 'Compras',           curto: 'Compras' },
+  locacao:       { label: 'Gestão de Imóveis', curto: 'Imóveis' },
+  despesas:      { label: 'Despesas / RH',     curto: 'Despesas' },
+  rh:            { label: 'RH',                curto: 'RH' },
+  frotas:        { label: 'Frotas',            curto: 'Frotas' },
+  logistica:     { label: 'Logística',         curto: 'Logística' },
+  cartao_fatura: { label: 'Cartão',            curto: 'Cartão' },
+  manual:        { label: 'Financeiro',        curto: 'Financeiro' },
+  financeiro:    { label: 'Financeiro',        curto: 'Financeiro' },
+}
 
 /**
  * Dados para pagamento gravados no próprio lançamento (mig 222).

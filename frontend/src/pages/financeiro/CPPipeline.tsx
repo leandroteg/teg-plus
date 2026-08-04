@@ -57,7 +57,7 @@ import { useDecisaoGenerica } from '../../hooks/useAprovacoes'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar, Fornecedor, LotePagamento, StatusCP, StatusLote } from '../../types/financeiro'
-import { CP_PIPELINE_STAGES } from '../../types/financeiro'
+import { CP_PIPELINE_STAGES, ORIGEM_CP_LABEL } from '../../types/financeiro'
 import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 // ══ Formatters ══════════════════════════════════════════════════
@@ -3406,6 +3406,17 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
         {obraNome ? <><Building2 size={9} className="shrink-0" /> {obraNome}</> : '\u2014'}
       </span>
 
+      <span className="min-w-0 truncate">
+        <span
+          className={`inline-block max-w-full truncate text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${
+            isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'
+          }`}
+          title={ORIGEM_CP_LABEL[cp.origem ?? 'manual']?.label ?? cp.origem ?? '\u2014'}
+        >
+          {ORIGEM_CP_LABEL[cp.origem ?? 'manual']?.curto ?? cp.origem ?? '\u2014'}
+        </span>
+      </span>
+
       <span className={`text-[11px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {cp.centro_custo || '\u2014'}
       </span>
@@ -3512,6 +3523,12 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
         {cp.origem === 'manual' && (
           <span className="inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-semibold rounded-full px-2 py-0.5">
             <Receipt size={9} /> Financeiro
+          </span>
+        )}
+        {/* Módulos que ainda não tinham selo próprio (imóveis, despesas, frotas…) */}
+        {cp.origem && !['logistica', 'compras', 'manual'].includes(cp.origem) && (
+          <span className="inline-flex items-center gap-0.5 bg-slate-100 text-slate-500 text-[10px] font-semibold rounded-full px-2 py-0.5">
+            <Building2 size={9} /> {ORIGEM_CP_LABEL[cp.origem]?.label ?? cp.origem}
           </span>
         )}
       </div>
@@ -3888,7 +3905,7 @@ export default function CPPipeline() {
   // Resizable columns
   const cpTableRef = useRef<HTMLDivElement>(null)
   const cpColWidthsRef = useRef<number[]>([])
-  const CP_COLS_DEFAULT = '20px 2px minmax(0,1.8fr) minmax(0,1.45fr) minmax(0,1fr) 70px 110px 72px 96px'
+  const CP_COLS_DEFAULT = '20px 2px minmax(0,1.8fr) minmax(0,1.45fr) minmax(0,1fr) 84px 70px 110px 72px 96px'
   const startCpColResize = useCallback((colIndex: number, startX: number) => {
     const container = cpTableRef.current
     if (!container) return
@@ -3897,7 +3914,7 @@ export default function CPPipeline() {
       ? cells.map(el => el.getBoundingClientRect().width)
       : cpColWidthsRef.current.length > 0
         ? [...cpColWidthsRef.current]
-        : [220, 180, 120, 70, 110, 72, 96]
+        : [220, 180, 120, 84, 70, 110, 72, 96]
     cpColWidthsRef.current = startWidths
     const onMove = (e: MouseEvent) => {
       const next = startWidths.map((w, i) => i === colIndex ? Math.max(40, w + (e.clientX - startX)) : w)
@@ -5052,9 +5069,10 @@ export default function CPPipeline() {
                 <span className="relative" data-cph>Fornecedor<CpColResizeHandle colIndex={0} onStart={startCpColResize} /></span>
                 <span className="relative" data-cph>{`Descri\u00e7\u00e3o`}<CpColResizeHandle colIndex={1} onStart={startCpColResize} /></span>
                 <span className="relative" data-cph>Obra<CpColResizeHandle colIndex={2} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>CC<CpColResizeHandle colIndex={3} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Pedido<CpColResizeHandle colIndex={4} onStart={startCpColResize} /></span>
-                <span className="relative text-right" data-cph>Venc.<CpColResizeHandle colIndex={5} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Origem<CpColResizeHandle colIndex={3} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>CC<CpColResizeHandle colIndex={4} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Pedido<CpColResizeHandle colIndex={5} onStart={startCpColResize} /></span>
+                <span className="relative text-right" data-cph>Venc.<CpColResizeHandle colIndex={6} onStart={startCpColResize} /></span>
                 <span className="text-right" data-cph>Valor</span>
               </div>
               {activeCPs.map(cp => (
