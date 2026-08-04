@@ -1455,11 +1455,11 @@ function NovaPrevisaoPagamentoModal({
         <div className={`flex items-center justify-between px-6 py-4 sticky top-0 z-10 ${isDark ? 'border-b border-white/[0.06] bg-[#1e293b]' : 'border-b border-slate-100 bg-white'}`}>
           <div>
             <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              {editMode ? 'Editar Pagamento Previsto' : 'Nova Previsão de Pagamento'}
+              {editMode ? 'Editar Lançamento' : 'Nova Previsão de Pagamento'}
             </h2>
             <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               {editMode
-                ? 'Edição permitida enquanto o título estiver em Previstos'
+                ? 'Edição permitida até o lançamento entrar em lote de pagamento'
                 : 'A previsão será criada em Previstos para acompanhamento financeiro'}
             </p>
           </div>
@@ -2989,7 +2989,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
             </button>
-            {cp.status === 'previsto' && perfil?.edita_previsao_fin && (
+            {['previsto', 'confirmado'].includes(cp.status) && !cp.lote_id && perfil?.edita_previsao_fin && (
               <button onClick={() => onAction('editarPrevisao', cp)} className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all flex items-center justify-center gap-2 ${isDark ? 'border-amber-500/40 text-amber-300 hover:bg-amber-500/10' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}`}>
                 <Pencil size={15} /> Editar
               </button>
@@ -4849,7 +4849,7 @@ export default function CPPipeline() {
           isDark={isDark}
           previsao={previsaoEmEdicao}
           onClose={() => setPrevisaoEmEdicao(null)}
-          onSuccess={() => showToast('success', 'Pagamento previsto atualizado')}
+          onSuccess={() => showToast('success', 'Lançamento atualizado')}
         />
       )}
 

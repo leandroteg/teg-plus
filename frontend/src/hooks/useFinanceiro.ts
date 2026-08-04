@@ -579,12 +579,17 @@ export function useEditarPrevisaoPagamentoCP() {
     }) => {
       const { data: atual, error: readErr } = await supabase
         .from('fin_contas_pagar')
-        .select('id, status, pedido_id')
+        .select('id, status, pedido_id, lote_id')
         .eq('id', cpId)
         .single()
-      if (readErr) throw new Error(getSupabaseErrorMessage(readErr, 'Erro ao carregar a previsão'))
-      if (atual.status !== 'previsto') {
-        throw new Error('Este título já saiu de Previstos e não pode mais ser editado. Use o cancelamento com aprovação.')
+      if (readErr) throw new Error(getSupabaseErrorMessage(readErr, 'Erro ao carregar o lançamento'))
+      // Editável enquanto não entra na esteira de pagamento. Depois do lote, o
+      // caminho é devolver p/ edição do lote ou o cancelamento com aprovação.
+      if (!['previsto', 'confirmado'].includes(atual.status)) {
+        throw new Error('Este lançamento já está em lote/pagamento e não pode ser editado. Use o cancelamento com aprovação.')
+      }
+      if (atual.lote_id) {
+        throw new Error('Lançamento já vinculado a um lote — remova do lote antes de editar.')
       }
 
       // Título de pedido: valor e fornecedor pertencem ao pedido (itens, impostos,
@@ -612,8 +617,8 @@ export function useEditarPrevisaoPagamentoCP() {
           updated_at: new Date().toISOString(),
         })
         .eq('id', cpId)
-        .eq('status', 'previsto')
-      if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao salvar a previsão'))
+        .in('status', ['previsto', 'confirmado'])
+      if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao salvar o lançamento'))
 
       // Anexos novos são acrescentados (os já existentes continuam)
       const falhas: string[] = []
