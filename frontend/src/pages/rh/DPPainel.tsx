@@ -252,7 +252,8 @@ export default function DPPainel() {
             <ul className="px-2 py-1.5">
               {agg.abertoPorBase.map(b => (
                 <li key={b.nome} className="flex items-center gap-2.5 px-2 py-1.5">
-                  <span className={`w-[92px] shrink-0 truncate text-[11px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{b.nome}</span>
+                  <span title={b.nome}
+                    className={`w-[104px] sm:w-[170px] shrink-0 text-[11px] font-semibold leading-tight ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{b.nome}</span>
                   <div className={`flex-1 h-5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
                     <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500" style={{ width: `${Math.max((b.pct / maxAbertoPct) * 100, 4)}%` }} />
                   </div>
@@ -283,7 +284,8 @@ export default function DPPainel() {
             <ul className="px-2 py-1.5">
               {agg.extraPorBase.map(b => (
                 <li key={b.nome} className="flex items-center gap-2.5 px-2 py-1.5">
-                  <span className={`w-[92px] shrink-0 truncate text-[11px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{b.nome}</span>
+                  <span title={b.nome}
+                    className={`w-[104px] sm:w-[170px] shrink-0 text-[11px] font-semibold leading-tight ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{b.nome}</span>
                   <div className={`flex-1 h-5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
                     <div className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-500" style={{ width: `${Math.max((b.pct / maxExtraPct) * 100, 4)}%` }} />
                   </div>
