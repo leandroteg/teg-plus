@@ -97,115 +97,26 @@ export function useCriarSolicitacaoAdiantamento() {
         throw new Error('Perfil do solicitante não carregado.')
       }
 
-      // ── Resolver aprovador ──────────────────────────────────────────────────
-      // O roteamento segue o FAVORECIDO (quem recebe o adiantamento), não quem
-      // digitou: o comprador lança em nome de terceiros e a aprovação precisa
-      // cair no gestor/UF de quem vai receber. Sem colaborador correspondente
-      // (favorecido fornecedor PJ, p.ex.), volta a usar o solicitante.
-      // Regras de roteamento (em ordem de prioridade):
-      //   1. UF da obra onde o colaborador está lotado:
-      //      MG → Welton Aparecido Pereira
-      //      MS → Leandro Maia Mallet
-      //   2. UF do próprio colaborador (endereço): mesma lógica acima
-      //   3. Gestor direto cadastrado no RH
-      //   4. Fallback: Leandro Maia Mallet
+      // ── Resolver aprovador (RPC SECURITY DEFINER) ───────────────────────────
+      // Roteamento pela lotação do FAVORECIDO: UF do local de trabalho → obra →
+      // endereço (MG=Welton, MS=Leandro), senão gestor direto do RH, senão
+      // Welton. Roda no banco porque a RLS de sys_perfis só deixa o usuário ler
+      // o PRÓPRIO perfil — resolvendo no cliente, a busca dos aprovadores vinha
+      // vazia e a solicitação morria em "Nenhum aprovador disponível".
+      const { data: rota, error: rotaError } = await supabase.rpc('desp_resolver_aprovador_adiantamento', {
+        p_favorecido_email: payload.favorecido_email?.trim() || null,
+        p_favorecido_nome: payload.favorecido_nome?.trim() || null,
+      })
+      if (rotaError) throw new Error(`Não foi possível definir o aprovador: ${rotaError.message}`)
 
-      const COLAB_FIELDS = 'id, nome, email, gestor_id, uf, obra_id, local_trabalho_uf'
-      type ColaboradorRota = {
-        id: string
-        nome: string
-        email: string | null
-        gestor_id: string | null
-        uf: string | null
-        obra_id: string | null
-        local_trabalho_uf: string | null
+      const aprovador = rota as { nome?: string; email?: string; gestor_rh_id?: string | null } | null
+      if (!aprovador?.email) {
+        throw new Error('Nenhum aprovador disponível para esta solicitação. Verifique o cadastro dos aprovadores (Welton/Leandro) no Admin de Usuários.')
       }
 
-      let colaborador: ColaboradorRota | null = null
-
-      const favorecidoEmail = payload.favorecido_email?.trim()
-      if (favorecidoEmail) {
-        const { data } = await supabase
-          .from('rh_colaboradores')
-          .select(COLAB_FIELDS)
-          .ilike('email', favorecidoEmail)
-          .limit(1)
-          .maybeSingle()
-        colaborador = (data as ColaboradorRota | null) ?? null
-      }
-
-      if (!colaborador && payload.favorecido_nome?.trim()) {
-        const { data } = await supabase
-          .from('rh_colaboradores')
-          .select(COLAB_FIELDS)
-          .ilike('nome', payload.favorecido_nome.trim())
-          .limit(1)
-          .maybeSingle()
-        colaborador = (data as ColaboradorRota | null) ?? null
-      }
-
-      if (!colaborador) {
-        const { data, error: colaboradorError } = await supabase
-          .from('rh_colaboradores')
-          .select(COLAB_FIELDS)
-          .eq('perfil_id', perfil.id)
-          .limit(1)
-          .maybeSingle()
-        if (colaboradorError) throw colaboradorError
-        colaborador = (data as ColaboradorRota | null) ?? null
-      }
-
-      // Determinar UF efetiva (prioridade: campo explícito > obra > endereço)
-      let ufEfetiva: string | null = null
-      if (colaborador?.local_trabalho_uf) {
-        ufEfetiva = colaborador.local_trabalho_uf.toUpperCase()
-      } else if (colaborador?.obra_id) {
-        const { data: obra } = await supabase
-          .from('sys_obras')
-          .select('uf')
-          .eq('id', colaborador.obra_id)
-          .maybeSingle()
-        ufEfetiva = obra?.uf?.toUpperCase() ?? null
-      }
-      if (!ufEfetiva && colaborador?.uf) {
-        ufEfetiva = colaborador.uf.toUpperCase()
-      }
-
-      // Buscar aprovadores nomeados por UF
-      const [{ data: welton }, { data: leandro }] = await Promise.all([
-        supabase.from('sys_perfis').select('id, nome, email').ilike('nome', '%WELTON APARECIDO PEREIRA%').maybeSingle(),
-        supabase.from('sys_perfis').select('id, nome, email').ilike('nome', '%LEANDRO MAIA MALLET%').maybeSingle(),
-      ])
-
-      let aprovadorRhId: string | null = null
-      let aprovadorNome = ''
-      let aprovadorEmail = ''
-
-      if (ufEfetiva === 'MG' && welton?.email) {
-        aprovadorNome = welton.nome
-        aprovadorEmail = welton.email
-      } else if (ufEfetiva === 'MS' && leandro?.email) {
-        aprovadorNome = leandro.nome
-        aprovadorEmail = leandro.email
-      } else if (colaborador?.gestor_id) {
-        // Fallback: gestor direto no RH
-        const { data: gestor, error: gestorError } = await supabase
-          .from('rh_colaboradores')
-          .select('id, nome, email')
-          .eq('id', colaborador.gestor_id)
-          .maybeSingle()
-        if (gestorError) throw gestorError
-        if (!gestor?.email) throw new Error('O gestor do solicitante está sem e-mail cadastrado no RH.')
-        aprovadorRhId = gestor.id
-        aprovadorNome = gestor.nome
-        aprovadorEmail = gestor.email
-      } else {
-        // Fallback final: Welton (sem UF definida)
-        const admin = welton ?? leandro ?? null
-        if (!admin?.email) throw new Error('Nenhum aprovador disponível para esta solicitação.')
-        aprovadorNome = admin.nome
-        aprovadorEmail = admin.email
-      }
+      const aprovadorRhId = aprovador.gestor_rh_id ?? null
+      const aprovadorNome = aprovador.nome ?? ''
+      const aprovadorEmail = aprovador.email
 
       const numero = gerarNumeroAdiantamento()
       const hoje = new Date().toISOString().split('T')[0]
