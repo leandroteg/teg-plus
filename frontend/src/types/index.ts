@@ -430,3 +430,46 @@ export interface NovaCotacaoPayload {
     observacao?: string
   }[]
 }
+
+// ── Despesas: adiantamento de viagem (repasse) ───────────────────────────────
+
+export type StatusDespesaAdiantamento =
+  | 'solicitado' | 'aprovado' | 'rejeitado'
+  | 'prestacao_pendente' | 'prestacao_enviada' | 'concluido'
+
+export interface DespesaAdiantamento {
+  id: string
+  numero: string
+  solicitante_id?: string | null
+  solicitante_nome: string
+  solicitante_email?: string | null
+  gestor_id?: string | null
+  gestor_nome?: string | null
+  gestor_email?: string | null
+  favorecido_nome: string
+  favorecido_email?: string | null
+  /** Chave PIX do favorecido — vai para a CP gerada na aprovação. */
+  chave_pix?: string | null
+  /** Banco do favorecido — sai no termo de repasse junto com a chave PIX. */
+  banco?: string | null
+  centro_custo?: string | null
+  centro_custo_id?: string | null
+  classe_financeira?: string | null
+  classe_financeira_id?: string | null
+  valor_solicitado: number
+  valor_aprovado: number
+  finalidade: string
+  justificativa?: string | null
+  data_solicitacao: string
+  data_limite_prestacao?: string | null
+  data_pagamento?: string | null
+  status: StatusDespesaAdiantamento
+  aprovacao_id?: string | null
+  /** CP gerada na aprovação (trigger fn_adiantamento_gera_cp). */
+  fin_conta_pagar_id?: string | null
+  aprovado_por?: string | null
+  aprovado_em?: string | null
+  observacoes?: string | null
+  created_at: string
+  updated_at: string
+}

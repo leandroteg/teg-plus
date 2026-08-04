@@ -226,6 +226,134 @@ export function useCriarSolicitacaoAdiantamento() {
   })
 }
 
+// ── Edição pelo criador ──────────────────────────────────────────────────────
+// Campos operacionais (finalidade, PIX, banco, observação) podem ser corrigidos
+// a qualquer tempo. Valor/favorecido/centro de custo só ANTES da aprovação: uma
+// vez aprovado o adiantamento já virou conta a pagar no Financeiro.
+
+export type CamposEdicaoAdiantamento = {
+  finalidade?: string
+  justificativa?: string
+  observacoes?: string
+  chave_pix?: string
+  banco?: string
+  favorecido_nome?: string
+  favorecido_email?: string
+  valor_solicitado?: number
+  data_pagamento?: string
+  data_limite_prestacao?: string
+  centro_custo?: string
+  centro_custo_id?: string
+}
+
+/** Campos que continuam editáveis depois que o gestor aprovou. */
+const CAMPOS_POS_APROVACAO = new Set(['finalidade', 'justificativa', 'observacoes', 'chave_pix', 'banco'])
+
+export function podeEditarAdiantamento(
+  adiantamento: { solicitante_id?: string | null; status?: string } | null | undefined,
+  perfilId?: string,
+  isAdmin = false,
+) {
+  if (!adiantamento) return false
+  if (['concluido', 'rejeitado'].includes(adiantamento.status ?? '')) return false
+  return isAdmin || (!!perfilId && adiantamento.solicitante_id === perfilId)
+}
+
+export function useAtualizarAdiantamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, status, campos }: {
+      id: string
+      status: string
+      campos: CamposEdicaoAdiantamento
+    }) => {
+      const aprovado = !['solicitado', 'rascunho'].includes(status)
+
+      const patch: Record<string, unknown> = {}
+      for (const [campo, valor] of Object.entries(campos)) {
+        if (valor === undefined) continue
+        if (aprovado && !CAMPOS_POS_APROVACAO.has(campo)) continue   // trava o que já virou CP
+        patch[campo] = typeof valor === 'string' ? (valor.trim() || null) : valor
+      }
+      if (Object.keys(patch).length === 0) return { atualizados: 0 }
+
+      patch.updated_at = new Date().toISOString()
+      const { data, error } = await supabase
+        .from('desp_adiantamentos')
+        .update(patch)
+        .eq('id', id)
+        .select('id, numero, favorecido_nome, chave_pix, banco, solicitante_nome, aprovado_por, data_limite_prestacao, fin_conta_pagar_id')
+        .single()
+      if (error) throw new Error(error.message)
+
+      // Já tem CP gerada: mantém os dados de pagamento da CP em dia
+      if (data?.fin_conta_pagar_id && (campos.chave_pix !== undefined || campos.banco !== undefined)) {
+        const partes = [
+          `Adiantamento a ${data.favorecido_nome}`,
+          data.banco ? `Banco: ${data.banco}` : null,
+          data.chave_pix ? `PIX: ${data.chave_pix}` : null,
+          `Solicitado por: ${data.solicitante_nome}`,
+          data.aprovado_por ? `Aprovado por: ${data.aprovado_por}` : null,
+          data.data_limite_prestacao
+            ? `Prestação de contas até ${new Date(data.data_limite_prestacao + 'T00:00:00').toLocaleDateString('pt-BR')}`
+            : null,
+        ].filter(Boolean)
+        await supabase
+          .from('fin_contas_pagar')
+          .update({
+            observacoes: partes.join(' | '),
+            forma_pagamento: data.chave_pix ? 'pix' : null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', data.fin_conta_pagar_id)
+          .neq('status', 'pago')
+      }
+
+      return { atualizados: Object.keys(patch).length - 1 }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['despesas-adiantamentos'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+    },
+  })
+}
+
+/** Anexa documentos a um adiantamento já criado (comprovante, orçamento, prestação). */
+export function useAnexarDocumentosAdiantamento() {
+  const qc = useQueryClient()
+  const { perfil } = useAuth()
+  return useMutation({
+    mutationFn: async ({ adiantamentoId, arquivos }: { adiantamentoId: string; arquivos: File[] }) => {
+      const falhas: string[] = []
+      for (const arquivo of arquivos) {
+        const ext = arquivo.name.split('.').pop()?.toLowerCase() || 'bin'
+        const path = `adiantamento/${adiantamentoId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        const up = await supabase.storage
+          .from('financeiro-docs')
+          .upload(path, arquivo, { contentType: arquivo.type || undefined })
+        if (up.error) { falhas.push(arquivo.name); continue }
+        const { data: urlData } = supabase.storage.from('financeiro-docs').getPublicUrl(path)
+        const { error } = await supabase.from('fin_documentos').insert({
+          entity_type: 'adiantamento',
+          entity_id: adiantamentoId,
+          tipo: 'doc_financeiro',
+          nome_arquivo: arquivo.name,
+          arquivo_url: urlData.publicUrl,
+          mime_type: arquivo.type || null,
+          tamanho_bytes: arquivo.size || null,
+          uploaded_by: perfil?.id ?? null,
+        })
+        if (error) falhas.push(arquivo.name)
+      }
+      if (falhas.length > 0) throw new Error(`Falha ao anexar: ${falhas.join(', ')}`)
+      return arquivos.length
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['adiantamento-anexos'] })
+    },
+  })
+}
+
 export function useAtualizarClasseAdiantamento() {
   const qc = useQueryClient()
   return useMutation({

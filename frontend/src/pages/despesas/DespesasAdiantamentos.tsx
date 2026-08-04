@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send, AlertCircle, ChevronRight, Save, Loader2, Paperclip, FileText, KeyRound, Printer } from 'lucide-react'
+import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send, AlertCircle, ChevronRight, Save, Loader2, Paperclip, FileText, KeyRound, Printer, Pencil } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCadCentrosCusto, useCadClasses, useCadFornecedores } from '../../hooks/useCadastros'
-import { isDespesaSchemaMissing, useAdiantamentosDespesa, useCriarSolicitacaoAdiantamento, useAtualizarClasseAdiantamento, useAnexosAdiantamento } from '../../hooks/useDespesas'
+import {
+  isDespesaSchemaMissing, useAdiantamentosDespesa, useCriarSolicitacaoAdiantamento,
+  useAtualizarClasseAdiantamento, useAnexosAdiantamento, useAtualizarAdiantamento,
+  useAnexarDocumentosAdiantamento, podeEditarAdiantamento,
+} from '../../hooks/useDespesas'
 import { useRHColaboradores } from '../../hooks/useRH'
 import NumericInput from '../../components/NumericInput'
 import { UpperTextarea } from '../../components/UpperInput'
@@ -669,6 +673,7 @@ function DetalheAdiantamento({
   salvando, onSalvarClasse, onClose,
 }: {
   item: { id: string; numero: string; finalidade: string; favorecido_nome: string; solicitante_nome?: string
+    solicitante_id?: string | null
     favorecido_email?: string | null; justificativa?: string | null; observacoes?: string | null
     gestor_nome?: string | null; valor_solicitado: number; status: StatusDespesaAdiantamento
     centro_custo?: string | null; classe_financeira?: string | null; chave_pix?: string | null; banco?: string | null
@@ -684,17 +689,62 @@ function DetalheAdiantamento({
   onClose: () => void
 }) {
   const { data: anexos = [] } = useAnexosAdiantamento(item.id)
+  const { perfil, isAdmin } = useAuth()
+  const atualizar = useAtualizarAdiantamento()
+  const anexarDocs = useAnexarDocumentosAdiantamento()
   const linha = `flex items-start justify-between gap-4 py-2 text-sm`
   const rotulo = dark ? 'text-slate-400' : 'text-slate-500'
   const valor = dark ? 'text-slate-100' : 'text-slate-800'
 
+  // Só o criador (ou admin) mexe. Depois de aprovado, valor/favorecido ficam
+  // travados — o adiantamento já virou conta a pagar no Financeiro.
+  const podeEditar = podeEditarAdiantamento(item, perfil?.id, isAdmin)
+  const jaAprovado = !['solicitado', 'rascunho'].includes(item.status)
+  const [editando, setEditando] = useState(false)
+  const [msgEdicao, setMsgEdicao] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null)
+  const arquivoRef = useRef<HTMLInputElement>(null)
+  const [form, setForm] = useState({
+    finalidade: item.finalidade ?? '',
+    justificativa: item.justificativa ?? '',
+    observacoes: item.observacoes ?? '',
+    chave_pix: item.chave_pix ?? '',
+    banco: item.banco ?? '',
+    favorecido_nome: item.favorecido_nome ?? '',
+    valor_solicitado: Number(item.valor_solicitado) || 0,
+  })
+
+  const salvarEdicao = async () => {
+    setMsgEdicao(null)
+    try {
+      await atualizar.mutateAsync({ id: item.id, status: item.status, campos: form })
+      setMsgEdicao({ tipo: 'ok', texto: 'Alterações salvas.' })
+      setEditando(false)
+    } catch (e) {
+      setMsgEdicao({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Erro ao salvar.' })
+    }
+  }
+
+  const enviarAnexos = async (files: FileList | null) => {
+    const arquivos = Array.from(files ?? [])
+    if (arquivos.length === 0) return
+    setMsgEdicao(null)
+    try {
+      await anexarDocs.mutateAsync({ adiantamentoId: item.id, arquivos })
+      setMsgEdicao({ tipo: 'ok', texto: `${arquivos.length} documento(s) anexado(s).` })
+    } catch (e) {
+      setMsgEdicao({ tipo: 'erro', texto: e instanceof Error ? e.message : 'Erro ao anexar.' })
+    } finally {
+      if (arquivoRef.current) arquivoRef.current.value = ''
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
-      <div className={`w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-[28px] border p-6 shadow-2xl ${dark ? 'border-white/10 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+      <div className={`w-full max-w-xl max-h-[92vh] overflow-y-auto overflow-x-hidden rounded-[28px] border p-6 shadow-2xl ${dark ? 'border-white/10 bg-slate-950' : 'border-slate-200 bg-white'}`}>
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <h2 className={`text-xl font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>{item.numero}</h2>
-            <p className={`mt-1 text-sm ${rotulo}`}>{item.finalidade}</p>
+            <p className={`mt-1 break-words text-sm ${rotulo}`}>{item.finalidade}</p>
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -719,11 +769,119 @@ function DetalheAdiantamento({
             >
               <Printer size={17} />
             </button>
+            {podeEditar && !editando && (
+              <button
+                type="button"
+                onClick={() => { setEditando(true); setMsgEdicao(null) }}
+                title="Editar solicitação"
+                className={`rounded-full p-2 ${dark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-600 hover:bg-slate-100'}`}
+              >
+                <Pencil size={16} />
+              </button>
+            )}
             <button type="button" onClick={onClose} className={`rounded-full p-2 ${dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-100'}`}>
               <XCircle size={18} />
             </button>
           </div>
         </div>
+
+        {/* Edição pelo criador */}
+        {editando && (
+          <div className={`mt-4 rounded-2xl border p-4 space-y-3 ${dark ? 'border-emerald-500/25 bg-emerald-500/5' : 'border-emerald-200 bg-emerald-50/50'}`}>
+            <p className={`text-xs font-bold ${dark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+              Editando a solicitação
+            </p>
+            {jaAprovado && (
+              <p className={`text-[11px] ${dark ? 'text-amber-300' : 'text-amber-700'}`}>
+                Já aprovada: valor e favorecido ficam travados (viraram conta a pagar).
+                Para mudar isso, o Financeiro precisa cancelar o título.
+              </p>
+            )}
+
+            {!jaAprovado && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className={`mb-1 block text-[11px] font-semibold ${rotulo}`}>Favorecido</label>
+                  <input
+                    value={form.favorecido_nome}
+                    onChange={e => setForm(p => ({ ...p, favorecido_nome: e.target.value }))}
+                    className={`w-full rounded-xl border px-3 py-2 text-sm outline-none ${dark ? 'border-white/10 bg-white/[0.04] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                  />
+                </div>
+                <div>
+                  <label className={`mb-1 block text-[11px] font-semibold ${rotulo}`}>Valor</label>
+                  <NumericInput
+                    value={form.valor_solicitado}
+                    onChange={v => setForm(p => ({ ...p, valor_solicitado: v }))}
+                    className={`w-full rounded-xl border px-3 py-2 text-sm outline-none ${dark ? 'border-white/10 bg-white/[0.04] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className={`mb-1 block text-[11px] font-semibold ${rotulo}`}>Finalidade</label>
+              <UpperTextarea
+                rows={2}
+                value={form.finalidade}
+                onChange={e => setForm(p => ({ ...p, finalidade: e.target.value }))}
+                className={`w-full rounded-xl border px-3 py-2 text-sm outline-none resize-none ${dark ? 'border-white/10 bg-white/[0.04] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className={`mb-1 block text-[11px] font-semibold ${rotulo}`}>Chave PIX</label>
+                <input
+                  value={form.chave_pix}
+                  onChange={e => setForm(p => ({ ...p, chave_pix: e.target.value }))}
+                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none ${dark ? 'border-white/10 bg-white/[0.04] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                />
+              </div>
+              <div>
+                <label className={`mb-1 block text-[11px] font-semibold ${rotulo}`}>Banco</label>
+                <input
+                  value={form.banco}
+                  onChange={e => setForm(p => ({ ...p, banco: e.target.value }))}
+                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none ${dark ? 'border-white/10 bg-white/[0.04] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={`mb-1 block text-[11px] font-semibold ${rotulo}`}>Observações</label>
+              <UpperTextarea
+                rows={2}
+                value={form.observacoes}
+                onChange={e => setForm(p => ({ ...p, observacoes: e.target.value }))}
+                className={`w-full rounded-xl border px-3 py-2 text-sm outline-none resize-none ${dark ? 'border-white/10 bg-white/[0.04] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditando(false)}
+                className={`rounded-xl px-3 py-2 text-xs font-semibold ${dark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-500 hover:bg-white'}`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={salvarEdicao}
+                disabled={atualizar.isPending}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-emerald-500 disabled:opacity-60"
+              >
+                {atualizar.isPending ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                Salvar alterações
+              </button>
+            </div>
+          </div>
+        )}
+
+        {msgEdicao && (
+          <p className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ${
+            msgEdicao.tipo === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+          }`}>{msgEdicao.texto}</p>
+        )}
 
         <div className={`mt-4 divide-y ${dark ? 'divide-white/5' : 'divide-slate-100'}`}>
           <div className={linha}><span className={rotulo}>Favorecido</span><span className={`font-semibold ${valor}`}>{item.favorecido_nome}</span></div>
@@ -740,8 +898,8 @@ function DetalheAdiantamento({
             <div className={linha}><span className={rotulo}>Prestar contas até</span><span className={valor}>{new Date(item.data_limite_prestacao + 'T00:00:00').toLocaleDateString('pt-BR')}</span></div>
           )}
           <div className={linha}>
-            <span className={`flex items-center gap-1.5 ${rotulo}`}><KeyRound size={13} /> Chave PIX</span>
-            <span className={`text-right font-mono text-xs ${item.chave_pix ? valor : dark ? 'text-slate-600' : 'text-slate-300'}`}>
+            <span className={`flex shrink-0 items-center gap-1.5 ${rotulo}`}><KeyRound size={13} /> Chave PIX</span>
+            <span className={`min-w-0 break-all text-right font-mono text-xs ${item.chave_pix ? valor : dark ? 'text-slate-600' : 'text-slate-300'}`}>
               {item.chave_pix || 'não informada'}
             </span>
           </div>
@@ -758,9 +916,34 @@ function DetalheAdiantamento({
 
         {/* Documentos anexados */}
         <div className="mt-4">
-          <p className={`mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${rotulo}`}>
-            <Paperclip size={12} /> Documentos ({anexos.length})
-          </p>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className={`flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${rotulo}`}>
+              <Paperclip size={12} /> Documentos ({anexos.length})
+            </p>
+            {podeEditar && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => arquivoRef.current?.click()}
+                  disabled={anexarDocs.isPending}
+                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition disabled:opacity-60 ${
+                    dark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {anexarDocs.isPending ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                  Anexar
+                </button>
+                <input
+                  ref={arquivoRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
+                  className="hidden"
+                  onChange={e => enviarAnexos(e.target.files)}
+                />
+              </>
+            )}
+          </div>
           {anexos.length === 0 ? (
             <p className={`text-xs italic ${dark ? 'text-slate-600' : 'text-slate-400'}`}>Nenhum documento anexado.</p>
           ) : (
@@ -789,11 +972,13 @@ function DetalheAdiantamento({
           <label className={`mb-1.5 block text-xs font-semibold ${rotulo}`}>
             Classe financeira {item.classe_financeira ? '' : '— pendente'}
           </label>
-          <div className="flex gap-2">
+          {/* min-w-0 no select: sem isso a opcao longa estoura o flex e joga o
+              botao Salvar pra fora da tela (o modal ganhava scroll horizontal) */}
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={classeId}
               onChange={e => { setClasseId(e.target.value); setErroClasse('') }}
-              className={`flex-1 rounded-2xl border px-3 py-2 text-sm outline-none ${dark ? 'border-white/10 bg-white/[0.04] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+              className={`min-w-0 flex-1 basis-48 truncate rounded-2xl border px-3 py-2 text-sm outline-none ${dark ? 'border-white/10 bg-white/[0.04] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
             >
               <option value="">Selecione</option>
               {classes.map(c => (
@@ -804,7 +989,7 @@ function DetalheAdiantamento({
               type="button"
               onClick={onSalvarClasse}
               disabled={salvando}
-              className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
             >
               {salvando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Salvar
