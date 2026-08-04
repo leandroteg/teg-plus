@@ -576,20 +576,27 @@ export function useEditarPrevisaoPagamentoCP() {
     }) => {
       const { data: atual, error: readErr } = await supabase
         .from('fin_contas_pagar')
-        .select('id, status')
+        .select('id, status, pedido_id')
         .eq('id', cpId)
         .single()
       if (readErr) throw new Error(getSupabaseErrorMessage(readErr, 'Erro ao carregar a previsão'))
       if (atual.status !== 'previsto') {
-        throw new Error('Esta previsão já saiu de Previstos e não pode mais ser editada. Use o cancelamento com aprovação.')
+        throw new Error('Este título já saiu de Previstos e não pode mais ser editado. Use o cancelamento com aprovação.')
       }
+
+      // Título de pedido: valor e fornecedor pertencem ao pedido (itens, impostos,
+      // recebimento). Mexer só aqui faria a CP divergir do pedido — nesse caso o
+      // caminho é devolver para correção no Compras.
+      const doPedido = Boolean(atual.pedido_id)
 
       const { error } = await supabase
         .from('fin_contas_pagar')
         .update({
-          fornecedor_id: fornecedorId || null,
-          fornecedor_nome: (fornecedorNome || nome).trim(),
-          valor_original: valor,
+          ...(doPedido ? {} : {
+            fornecedor_id: fornecedorId || null,
+            fornecedor_nome: (fornecedorNome || nome).trim(),
+            valor_original: valor,
+          }),
           data_vencimento: dataVencimento,
           centro_custo,
           classe_financeira,
@@ -644,6 +651,42 @@ export function useEditarPrevisaoPagamentoCP() {
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
       qc.invalidateQueries({ queryKey: ['fin-documentos'] })
+    },
+  })
+}
+
+// ── Devolver título para correção (aviso de inconsistência) ─────────────────
+// O título não muda de status nem é excluído: ganha a marca de pendência, que
+// vira alerta na tela e notificação in-app para quem lançou (RPC mig 211).
+
+export function useDevolverCPCorrecao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ cpId, motivo }: { cpId: string; motivo: string }) => {
+      const { data, error } = await supabase.rpc('fin_cp_devolver_correcao', {
+        p_cp_id: cpId,
+        p_motivo: motivo,
+      })
+      if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao devolver o título'))
+      return data as { ok: boolean; devolvido_para: string | null; notificado: boolean }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['cps-para-pagamento'] })
+    },
+  })
+}
+
+export function useResolverDevolucaoCP() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (cpId: string) => {
+      const { error } = await supabase.rpc('fin_cp_resolver_devolucao', { p_cp_id: cpId })
+      if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao baixar a pendência'))
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['cps-para-pagamento'] })
     },
   })
 }

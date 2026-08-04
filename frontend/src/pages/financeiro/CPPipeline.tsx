@@ -6,7 +6,7 @@ import {
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
   ChevronLeft, ChevronRight, ArrowRight,
-  Plus, Save, Loader2, RefreshCw, Landmark, Pencil,
+  Plus, Save, Loader2, RefreshCw, Landmark, Pencil, Undo2,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -21,6 +21,8 @@ import {
   useCriarSolicitacaoExtraordinariaCP,
   useCriarPrevisaoPagamentoCP,
   useEditarPrevisaoPagamentoCP,
+  useDevolverCPCorrecao,
+  useResolverDevolucaoCP,
   useDocumentosCP,
   useObras,
   useExtratoCandidatos,
@@ -1476,8 +1478,19 @@ function NovaPrevisaoPagamentoModal({
             </p>
           </div>
 
+          {/* Título vindo de pedido: valor e fornecedor pertencem ao pedido, não ao Financeiro */}
+          {editMode && previsao?.pedido_id && (
+            <div className={`rounded-xl border px-4 py-3 ${isDark ? 'border-amber-500/25 bg-amber-500/10' : 'border-amber-200 bg-amber-50'}`}>
+              <p className={`text-xs font-bold ${isDark ? 'text-amber-200' : 'text-amber-700'}`}>Título de pedido de compra</p>
+              <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                Beneficiário e valor vêm do pedido e não são alterados aqui — ajuste vencimento, centro de custo,
+                natureza e anexos. Para trocar fornecedor ou valor, use <strong>Devolver para correção</strong>.
+              </p>
+            </div>
+          )}
+
           {/* Beneficiário: quem recebe (fornecedor PJ ou PF do cadastro) */}
-          <div className="relative">
+          <div className={`relative ${editMode && previsao?.pedido_id ? 'opacity-60 pointer-events-none' : ''}`}>
             <label className={labelCls}>Beneficiário *</label>
             {form.fornecedor_id ? (
               <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 border ${isDark ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-emerald-200 bg-emerald-50'}`}>
@@ -1543,12 +1556,19 @@ function NovaPrevisaoPagamentoModal({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
+            <div className={editMode && previsao?.pedido_id ? 'opacity-60' : ''}>
               <label className={labelCls}>Valor *</label>
-              <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setField('valor', e.target.value)} className={inputCls} placeholder="0,00" />
+              <input
+                type="number" min="0" step="0.01"
+                value={form.valor}
+                disabled={Boolean(editMode && previsao?.pedido_id)}
+                onChange={e => setField('valor', e.target.value)}
+                className={inputCls}
+                placeholder="0,00"
+              />
             </div>
             <div>
-              <label className={labelCls}>Primeiro vencimento *</label>
+              <label className={labelCls}>{editMode ? 'Vencimento *' : 'Primeiro vencimento *'}</label>
               <input type="date" value={form.dataVencimento} onChange={e => setField('dataVencimento', e.target.value)} className={inputCls} />
             </div>
           </div>
@@ -2284,6 +2304,13 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const [editClasse, setEditClasse] = useState(cp.classe_financeira ?? '')
   const [editObra, setEditObra] = useState((cp as any).projeto_id ?? '')
   const [savingClass, setSavingClass] = useState(false)
+  // Devolução p/ correção (aviso de inconsistência)
+  const devolverMut = useDevolverCPCorrecao()
+  const resolverDevMut = useResolverDevolucaoCP()
+  const [showDevolver, setShowDevolver] = useState(false)
+  const [motivoDevolucao, setMotivoDevolucao] = useState('')
+  const [erroDevolucao, setErroDevolucao] = useState('')
+  const devolvida = Boolean(cp.devolucao_motivo)
   const [selExtratoMovId, setSelExtratoMovId] = useState<string | null>(null)
   const aplicarConcil = useAplicarConciliacaoAuto()
   const { data: extratoCandidatos = [], isLoading: loadingExtrato } = useExtratoCandidatos({
@@ -2863,6 +2890,91 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             </div>
           )}
 
+          {/* Aviso de inconsistência — título devolvido a quem lançou */}
+          {devolvida && (
+            <div className={`rounded-xl border-2 p-3 mb-2 ${isDark ? 'border-rose-500/40 bg-rose-500/10' : 'border-rose-300 bg-rose-50'}`}>
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={15} className={isDark ? 'text-rose-300 mt-0.5 shrink-0' : 'text-rose-600 mt-0.5 shrink-0'} />
+                <div className="min-w-0 flex-1">
+                  <p className={`text-xs font-bold ${isDark ? 'text-rose-200' : 'text-rose-700'}`}>
+                    Devolvido para correção{cp.devolvido_para_nome ? ` — ${cp.devolvido_para_nome}` : ''}
+                  </p>
+                  <p className={`text-[11px] mt-1 leading-snug ${isDark ? 'text-rose-100' : 'text-rose-700'}`}>
+                    {cp.devolucao_motivo}
+                  </p>
+                  <p className={`text-[10px] mt-1 ${isDark ? 'text-rose-300/70' : 'text-rose-500'}`}>
+                    Por {cp.devolvido_por ?? 'Financeiro'}
+                    {cp.devolvido_em ? ` em ${new Date(cp.devolvido_em).toLocaleString('pt-BR')}` : ''}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={resolverDevMut.isPending}
+                    onClick={async () => { await resolverDevMut.mutateAsync(cp.id); onClose() }}
+                    className={`mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${isDark ? 'bg-rose-500/20 text-rose-200 hover:bg-rose-500/30' : 'bg-white border border-rose-300 text-rose-700 hover:bg-rose-100'}`}
+                  >
+                    <CheckCircle2 size={12} /> Marcar como corrigido
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Devolver para correção */}
+          {!devolvida && ['previsto', 'confirmado'].includes(cp.status) && !cp.lote_id && (
+            showDevolver ? (
+              <div className={`rounded-xl border p-3 mb-2 space-y-2 ${isDark ? 'border-amber-500/30 bg-amber-500/10' : 'border-amber-200 bg-amber-50'}`}>
+                <p className={`text-xs font-bold ${isDark ? 'text-amber-200' : 'text-amber-700'}`}>
+                  Qual a inconsistência?
+                </p>
+                <textarea
+                  rows={3}
+                  value={motivoDevolucao}
+                  onChange={e => { setMotivoDevolucao(e.target.value); setErroDevolucao('') }}
+                  placeholder="Ex.: boleto emitido por CNPJ diferente do fornecedor do pedido; valor do boleto nao confere; falta a nota fiscal..."
+                  className={`w-full rounded-xl px-3 py-2 text-sm outline-none resize-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-white border border-slate-200 text-slate-700'}`}
+                />
+                {erroDevolucao && <p className="text-[11px] text-rose-500">{erroDevolucao}</p>}
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setShowDevolver(false); setMotivoDevolucao(''); setErroDevolucao('') }}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold ${isDark ? 'text-slate-300 hover:bg-white/10' : 'text-slate-600 hover:bg-white'}`}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={devolverMut.isPending}
+                    onClick={async () => {
+                      if (motivoDevolucao.trim().length < 15) {
+                        setErroDevolucao('Descreva a inconsistência com pelo menos 15 caracteres — o texto vai para quem lançou.')
+                        return
+                      }
+                      try {
+                        await devolverMut.mutateAsync({ cpId: cp.id, motivo: motivoDevolucao.trim() })
+                        onClose()
+                      } catch (e) {
+                        setErroDevolucao(e instanceof Error ? e.message : 'Erro ao devolver')
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 text-white text-[11px] font-bold hover:bg-rose-700 disabled:opacity-60"
+                  >
+                    {devolverMut.isPending ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                    Devolver ao autor
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDevolver(true)}
+                className={`w-full mb-2 py-2.5 rounded-xl border-2 border-dashed text-xs font-bold transition-colors flex items-center justify-center gap-2 ${isDark ? 'border-amber-500/30 text-amber-300 hover:bg-amber-500/10' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}`}
+              >
+                <Undo2 size={13} /> Devolver para correção
+              </button>
+            )
+          )}
+
           <CancelamentoDocControl
             tipo="cp"
             docId={cp.id}
@@ -2877,13 +2989,18 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
             </button>
-            {cp.status === 'previsto' && cp.natureza === 'previsao_pagamento' && perfil?.edita_previsao_fin && (
+            {cp.status === 'previsto' && perfil?.edita_previsao_fin && (
               <button onClick={() => onAction('editarPrevisao', cp)} className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all flex items-center justify-center gap-2 ${isDark ? 'border-amber-500/40 text-amber-300 hover:bg-amber-500/10' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}`}>
                 <Pencil size={15} /> Editar
               </button>
             )}
             {cp.status === 'previsto' && (
-              <button onClick={() => onAction('confirmar', cp)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+              <button
+                onClick={() => onAction('confirmar', cp)}
+                disabled={devolvida}
+                title={devolvida ? 'Resolva a inconsistência antes de confirmar' : undefined}
+                className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 <CheckCircle2 size={15} /> Confirmar
               </button>
             )}

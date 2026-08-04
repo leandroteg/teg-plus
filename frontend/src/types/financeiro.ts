@@ -80,6 +80,11 @@ export interface ContaPagar {
   origem?: OrigemCP
   valor_original: number
   valor_pago: number
+  /** Inconsistência apontada pelo Financeiro (mig 211). Preenchido = devolvido p/ correção. */
+  devolucao_motivo?: string | null
+  devolvido_em?: string | null
+  devolvido_por?: string | null
+  devolvido_para_nome?: string | null
   /** Desconto financeiro obtido na baixa (mig 203). valor_pago = original − desconto + juros/multa. */
   valor_desconto?: number
   /** Juros/multa pagos na baixa por atraso (mig 203). */
