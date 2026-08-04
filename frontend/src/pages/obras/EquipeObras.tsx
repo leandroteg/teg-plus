@@ -375,8 +375,8 @@ function PessoasView({ isDark }: { isDark: boolean }) {
                 <Th label="Função" k="cargo" cls="hidden md:table-cell" />
                 <Th label="Admissão" k="adm" cls="hidden sm:table-cell" />
                 <Th label="Alojamento" k="aloj" />
-                <Th label="Base (último ponto)" k="base" />
-                <th className={`${TH} hidden lg:table-cell`}>Obra</th>
+                <Th label="Último Ponto" k="base" />
+                <th className={`${TH} hidden lg:table-cell`}>Alocação</th>
               </tr></thead>
               <tbody>{lista.map(p => (
                 <tr key={p.colaborador_id} className={`border-t ${isDark ? 'border-white/[0.05] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50/70'}`}>
@@ -408,7 +408,19 @@ function PessoasView({ isDark }: { isDark: boolean }) {
                       : <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'}`}>sem ponto</span>}
                   </td>
                   <td className={`${TD} hidden lg:table-cell ${sub}`}>
-                    <span className="block truncate max-w-[220px]" title={p.obra ?? ''}>{p.obra ?? '—'}</span>
+                    {p.papel ? (
+                      <div className="min-w-0">
+                        {/* apoio serve o canteiro inteiro, nao uma obra: para ele o
+                            lugar certo e a base onde bateu. Engenheiro e supervisor
+                            respondem pelo polo e nao batem ponto, entao para esses a
+                            alocacao segue sendo o unico sinal que existe. */}
+                        <span className="block truncate max-w-[220px]"
+                          title={p.papel === 'apoio' ? (p.base_ponto ?? 'apoio — sem ponto para localizar') : (p.obra ?? '')}>
+                          {p.papel === 'apoio' ? (p.base_ponto ?? '—') : (p.obra ?? '—')}
+                        </span>
+                        <span className={`text-[10px] ${sub}`}>{p.papel}</span>
+                      </div>
+                    ) : '—'}
                   </td>
                 </tr>
               ))}</tbody>
