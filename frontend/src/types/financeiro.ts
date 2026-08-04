@@ -1,9 +1,14 @@
 // ── Financeiro Types ─────────────────────────────────────────────────────────
 
 export type StatusCP =
+  /** Pedido extraordinário emitido e ainda em conferência no Compras — não aparece no Financeiro (mig 212). */
+  | 'aguardando_conferencia'
   | 'previsto' | 'confirmado' | 'em_lote'
   | 'aprovado_pgto' | 'em_pagamento'
   | 'pago' | 'conciliado' | 'cancelado'
+
+/** Títulos que ainda não pertencem ao Financeiro (fora de todas as listas/KPIs). */
+export const STATUS_CP_FORA_DO_FINANCEIRO: StatusCP[] = ['aguardando_conferencia']
 
 export type RemessaCPStatus =
   | 'nao_enviada'

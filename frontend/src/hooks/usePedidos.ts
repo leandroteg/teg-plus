@@ -838,7 +838,9 @@ export function useEmitirPedidoDireto() {
         data_emissao: now.toISOString().split('T')[0],
         data_vencimento: parcela.data_vencimento,
         data_vencimento_orig: parcela.data_vencimento,
-        status: parcela.status_inicial === 'confirmado' ? 'confirmado' : 'previsto',
+        // Extraordinário fica fora do Financeiro até o Compras conferir os
+        // documentos e liberar (mig 212). Adiantamento segue confirmado.
+        status: parcela.status_inicial === 'confirmado' ? 'confirmado' : 'aguardando_conferencia',
         centro_custo: payload.centroCusto || null,
         classe_financeira: payload.classeFinanceira || null,
         empresa_id: payload.empresaId || null,
@@ -935,7 +937,7 @@ export function useEditarPedidoDireto() {
         .eq('pedido_id', payload.pedidoId)
         .order('created_at', { ascending: true })
       if (cpErr) throw new Error(cpErr.message)
-      const emProcesso = (cps ?? []).filter((cp: any) => !['previsto', 'confirmado', 'cancelado'].includes(cp.status))
+      const emProcesso = (cps ?? []).filter((cp: any) => !['aguardando_conferencia', 'previsto', 'confirmado', 'cancelado'].includes(cp.status))
       if (emProcesso.length > 0) {
         throw new Error('Uma parcela deste pedido já está em lote/pagamento — ajuste pelo Financeiro.')
       }
@@ -986,7 +988,8 @@ export function useEditarPedidoDireto() {
         valor_pago: 0,
         data_vencimento: parcela.data_vencimento,
         data_vencimento_orig: parcela.data_vencimento,
-        status: parcela.status_inicial === 'confirmado' ? 'confirmado' : 'previsto',
+        // Mantém o título fora do Financeiro até a conferência do Compras (mig 212)
+        status: parcela.status_inicial === 'confirmado' ? 'confirmado' : 'aguardando_conferencia',
         centro_custo: payload.centroCusto || null,
         classe_financeira: payload.classeFinanceira || null,
         empresa_id: payload.empresaId || null,

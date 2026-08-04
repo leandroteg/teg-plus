@@ -5,6 +5,7 @@ import type {
   ContaPagar, ContaReceber, Fornecedor,
   FinanceiroDashboardData, FinanceiroKPIs,
 } from '../types/financeiro'
+import { STATUS_CP_FORA_DO_FINANCEIRO } from '../types/financeiro'
 
 const EMPTY_KPIS: FinanceiroKPIs = {
   total_cp: 0, cp_a_vencer: 0, cp_vencidas: 0, cp_pagas_periodo: 0,
@@ -98,6 +99,8 @@ export function useContasPagar(filters?: { status?: string; centro_custo?: strin
           .order('data_vencimento', { ascending: true })
           .range(from, from + PAGE - 1)
         if (filters?.status) q = q.eq('status', filters.status)
+        // Extraordinário em conferência no Compras ainda não é do Financeiro (mig 212)
+        else q = q.not('status', 'in', `(${STATUS_CP_FORA_DO_FINANCEIRO.join(',')})`)
         if (filters?.centro_custo) q = q.eq('centro_custo', filters.centro_custo)
         const { data, error } = await q
         if (error) throw error

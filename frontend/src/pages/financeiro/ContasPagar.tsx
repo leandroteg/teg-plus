@@ -447,6 +447,7 @@ const fmtData = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
 const STATUS_CONFIG: Record<string, { label: string; dot: string; bg: string; text: string; icon: typeof Clock }> = {
+  aguardando_conferencia: { label: 'Conferência (Compras)', dot: 'bg-orange-400', bg: 'bg-orange-50', text: 'text-orange-700', icon: Clock },
   previsto:       { label: 'Previsto',       dot: 'bg-slate-400',   bg: 'bg-slate-50',    text: 'text-slate-600',    icon: Calendar },
   confirmado:     { label: 'Confirmado',     dot: 'bg-blue-500',    bg: 'bg-blue-50',     text: 'text-blue-700',     icon: CheckCircle2 },
   em_lote:        { label: 'Em Lote',        dot: 'bg-violet-500',  bg: 'bg-violet-50',   text: 'text-violet-700',   icon: Receipt },
@@ -717,7 +718,7 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
   const vencido = !['pago', 'conciliado', 'cancelado'].includes(cp.status) &&
     new Date(cp.data_vencimento + 'T00:00:00') < new Date()
   const isPago = ['pago', 'conciliado'].includes(cp.status)
-  const canApprove = cp.status === 'confirmado' || cp.status === 'aguardando_aprovacao'
+  const canApprove = cp.status === 'confirmado'
   const canPay = cp.status === 'aprovado_pgto'
   const cfg = STATUS_CONFIG[cp.status]
 
