@@ -888,8 +888,12 @@ export function useIntegracaoTreinos() {
     queryFn: async () => {
       const { data: adms, error } = await supabase
         .from('rh_admissoes')
-        .select('id, base, cargo_previsto, candidatos:rh_admissao_candidatos(id, nome, cargo, colaborador_id)')
+        .select('id, base, cargo_previsto, arquivada, candidatos:rh_admissao_candidatos(id, nome, cargo, colaborador_id)')
         .eq('etapa', 'integracao')
+        // Mesma regra do board de Admissao (RHAdmissao.tsx): arquivada sai de vez.
+        // Sem isto a requisicao arquivada na etapa 'integracao' fica presa aqui
+        // para sempre, virando pendencia fantasma de quem ja foi admitido.
+        .or('arquivada.is.null,arquivada.eq.false')
       if (error) { console.error('useIntegracaoTreinos:', error); return { candidatos: [], treinos: [] } }
       const candidatos: IntegracaoCand[] = (adms ?? []).flatMap((a: any) =>
         (a.candidatos ?? []).map((c: any) => ({
