@@ -4,7 +4,8 @@ import { supabase } from '../services/supabase'
 export interface Lookups {
   obras: Array<{ id: string; nome: string; codigo: string; status: string; centro_custo_id?: string; centro_custo_codigo?: string; centro_custo_descricao?: string }>
   centros_custo: Array<{ id: string; codigo: string; descricao: string }>
-  classes_financeiras: Array<{ id: string; codigo: string; descricao: string; tipo: string }>
+  /** codigo_legado = código(s) do plano antigo que esta natureza substituiu (mig 209) */
+  classes_financeiras: Array<{ id: string; codigo: string; descricao: string; tipo: string; codigo_legado?: string | null }>
   categorias: Array<{ id: string; nome: string }>
   empresas: Array<{ id: string; codigo: string; razao_social: string; nome_fantasia: string; cnpjs: string[] }>
 }
@@ -23,7 +24,7 @@ export function useLookups() {
         supabase.from('sys_centros_custo').select('id, codigo, descricao').eq('ativo', true).order('codigo'),
         // Só as ativas: a mig 200 desativou as 137 classes CLS-* legadas, que
         // continuavam aparecendo nos seletores. Ordem por código = hierarquia RM.
-        supabase.from('fin_classes_financeiras').select('id, codigo, descricao, tipo').eq('ativo', true).order('codigo'),
+        supabase.from('fin_classes_financeiras').select('id, codigo, descricao, tipo, codigo_legado').eq('ativo', true).order('codigo'),
         supabase.from('cmp_categorias').select('id, nome').eq('ativo', true).order('nome'),
         supabase.from('sys_empresas').select('id, codigo, razao_social, nome_fantasia, cnpjs').eq('ativo', true).order('razao_social'),
       ])

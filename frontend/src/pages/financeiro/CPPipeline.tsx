@@ -900,7 +900,9 @@ function NovaSolicitacaoExtraordinariaModal({
     .filter(cc => `${cc.codigo} ${cc.descricao}`.toLowerCase().includes(ccBusca.toLowerCase()))
 
   const classesFiltradas = classesFinanceiras
-    .filter(classe => `${classe.codigo} ${classe.descricao}`.toLowerCase().includes(classeBusca.toLowerCase()))
+    // Busca também pelo código do plano ANTIGO (codigo_legado, mig 209): quem
+    // digita "02.09.02" acha a natureza RM que a substituiu.
+    .filter(classe => `${classe.codigo} ${classe.descricao} ${classe.codigo_legado ?? ''}`.toLowerCase().includes(classeBusca.toLowerCase()))
     .slice(0, 8)
 
   const getLookupValue = (codigo?: string | null, descricao?: string | null) =>
@@ -1075,6 +1077,9 @@ function NovaSolicitacaoExtraordinariaModal({
                         >
                           <div className="font-medium">{classe.codigo || classe.descricao}</div>
                           {!!classe.codigo && <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{classe.descricao}</div>}
+                          {!!classe.codigo_legado && (
+                            <div className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>antes {classe.codigo_legado}</div>
+                          )}
                         </button>
                       )
                     })}
@@ -1354,7 +1359,9 @@ function NovaPrevisaoPagamentoModal({
     .filter(cc => `${cc.codigo} ${cc.descricao}`.toLowerCase().includes(ccBusca.toLowerCase()))
 
   const classesMatches = classesFinanceiras
-    .filter(classe => `${classe.codigo} ${classe.descricao}`.toLowerCase().includes(classeBusca.toLowerCase()))
+    // Busca também pelo código do plano ANTIGO (codigo_legado, mig 209): quem
+    // digita "02.09.02" acha a natureza RM que a substituiu.
+    .filter(classe => `${classe.codigo} ${classe.descricao} ${classe.codigo_legado ?? ''}`.toLowerCase().includes(classeBusca.toLowerCase()))
   const classesFiltradas = classesMatches.slice(0, 50)
 
   const getLookupValue = (codigo?: string | null, descricao?: string | null) =>
@@ -1629,6 +1636,9 @@ function NovaPrevisaoPagamentoModal({
                         >
                           <div className="font-medium">{classe.codigo || classe.descricao}</div>
                           {!!classe.codigo && <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{classe.descricao}</div>}
+                          {!!classe.codigo_legado && (
+                            <div className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>antes {classe.codigo_legado}</div>
+                          )}
                         </button>
                       )
                     })}
