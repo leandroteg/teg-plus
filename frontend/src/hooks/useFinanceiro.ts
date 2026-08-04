@@ -474,8 +474,13 @@ export function useRemoverDocumentoFin() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ docId, arquivoUrl }: { docId: string; arquivoUrl?: string | null }) => {
-      const { error } = await supabase.from('fin_documentos').delete().eq('id', docId)
+      // Via RPC (mig 217): a política de DELETE de fin_documentos exige
+      // diretor/admin e o DELETE direto apagava 0 linhas SEM erro — supervisor
+      // clicava e nada acontecia.
+      const { data, error } = await supabase.rpc('fin_documento_remover', { p_doc_id: docId })
       if (error) throw new Error(`Não foi possível remover o documento: ${error.message}`)
+      const r = data as { ok: boolean; erro?: string }
+      if (!r?.ok) throw new Error(r?.erro ?? 'Não foi possível remover o documento.')
 
       // .../object/public/<bucket>/<path...>  →  bucket + path
       const m = arquivoUrl?.match(/\/object\/(?:public|sign)\/([^/]+)\/(.+?)(?:\?|$)/)
