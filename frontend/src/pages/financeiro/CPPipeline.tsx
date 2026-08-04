@@ -266,6 +266,13 @@ type NovaPrevisaoPagamentoForm = {
   impostoAliquota: string
   impostoValor: string
   impostoDeduzir: boolean
+  /** Dados para pagamento (mig 215) — vêm do cadastro do beneficiário e são editáveis */
+  favorecido: string
+  banco_nome: string
+  agencia: string
+  conta: string
+  pix_tipo: string
+  pix_chave: string
 }
 
 /** Tipos de documento aceitos na previsão (espelham fin_documentos.tipo) */
@@ -311,6 +318,12 @@ const EMPTY_PREVISAO_FORM: NovaPrevisaoPagamentoForm = {
   impostoAliquota: '',
   impostoValor: '',
   impostoDeduzir: false,
+  favorecido: '',
+  banco_nome: '',
+  agencia: '',
+  conta: '',
+  pix_tipo: '',
+  pix_chave: '',
 }
 
 function summarizeNames(values: string[], fallback: string) {
@@ -852,7 +865,8 @@ function NovaSolicitacaoExtraordinariaModal({
       ...prev,
       fornecedor_id: fornecedor.id,
       fornecedor_cnpj: formatCpfCnpj(fornecedor.cnpj),
-      favorecido: fornecedor.nome_fantasia?.trim() || fornecedor.razao_social?.trim() || prev.favorecido,
+      // Favorecido do pagamento = NOME EMPRESARIAL (razão social do cartão CNPJ)
+      favorecido: fornecedor.razao_social?.trim() || fornecedor.nome_fantasia?.trim() || prev.favorecido,
       banco_nome: fornecedor.banco_nome ?? '',
       agencia: fornecedor.agencia ?? '',
       conta: fornecedor.conta ?? '',
@@ -864,7 +878,8 @@ function NovaSolicitacaoExtraordinariaModal({
   const cnpjLookup = useConsultaCNPJ(useCallback((result) => {
     setForm(prev => ({
       ...prev,
-      favorecido: result.nome_fantasia || result.razao_social || prev.favorecido,
+      // Nome empresarial da Receita — é ele que vai no documento financeiro
+      favorecido: result.razao_social || result.nome_fantasia || prev.favorecido,
     }))
   }, []))
 
@@ -1359,8 +1374,15 @@ function NovaPrevisaoPagamentoModal({
   // Modo edição: hidrata o formulário com o título existente
   useEffect(() => {
     if (!previsao) return
+    const pgto = previsao.dados_pagamento ?? {}
     setForm({
       ...EMPTY_PREVISAO_FORM,
+      favorecido: pgto.favorecido ?? '',
+      banco_nome: pgto.banco_nome ?? '',
+      agencia: pgto.agencia ?? '',
+      conta: pgto.conta ?? '',
+      pix_tipo: pgto.pix_tipo ?? '',
+      pix_chave: pgto.pix_chave ?? '',
       nome: previsao.descricao ?? '',
       fornecedor_id: previsao.fornecedor_id ?? '',
       fornecedor_nome: previsao.fornecedor_nome ?? '',
@@ -1401,6 +1423,26 @@ function NovaPrevisaoPagamentoModal({
 
   const setField = <K extends keyof NovaPrevisaoPagamentoForm>(field: K, value: NovaPrevisaoPagamentoForm[K]) => {
     setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  // Escolher o beneficiário já traz os dados para pagamento do cadastro — quem
+  // lança só confere (ou sobrescreve, quando o pagamento vai por outra conta).
+  const selecionarBeneficiario = (f: Fornecedor) => {
+    setForm(prev => ({
+      ...prev,
+      fornecedor_id: f.id,
+      // Documento financeiro anda pelo NOME EMPRESARIAL (razão social do cartão
+      // CNPJ) — a fantasia fica só como apoio visual na busca.
+      fornecedor_nome: f.razao_social || f.nome_fantasia || '',
+      favorecido: f.razao_social || f.nome_fantasia || '',
+      banco_nome: f.banco_nome ?? '',
+      agencia: f.agencia ?? '',
+      conta: f.conta ?? '',
+      pix_tipo: f.pix_tipo ?? '',
+      pix_chave: f.pix_chave ?? '',
+    }))
+    setFornBusca('')
+    setFornOpen(false)
   }
 
   // Valor a pagar = valor − desconto + juros/multa − imposto retido
@@ -1458,6 +1500,14 @@ function NovaPrevisaoPagamentoModal({
           deduzir: form.impostoDeduzir,
         }
       : undefined
+    const dadosPagamento = {
+      favorecido: form.favorecido,
+      banco_nome: form.banco_nome,
+      agencia: form.agencia,
+      conta: form.conta,
+      pix_tipo: form.pix_tipo,
+      pix_chave: form.pix_chave,
+    }
     try {
       if (editMode && previsao) {
         await editarPrevisaoMut.mutateAsync({
@@ -1473,6 +1523,7 @@ function NovaPrevisaoPagamentoModal({
           jurosMulta: Number(form.jurosMulta || 0) || 0,
           empresaId: form.empresa_id || undefined,
           imposto,
+          dadosPagamento,
           arquivos,
         })
       } else {
@@ -1492,6 +1543,7 @@ function NovaPrevisaoPagamentoModal({
           jurosMulta: Number(form.jurosMulta || 0) || 0,
           empresaId: form.empresa_id || undefined,
           imposto,
+          dadosPagamento,
           arquivos,
         })
       }
@@ -1559,7 +1611,16 @@ function NovaPrevisaoPagamentoModal({
                 </span>
                 <button
                   type="button"
-                  onClick={() => { setField('fornecedor_id', ''); setField('fornecedor_nome', ''); setFornBusca('') }}
+                  onClick={() => {
+                    // Limpa junto os dados para pagamento: eram do beneficiário
+                    // antigo e passariam batido na conferência
+                    setForm(prev => ({
+                      ...prev,
+                      fornecedor_id: '', fornecedor_nome: '',
+                      favorecido: '', banco_nome: '', agencia: '', conta: '', pix_tipo: '', pix_chave: '',
+                    }))
+                    setFornBusca('')
+                  }}
                   className="text-slate-400 hover:text-slate-600 shrink-0"
                   title="Trocar fornecedor"
                 >
@@ -1582,15 +1643,17 @@ function NovaPrevisaoPagamentoModal({
                       <button
                         key={f.id}
                         type="button"
-                        onMouseDown={() => {
-                          setField('fornecedor_id', f.id)
-                          setField('fornecedor_nome', f.nome_fantasia || f.razao_social || '')
-                          setFornBusca('')
-                          setFornOpen(false)
-                        }}
+                        onMouseDown={() => selecionarBeneficiario(f)}
                         className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm ${isDark ? 'text-slate-200 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
                       >
-                        <span className="truncate font-medium">{f.nome_fantasia || f.razao_social}</span>
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="font-medium">{f.razao_social || f.nome_fantasia}</span>
+                          {f.nome_fantasia && f.razao_social && f.nome_fantasia !== f.razao_social && (
+                            <span className={`ml-1.5 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                              · {f.nome_fantasia}
+                            </span>
+                          )}
+                        </span>
                         {f.cnpj && <span className="text-[11px] text-slate-400 shrink-0 font-mono">{formatCNPJ(f.cnpj)}</span>}
                       </button>
                     ))}
@@ -1765,6 +1828,50 @@ function NovaPrevisaoPagamentoModal({
             </select>
           </div>
 
+          {/* Dados para pagamento (mig 215) — puxados do cadastro do beneficiário */}
+          <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
+            <div>
+              <p className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Dados para pagamento</p>
+              <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Vêm do cadastro do beneficiário ao selecioná-lo. Ajuste aqui se o pagamento for para outra conta —
+                a alteração vale só para este lançamento.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Favorecido</label>
+                <UpperInput value={form.favorecido} onChange={e => setField('favorecido', e.target.value)} className={inputCls} placeholder="Nome de quem recebe" />
+              </div>
+              <div>
+                <label className={labelCls}>Banco</label>
+                <UpperInput value={form.banco_nome} onChange={e => setField('banco_nome', e.target.value)} className={inputCls} placeholder="Nome do banco" />
+              </div>
+              <div>
+                <label className={labelCls}>Agência</label>
+                <UpperInput value={form.agencia} onChange={e => setField('agencia', e.target.value)} className={inputCls} placeholder="0001" />
+              </div>
+              <div>
+                <label className={labelCls}>Conta</label>
+                <UpperInput value={form.conta} onChange={e => setField('conta', e.target.value)} className={inputCls} placeholder="12345-6" />
+              </div>
+              <div>
+                <label className={labelCls}>Tipo PIX</label>
+                <select value={form.pix_tipo} onChange={e => setField('pix_tipo', e.target.value)} className={inputCls}>
+                  <option value="">Selecione...</option>
+                  <option value="cpf">CPF</option>
+                  <option value="cnpj">CNPJ</option>
+                  <option value="email">E-mail</option>
+                  <option value="telefone">Telefone</option>
+                  <option value="aleatoria">Chave aleatória</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Chave PIX</label>
+                <UpperInput value={form.pix_chave} onChange={e => setField('pix_chave', e.target.value)} className={inputCls} placeholder="Informe a chave PIX" />
+              </div>
+            </div>
+          </div>
+
           <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -1936,9 +2043,7 @@ function NovaPrevisaoPagamentoModal({
         onClose={() => setShowFornecedorCadastro(false)}
         onSaved={(fornecedor) => {
           setShowFornecedorCadastro(false)
-          setField('fornecedor_id', fornecedor.id)
-          setField('fornecedor_nome', fornecedor.nome_fantasia || fornecedor.razao_social || '')
-          setFornBusca('')
+          selecionarBeneficiario(fornecedor)
         }}
       />
     </div>
@@ -2406,7 +2511,11 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
     : undefined
   const manualAttachments = Array.isArray(manualRequest?.anexos) ? manualRequest?.anexos as Array<{ nome: string; url: string }> : []
   const { data: docsCP = [] } = useDocumentosCP(cp.id)
-  const bankInfo = manualRequest?.dados_bancarios as Record<string, string | undefined> | undefined
+  // mig 215: dados_pagamento é a fonte estruturada. O fallback cobre as CPs
+  // antigas em que o extraordinário só deixou o rastro em remessa_payload.
+  const bankInfo = (cp.dados_pagamento && Object.keys(cp.dados_pagamento).length > 0)
+    ? cp.dados_pagamento as Record<string, string | undefined>
+    : manualRequest?.dados_bancarios as Record<string, string | undefined> | undefined
   const [approval, setApproval] = useState<null | {
     id: string
     entidade_id: string
@@ -2661,7 +2770,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
           {bankInfo && Object.values(bankInfo).some(Boolean) && (
             <div className={`rounded-xl p-3 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-emerald-50/70'}`}>
               <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1">
-                <Banknote size={10} /> Dados bancários informados
+                <Banknote size={10} /> Dados para pagamento
               </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                 {bankInfo.favorecido && <div><span className="text-slate-400">Favorecido:</span> <span className="font-semibold">{bankInfo.favorecido}</span></div>}
