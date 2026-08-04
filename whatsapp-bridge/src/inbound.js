@@ -215,11 +215,10 @@ async function processMessage({ raw, digits, name, body, mediaInfo, msgId, efeit
     return
   }
 
-  // Conversa NOVA (sem chamado aberto): com o agente IA ligado, ele assume.
-  // Ficam no fluxo clássico: mídia (só é salva quando há chamado — nada se
-  // perde) e mini-fluxo de setor já iniciado (termina o que começou, mesmo
-  // que a IA tenha voltado ao ar no meio).
-  if (aiEnabled() && !media && body && !pendingSector.has(digits)) {
+  // Conversa NOVA: o padrão é o fluxo clássico (pergunta o setor → abre o
+  // chamado na hora). Só encaminha para a IA se ela estiver explicitamente
+  // ligada como 1ª linha (AI_PRIMEIRA_LINHA=true).
+  if (config.aiPrimeiraLinha && aiEnabled() && !media && body && !pendingSector.has(digits)) {
     const assumiu = await forwardToAI({ digits, name, conhecido: !!known, texto: body, msgId })
     if (assumiu) { log(`→ agente IA (${digits})`); return }
     err('agente IA indisponível — seguindo fluxo clássico:', digits)

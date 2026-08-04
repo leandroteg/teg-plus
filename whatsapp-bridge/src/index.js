@@ -11,7 +11,7 @@ import { aiEnabled, aiRouter } from './ai.js'
 
 // Versão do código: vai para o log de boot E para ti_whatsapp.worker_versao,
 // então dá para conferir por SQL se um deploy aplicou mesmo o código novo.
-const BUILD = '1.1.0-status-notify'
+const BUILD = '1.2.0-followup'
 
 // Estado local espelhado em ti_whatsapp (o painel do TEG+ lê de lá).
 let local = { status: 'disconnected', numero: null }
@@ -143,7 +143,10 @@ async function loopSaida() {
     try {
       const { out: replies, lastSeen } = await db.getOutboundReplies(outboundCursor)
       for (const r of replies) {
-        await evo.sendWhatsApp({ to: r.to, text: `*Resposta no CH-${String(r.numero).padStart(4, '0')}*\n${r.mensagem}` })
+        const texto = r.doAssistente
+          ? r.mensagem // aviso automático já se explica; prefixo de "resposta" enganaria
+          : `*Resposta no CH-${String(r.numero).padStart(4, '0')}*\n${r.mensagem}`
+        await evo.sendWhatsApp({ to: r.to, text: texto })
       }
       // Avança pelo último comentário VISTO (não só enviado): comentários filtrados
       // (autor=solicitante, chamado sem telefone) deixam de ser re-buscados a cada
@@ -194,6 +197,38 @@ async function loopStatus() {
   }
 }
 
+// Acompanhamento: o solicitante abriu (ou comentou) e a equipe não respondeu.
+// Postura definida pelo negócio: NÃO tentar resolver — só dar satisfação. O
+// texto é postado como comentário do assistente no chamado (a equipe vê o que
+// foi dito) e o loopSaida se encarrega de entregá-lo no WhatsApp.
+const TEXTO_FOLLOWUP = (n, aviso) => aviso === 1
+  ? `Oi! Passando para você não ficar sem notícia: seu chamado *CH-${n}* está na fila da nossa equipe de T.I. 👍\n\nAssim que alguém assumir, a resposta chega por aqui mesmo.`
+  : `Seu chamado *CH-${n}* continua na fila e ainda será respondido por aqui. Obrigado pela paciência! 🙏\n\nSe algo mudou ou ficou urgente, é só escrever — sua mensagem entra no chamado.`
+
+async function loopFollowup() {
+  if (config.followupEsperaMin <= 0) { log('acompanhamento automático: desligado'); return }
+  let assistenteId = null
+  while (!stopped) {
+    try {
+      if (!assistenteId) assistenteId = await db.getAssistentePerfilId()
+      const pendentes = await db.getChamadosSemResposta({
+        esperaMin: config.followupEsperaMin,
+        maxAvisos: config.followupMax,
+        assistenteId,
+      })
+      for (const p of pendentes) {
+        await db.addComment({
+          chamadoId: p.id,
+          autorId: assistenteId,
+          mensagem: TEXTO_FOLLOWUP(String(p.numero).padStart(4, '0'), p.aviso),
+        })
+        log(`acompanhamento CH-${p.numero} (aviso ${p.aviso}/${config.followupMax})`)
+      }
+    } catch (e) { err('loopFollowup', e.message) }
+    await sleep(60_000)
+  }
+}
+
 async function loopReconcile() {
   while (!stopped) {
     await reconcile()
@@ -212,8 +247,10 @@ async function loopLimpeza() {
 async function main() {
   log(`TEG+ WhatsApp bridge ${BUILD} iniciando…`)
   log('Supabase:', config.supabaseUrl, '| Evolution:', config.evolutionUrl, '| instância:', config.evolutionInstance)
-  log('agente IA (n8n):', aiEnabled() ? `LIGADO → ${config.n8nWebhookUrl}` : 'desligado (fluxo clássico)')
+  log('fluxo de entrada:', config.aiPrimeiraLinha && aiEnabled() ? 'IA de 1ª linha' : 'CLÁSSICO (setor → abre chamado)')
+  log('endpoints /ai/*:', aiEnabled() ? 'ativos' : 'desligados')
   log(`aviso de mudança de status: LIGADO (agrupa após ${config.statusSettleMs / 1000}s de silêncio)`)
+  log(`acompanhamento automático: ${config.followupEsperaMin > 0 ? `LIGADO (${config.followupEsperaMin} min, máx ${config.followupMax} avisos)` : 'desligado'}`)
   try { log('conta externa:', await db.getExternoPerfilId()) } catch (e) { err(e.message) }
 
   await db.syncStatus({ worker_versao: BUILD }) // carimba a versão p/ conferência por SQL
@@ -224,6 +261,7 @@ async function main() {
   loopComandos()
   loopSaida()
   loopStatus()
+  loopFollowup()
   loopReconcile()
   loopLimpeza()
 }

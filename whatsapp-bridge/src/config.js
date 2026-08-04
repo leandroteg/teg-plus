@@ -19,6 +19,9 @@ export const config = {
   n8nWebhookUrl: (process.env.N8N_WEBHOOK_URL ?? '').replace(/\/+$/, ''),
   aiSharedToken: process.env.AI_SHARED_TOKEN ?? '',
   n8nTimeoutMs: Number(process.env.N8N_TIMEOUT_MS ?? 6000),
+  // Fluxo padrão = clássico (pergunta o setor e abre o chamado na hora). A IA
+  // como 1ª linha só entra se ligada explicitamente aqui.
+  aiPrimeiraLinha: String(process.env.AI_PRIMEIRA_LINHA ?? 'false').toLowerCase() === 'true',
   janelaMin: Number(process.env.WHATSAPP_CONVERSA_JANELA_MIN ?? 360),
   externoEmail: process.env.WHATSAPP_PERFIL_EXTERNO_EMAIL ?? 'whatsapp-externo@sistema.teguniao.com.br',
   bucket: process.env.WHATSAPP_BUCKET ?? 'ti-chamados',
@@ -31,4 +34,9 @@ export const config = {
   // Chamado em 'aguardando_usuario' espera resposta do solicitante — aceita
   // mensagem solta (sem citar CH-xxxx) por bem mais tempo que a janela normal.
   aguardandoJanelaMin: Number(process.env.WHATSAPP_AGUARDANDO_JANELA_MIN ?? 4320), // 3 dias
+  // Acompanhamento automático: minutos sem resposta da equipe antes do
+  // assistente dar satisfação ao solicitante (0 = desliga).
+  followupEsperaMin: Number(process.env.WHATSAPP_FOLLOWUP_ESPERA_MIN ?? 15),
+  followupMax: Number(process.env.WHATSAPP_FOLLOWUP_MAX ?? 2), // avisos por chamado
+  assistenteEmail: process.env.WHATSAPP_PERFIL_ASSISTENTE_EMAIL ?? 'assistente-ia@sistema.teguniao.com.br',
 }
