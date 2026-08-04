@@ -9,6 +9,10 @@ type NovaSolicitacaoAdiantamentoPayload = {
   valor_solicitado: number
   favorecido_nome: string
   favorecido_email?: string
+  /** Chave PIX do favorecido — vai para a CP gerada na aprovação. */
+  chave_pix?: string
+  /** Comprovantes/orçamentos anexados à solicitação. */
+  arquivos?: File[]
   data_limite_prestacao?: string
   data_pagamento?: string
   centro_custo?: string
@@ -17,6 +21,33 @@ type NovaSolicitacaoAdiantamentoPayload = {
   classe_financeira_id?: string
   observacoes?: string
   solicitante_email?: string
+}
+
+export interface AnexoAdiantamento {
+  id: string
+  nome_arquivo: string
+  arquivo_url: string
+  mime_type: string | null
+  tamanho_bytes: number | null
+  uploaded_at: string | null
+}
+
+/** Anexos da solicitação — fin_documentos com entity_type='adiantamento'. */
+export function useAnexosAdiantamento(adiantamentoId?: string) {
+  return useQuery<AnexoAdiantamento[]>({
+    queryKey: ['adiantamento-anexos', adiantamentoId],
+    enabled: !!adiantamentoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fin_documentos')
+        .select('id, nome_arquivo, arquivo_url, mime_type, tamanho_bytes, uploaded_at')
+        .eq('entity_type', 'adiantamento')
+        .eq('entity_id', adiantamentoId!)
+        .order('uploaded_at', { ascending: false })
+      if (error) return []
+      return (data ?? []) as AnexoAdiantamento[]
+    },
+  })
 }
 
 function gerarNumeroAdiantamento() {
@@ -191,6 +222,7 @@ export function useCriarSolicitacaoAdiantamento() {
           gestor_email: aprovadorEmail,
           favorecido_nome: payload.favorecido_nome.trim(),
           favorecido_email: payload.favorecido_email?.trim() || null,
+          chave_pix: payload.chave_pix?.trim() || null,
           centro_custo: payload.centro_custo || null,
           centro_custo_id: payload.centro_custo_id || null,
           classe_financeira: payload.classe_financeira || null,
@@ -213,6 +245,33 @@ export function useCriarSolicitacaoAdiantamento() {
           throw new Error('Fluxo de adiantamentos ainda está em implantação no banco de dados.')
         }
         throw adiantamentoError
+      }
+
+      // Anexos → bucket financeiro-docs + fin_documentos (mesmo padrão da CP).
+      // Best-effort: falha de anexo não derruba a solicitação já criada.
+      const falhasAnexo: string[] = []
+      for (const arquivo of payload.arquivos ?? []) {
+        const ext = arquivo.name.split('.').pop()?.toLowerCase() || 'bin'
+        const path = `adiantamento/${adiantamento.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        const up = await supabase.storage
+          .from('financeiro-docs')
+          .upload(path, arquivo, { contentType: arquivo.type || undefined })
+        if (up.error) { falhasAnexo.push(arquivo.name); continue }
+        const { data: urlData } = supabase.storage.from('financeiro-docs').getPublicUrl(path)
+        const { error: docErr } = await supabase.from('fin_documentos').insert({
+          entity_type: 'adiantamento',
+          entity_id: adiantamento.id,
+          tipo: 'doc_financeiro',
+          nome_arquivo: arquivo.name,
+          arquivo_url: urlData.publicUrl,
+          mime_type: arquivo.type || null,
+          tamanho_bytes: arquivo.size || null,
+          uploaded_by: perfil.id,
+        })
+        if (docErr) falhasAnexo.push(arquivo.name)
+      }
+      if (falhasAnexo.length > 0) {
+        console.warn('Aviso: anexos não enviados:', falhasAnexo.join(', '))
       }
 
       const { data: aprovacao, error: aprovacaoError } = await supabase
@@ -246,6 +305,7 @@ export function useCriarSolicitacaoAdiantamento() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['despesas-adiantamentos'] })
+      qc.invalidateQueries({ queryKey: ['adiantamento-anexos'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
     },

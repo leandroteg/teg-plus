@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send, AlertCircle, ChevronRight, Save, Loader2 } from 'lucide-react'
+import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send, AlertCircle, ChevronRight, Save, Loader2, Paperclip, FileText, KeyRound } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCadCentrosCusto, useCadClasses, useCadFornecedores } from '../../hooks/useCadastros'
-import { isDespesaSchemaMissing, useAdiantamentosDespesa, useCriarSolicitacaoAdiantamento, useAtualizarClasseAdiantamento } from '../../hooks/useDespesas'
+import { isDespesaSchemaMissing, useAdiantamentosDespesa, useCriarSolicitacaoAdiantamento, useAtualizarClasseAdiantamento, useAnexosAdiantamento } from '../../hooks/useDespesas'
 import { useRHColaboradores } from '../../hooks/useRH'
 import NumericInput from '../../components/NumericInput'
 import { UpperTextarea } from '../../components/UpperInput'
@@ -50,6 +50,7 @@ const EMPTY_FORM = {
   favorecido_key: '',
   favorecido_nome: '',
   favorecido_email: '',
+  chave_pix: '',
   finalidade: '',
   justificativa: '',
   valor_solicitado: 0,
@@ -114,6 +115,8 @@ export default function DespesasAdiantamentos() {
   const [showModal, setShowModal] = useState(false)
   const [erro, setErro] = useState('')
   const [form, setForm] = useState(EMPTY_FORM)
+  const [arquivos, setArquivos] = useState<File[]>([])
+  const fileRef = useRef<HTMLInputElement>(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Abre o modal automaticamente quando vier ?nova= na URL (fluxo do requisitante)
@@ -222,6 +225,8 @@ export default function DespesasAdiantamentos() {
       await criar.mutateAsync({
         favorecido_nome: form.favorecido_nome,
         favorecido_email: form.favorecido_email || undefined,
+        chave_pix: form.chave_pix || undefined,
+        arquivos,
         finalidade: form.finalidade,
         justificativa: form.justificativa,
         valor_solicitado: Number(form.valor_solicitado),
@@ -233,6 +238,7 @@ export default function DespesasAdiantamentos() {
       })
       setShowModal(false)
       setForm(EMPTY_FORM)
+      setArquivos([])
     } catch (error) {
       setErro(error instanceof Error ? error.message : 'Não foi possível enviar a solicitação.')
     }
@@ -382,9 +388,38 @@ export default function DespesasAdiantamentos() {
         </div>
       </div>
 
+      {detalheItem && (
+        <DetalheAdiantamento
+          item={detalheItem}
+          dark={dark}
+          classes={classes}
+          classeId={detalheClasseId}
+          setClasseId={setDetalheClasseId}
+          erroClasse={detalheErroCls}
+          setErroClasse={setDetalheErroCls}
+          salvando={atualizarClasse.isPending}
+          onSalvarClasse={async () => {
+            const selecionada = classes.find(c => c.id === detalheClasseId)
+            if (!selecionada) { setDetalheErroCls('Selecione a classe financeira.'); return }
+            try {
+              await atualizarClasse.mutateAsync({
+                id: detalheItem.id,
+                classe_financeira: selecionada.codigo || selecionada.descricao || '',
+                classe_financeira_id: selecionada.id,
+              })
+              setDetalheErroCls('')
+              setDetalheItem(null)
+            } catch (e) {
+              setDetalheErroCls(e instanceof Error ? e.message : 'Erro ao salvar a classe.')
+            }
+          }}
+          onClose={() => setDetalheItem(null)}
+        />
+      )}
+
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
-          <div className={`w-full max-w-2xl rounded-[28px] border p-6 shadow-2xl ${dark ? 'border-white/10 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+          <div className={`w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-[28px] border p-6 shadow-2xl ${dark ? 'border-white/10 bg-slate-950' : 'border-slate-200 bg-white'}`}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className={`text-xl font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>Solicitação de Adiantamento</h2>
@@ -484,9 +519,83 @@ export default function DespesasAdiantamentos() {
                   ))}
                 </select>
               </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-500">
+                  Chave PIX do favorecido
+                  <span className={`ml-1.5 font-normal ${dark ? 'text-slate-500' : 'text-slate-400'}`}>(opcional)</span>
+                </label>
+                <input
+                  value={form.chave_pix}
+                  onChange={e => setForm(prev => ({ ...prev, chave_pix: e.target.value }))}
+                  className={inputCls}
+                  placeholder="CPF/CNPJ, e-mail, telefone ou chave aleatória"
+                />
+                <p className={`mt-1 text-[11px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Vai junto para o Financeiro na conta a pagar gerada após a aprovação.
+                </p>
+              </div>
               <div className="md:col-span-2">
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Observações</label>
                 <UpperTextarea rows={2} value={form.observacoes} onChange={e => setForm(prev => ({ ...prev, observacoes: e.target.value }))} className={inputCls} placeholder="Informações complementares para o financeiro" />
+              </div>
+
+              {/* Anexos da solicitação (orçamento, comprovante, autorização...) */}
+              <div className="md:col-span-2">
+                <label className="mb-1.5 block text-xs font-semibold text-slate-500">
+                  Documentos
+                  <span className={`ml-1.5 font-normal ${dark ? 'text-slate-500' : 'text-slate-400'}`}>(opcional)</span>
+                </label>
+                <div
+                  onClick={() => fileRef.current?.click()}
+                  className={`flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-dashed px-4 py-4 transition ${
+                    dark ? 'border-white/10 bg-white/[0.03] hover:border-emerald-400/40' : 'border-slate-200 bg-slate-50 hover:border-emerald-300 hover:bg-emerald-50/40'
+                  }`}
+                >
+                  <Paperclip size={18} className={dark ? 'text-slate-400' : 'text-slate-400'} />
+                  <div className="min-w-0">
+                    <p className={`text-sm ${dark ? 'text-slate-300' : 'text-slate-600'}`}>Clique para anexar</p>
+                    <p className={`text-[11px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      PDF, JPG, PNG, XLS, XLSX — pode escolher mais de um
+                    </p>
+                  </div>
+                </div>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
+                  className="hidden"
+                  onChange={e => {
+                    const novos = Array.from(e.target.files ?? [])
+                    if (novos.length) setArquivos(prev => [...prev, ...novos])
+                    if (fileRef.current) fileRef.current.value = ''
+                  }}
+                />
+                {arquivos.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {arquivos.map((arquivo, i) => (
+                      <div
+                        key={`${arquivo.name}-${i}`}
+                        className={`flex items-center gap-2 rounded-xl px-3 py-2 ${dark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}
+                      >
+                        <FileText size={14} className="shrink-0 text-emerald-500" />
+                        <span className={`min-w-0 flex-1 truncate text-xs ${dark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {arquivo.name}
+                        </span>
+                        <span className={`shrink-0 text-[10px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {(arquivo.size / 1024).toFixed(0)} KB
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setArquivos(prev => prev.filter((_, idx) => idx !== i))}
+                          className="shrink-0 rounded-lg p-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
+                        >
+                          <XCircle size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -513,6 +622,133 @@ export default function DespesasAdiantamentos() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Detalhe do adiantamento: PIX, documentos anexados e classe financeira ────
+
+function DetalheAdiantamento({
+  item, dark, classes, classeId, setClasseId, erroClasse, setErroClasse,
+  salvando, onSalvarClasse, onClose,
+}: {
+  item: { id: string; numero: string; finalidade: string; favorecido_nome: string; solicitante_nome?: string
+    gestor_nome?: string | null; valor_solicitado: number; status: StatusDespesaAdiantamento
+    centro_custo?: string | null; classe_financeira?: string | null; chave_pix?: string | null
+    data_pagamento?: string | null; data_limite_prestacao?: string | null; fin_conta_pagar_id?: string | null }
+  dark: boolean
+  classes: { id: string; codigo?: string | null; descricao?: string | null }[]
+  classeId: string
+  setClasseId: (v: string) => void
+  erroClasse: string
+  setErroClasse: (v: string) => void
+  salvando: boolean
+  onSalvarClasse: () => void
+  onClose: () => void
+}) {
+  const { data: anexos = [] } = useAnexosAdiantamento(item.id)
+  const linha = `flex items-start justify-between gap-4 py-2 text-sm`
+  const rotulo = dark ? 'text-slate-400' : 'text-slate-500'
+  const valor = dark ? 'text-slate-100' : 'text-slate-800'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
+      <div className={`w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-[28px] border p-6 shadow-2xl ${dark ? 'border-white/10 bg-slate-950' : 'border-slate-200 bg-white'}`}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className={`text-xl font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>{item.numero}</h2>
+            <p className={`mt-1 text-sm ${rotulo}`}>{item.finalidade}</p>
+          </div>
+          <button type="button" onClick={onClose} className={`rounded-full p-2 ${dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-100'}`}>
+            <XCircle size={18} />
+          </button>
+        </div>
+
+        <div className={`mt-4 divide-y ${dark ? 'divide-white/5' : 'divide-slate-100'}`}>
+          <div className={linha}><span className={rotulo}>Favorecido</span><span className={`font-semibold ${valor}`}>{item.favorecido_nome}</span></div>
+          <div className={linha}><span className={rotulo}>Valor</span><span className={`font-bold ${valor}`}>{fmt(Number(item.valor_solicitado))}</span></div>
+          <div className={linha}><span className={rotulo}>Solicitante</span><span className={valor}>{item.solicitante_nome || '—'}</span></div>
+          <div className={linha}><span className={rotulo}>Gestor aprovador</span><span className={valor}>{item.gestor_nome || '—'}</span></div>
+          {item.centro_custo && (
+            <div className={linha}><span className={rotulo}>Centro de custo</span><span className={valor}>{item.centro_custo}</span></div>
+          )}
+          {item.data_pagamento && (
+            <div className={linha}><span className={rotulo}>Pagamento</span><span className={valor}>{new Date(item.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span></div>
+          )}
+          {item.data_limite_prestacao && (
+            <div className={linha}><span className={rotulo}>Prestar contas até</span><span className={valor}>{new Date(item.data_limite_prestacao + 'T00:00:00').toLocaleDateString('pt-BR')}</span></div>
+          )}
+          <div className={linha}>
+            <span className={`flex items-center gap-1.5 ${rotulo}`}><KeyRound size={13} /> Chave PIX</span>
+            <span className={`text-right font-mono text-xs ${item.chave_pix ? valor : dark ? 'text-slate-600' : 'text-slate-300'}`}>
+              {item.chave_pix || 'não informada'}
+            </span>
+          </div>
+          {item.fin_conta_pagar_id && (
+            <div className={linha}>
+              <span className={rotulo}>Financeiro</span>
+              <span className="text-right text-xs font-semibold text-emerald-500">Conta a pagar gerada (Confirmados)</span>
+            </div>
+          )}
+        </div>
+
+        {/* Documentos anexados */}
+        <div className="mt-4">
+          <p className={`mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide ${rotulo}`}>
+            <Paperclip size={12} /> Documentos ({anexos.length})
+          </p>
+          {anexos.length === 0 ? (
+            <p className={`text-xs italic ${dark ? 'text-slate-600' : 'text-slate-400'}`}>Nenhum documento anexado.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {anexos.map(anexo => (
+                <a
+                  key={anexo.id}
+                  href={anexo.arquivo_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center gap-2 rounded-xl px-3 py-2 transition ${dark ? 'bg-white/[0.04] hover:bg-white/[0.08]' : 'bg-slate-50 hover:bg-slate-100'}`}
+                >
+                  <FileText size={14} className="shrink-0 text-emerald-500" />
+                  <span className={`min-w-0 flex-1 truncate text-xs ${valor}`}>{anexo.nome_arquivo}</span>
+                  {anexo.tamanho_bytes != null && (
+                    <span className={`shrink-0 text-[10px] ${rotulo}`}>{(anexo.tamanho_bytes / 1024).toFixed(0)} KB</span>
+                  )}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Classe financeira — necessária para a contabilização da CP */}
+        <div className={`mt-4 rounded-2xl border p-3 ${dark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
+          <label className={`mb-1.5 block text-xs font-semibold ${rotulo}`}>
+            Classe financeira {item.classe_financeira ? '' : '— pendente'}
+          </label>
+          <div className="flex gap-2">
+            <select
+              value={classeId}
+              onChange={e => { setClasseId(e.target.value); setErroClasse('') }}
+              className={`flex-1 rounded-2xl border px-3 py-2 text-sm outline-none ${dark ? 'border-white/10 bg-white/[0.04] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+            >
+              <option value="">Selecione</option>
+              {classes.map(c => (
+                <option key={c.id} value={c.id}>{c.codigo ? `${c.codigo} - ${c.descricao || ''}` : c.descricao}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onSalvarClasse}
+              disabled={salvando}
+              className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
+            >
+              {salvando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Salvar
+            </button>
+          </div>
+          {erroClasse && <p className="mt-1.5 text-xs text-rose-500">{erroClasse}</p>}
+        </div>
+      </div>
     </div>
   )
 }
