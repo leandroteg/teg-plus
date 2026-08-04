@@ -668,3 +668,42 @@ export function useOrdemPriorizacao() {
     staleTime: 60_000,
   })
 }
+
+// ── Obras › Equipe › Lista ───────────────────────────────────────────────────
+// Uma linha por pessoa ativa, juntando o que hoje mora em três módulos: cadastro
+// (RH), alojamento (Locação) e último ponto batido (DP). A base exibida é a do
+// ÚLTIMO PONTO, não a do cadastro — a obra precisa saber onde a pessoa ESTÁ, e
+// os dois divergem bastante na prática.
+export interface ObrasEquipePessoa {
+  colaborador_id: string
+  nome: string
+  cargo: string | null
+  matricula: string | null
+  data_admissao: string | null
+  foto_url: string | null
+  base_cadastro_id: string | null
+  base_cadastro: string | null
+  base_ponto_id: string | null
+  base_ponto: string | null
+  ultimo_ponto: string | null
+  alojamento_id: string | null
+  alojamento: string | null
+  alojamento_cidade: string | null
+  leito: string | null
+  obra_id: string | null
+  obra: string | null
+  papel: string | null
+  funcao_equipe: string | null
+}
+
+export function useObrasEquipeLista() {
+  return useQuery<ObrasEquipePessoa[]>({
+    queryKey: ['obras-equipe-lista'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('obr_equipe_lista')
+      if (error) { console.error('useObrasEquipeLista:', error); return [] }
+      return (data ?? []) as ObrasEquipePessoa[]
+    },
+    staleTime: 60_000,
+  })
+}

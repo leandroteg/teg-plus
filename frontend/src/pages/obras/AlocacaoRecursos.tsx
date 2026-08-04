@@ -110,7 +110,7 @@ export default function AlocacaoRecursos() {
   const [novaAlocPreset, setNovaAlocPreset] = useState<{ veiculoId?: string; obraId?: string } | null>(null)
   const [editAloc, setEditAloc] = useState<FroAlocacao | null>(null)
   // Modo Planejamento — Obras planeja sem impactar Frotas
-  const [modoPlanejamento, setModoPlanejamento] = useState(false)
+  const [modoPlanejamento] = useState(false)
   const [confirmacaoOpen, setConfirmacaoOpen] = useState<'publicar' | 'descartar' | null>(null)
 
   const { data: veiculos = [], isLoading: loadingVeic } = useVeiculos()
@@ -162,47 +162,12 @@ export default function AlocacaoRecursos() {
     }
   }, [alocAtivaByVeic, solicitarMovimento, modoPlanejamento])
 
-  // Botões flutuantes no canto superior direito (alinha com o título do flow)
-  const headerBtns = (
-    <div className="flex items-center gap-2">
-      {/* Toggle Modo Planejamento */}
-      <label
-        className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-bold cursor-pointer border transition-colors ${
-          modoPlanejamento
-            ? (isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-500/15 border-amber-500/40 text-amber-300')
-            : (isLight ? 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50' : 'bg-white/[0.04] border-white/[0.08] text-slate-300 hover:bg-white/[0.08]')
-        }`}
-      >
-        <input
-          type="checkbox"
-          className="sr-only"
-          checked={modoPlanejamento}
-          onChange={e => setModoPlanejamento(e.target.checked)}
-        />
-        <FileEdit size={13} />
-        Modo Planejamento
-        {modoPlanejamento && rascunhos.length > 0 && (
-          <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold">
-            {rascunhos.length}
-          </span>
-        )}
-      </label>
-      <button
-        onClick={() => handleOpenNova()}
-        className="inline-flex items-center gap-1.5 rounded-xl bg-orange-500 text-white px-3 py-2 text-xs font-bold hover:bg-orange-600 transition-colors shadow-sm"
-      >
-        <Plus size={14} /> Nova Alocação
-      </button>
-    </div>
-  )
-
+  // Os botões "Modo Planejamento" e "Nova Alocação" saíram do cabeçalho: o fluxo
+  // hoje é arrastar no Quadro Geral, que já abre a alocação sozinho. O motor do
+  // planejamento continua no código (banner e publicar/descartar), só ficou sem
+  // gatilho — o toggle era a única porta de entrada.
   return (
     <div className="relative">
-      {/* Botões de ação fixos no canto superior direito */}
-      <div className="absolute top-0 right-0 z-10">
-        {headerBtns}
-      </div>
-
       <ControladoriaFlow
         title="Alocação de Recursos"
         subtitle="Frota x Obras — visão integrada com o módulo Frotas"

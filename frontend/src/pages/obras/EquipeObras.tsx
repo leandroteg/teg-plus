@@ -8,9 +8,9 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import {
-  usePlanejamentoEquipe, useColaboradoresAtivos, useObrasComProjeto,
+  usePlanejamentoEquipe, useColaboradoresAtivos, useObrasComProjeto, useObrasEquipeLista,
   useCriarPlanEquipe, useExcluirPlanEquipe, useAtualizarPlanEquipe, useMoverLiderTime,
-  papelSugerido, type ObraComProjeto,
+  papelSugerido, type ObraComProjeto, type ObrasEquipePessoa,
 } from '../../hooks/useObras'
 import type {
   ObraPlanejamentoEquipe, ColaboradorAtivo, PapelEquipe,
@@ -48,9 +48,15 @@ const STATUS_CONFIG: Record<StatusEquipePlan, { label: string; light: string; da
 
 const STATUS_ATIVO: StatusEquipePlan[] = ['planejado', 'mobilizado', 'ativo']
 
-type TabKey = 'lista' | 'programacao' | 'kanban'
+type TabKey = 'pessoas' | 'lista' | 'programacao' | 'kanban'
 
 const STEPS: FlowStep[] = [
+  {
+    key: 'pessoas', label: 'Lista',
+    description: 'Todo o efetivo ativo: função, admissão, alojamento e onde bateu o último ponto.',
+    icon: Users2,
+    accent: { bg: 'hover:bg-sky-50', bgActive: 'bg-sky-50', text: 'text-sky-600', textActive: 'text-sky-800', border: 'border-sky-500', badge: 'bg-sky-100 text-sky-700' },
+  },
   {
     key: 'lista', label: 'Equipes',
     description: 'Monte os times: lideranças por obra, cada encarregado com sua tropa, e o apoio.',
@@ -99,7 +105,7 @@ function Avatar({ nome, fotoUrl, isDark, size = 28 }: { nome: string; fotoUrl?: 
 export default function EquipeObras() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
-  const [tab, setTab] = useState<TabKey>('lista')
+  const [tab, setTab] = useState<TabKey>('pessoas')
   const [alocarOpen, setAlocarOpen] = useState(false)
   const [alocarPreset, setAlocarPreset] = useState<{ obraId?: string; colaboradorId?: string; papel?: PapelEquipe; liderId?: string } | null>(null)
 
@@ -177,6 +183,7 @@ export default function EquipeObras() {
           </div>
         ) : (
           <>
+            {tab === 'pessoas' && <PessoasView isDark={isDark} />}
             {tab === 'lista' && (
               <ListaView
                 colaboradores={colaboradores} equipe={equipe} obras={obras}
@@ -267,6 +274,151 @@ const PAPEL_PLURAL: Record<PapelEquipe, string> = {
 
 // Frente de trabalho da equipe (definida na alocação, varia por obra)
 const FUNCOES_EQUIPE = ['Supressão', 'Fundação', 'Montagem', 'Lançamento']
+
+// ── Lista: todo o efetivo ativo ─────────────────────────────────────────────────
+// Responde "quem eu tenho e onde essa pessoa está" juntando três módulos. A base
+// mostrada é a do ÚLTIMO PONTO (relógio onde bateu), não a do cadastro: são
+// coisas diferentes e divergem bastante — quem está lotado num canteiro e
+// trabalhando em outro aparecia no lugar errado.
+function PessoasView({ isDark }: { isDark: boolean }) {
+  const { data: pessoas = [], isLoading } = useObrasEquipeLista()
+  const [q, setQ] = useState('')
+  const [fFuncao, setFFuncao] = useState<Set<string>>(new Set())
+  const [fBase, setFBase] = useState<Set<string>>(new Set())
+  const [fAloj, setFAloj] = useState<Set<string>>(new Set())
+  const [fObra, setFObra] = useState<Set<string>>(new Set())
+  const [ord, setOrd] = useState<{ k: 'nome' | 'cargo' | 'adm' | 'aloj' | 'base'; dir: 1 | -1 }>({ k: 'nome', dir: 1 })
+
+  const opts = useMemo(() => {
+    const uniq = (vals: (string | null)[]) =>
+      [...new Set(vals.filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+        .map(v => ({ value: v, label: v }))
+    return {
+      funcao: uniq(pessoas.map(p => p.cargo)),
+      // "sem registro" é filtro de verdade: é assim que o DP acha o furo
+      base: [...uniq(pessoas.map(p => p.base_ponto)), { value: '—', label: '— sem ponto' }],
+      aloj: [...uniq(pessoas.map(p => p.alojamento)), { value: '—', label: '— sem alojamento' }],
+      obra: [...uniq(pessoas.map(p => p.obra)), { value: '—', label: '— sem obra' }],
+    }
+  }, [pessoas])
+
+  const lista = useMemo(() => {
+    const busca = q.trim().toLowerCase()
+    const casa = (set: Set<string>, v: string | null) => set.size === 0 || set.has(v ?? '—')
+    return pessoas
+      .filter(p => (!busca
+        || p.nome.toLowerCase().includes(busca)
+        || (p.cargo ?? '').toLowerCase().includes(busca)
+        || (p.matricula ?? '').toLowerCase().includes(busca))
+        && casa(fFuncao, p.cargo) && casa(fBase, p.base_ponto)
+        && casa(fAloj, p.alojamento) && casa(fObra, p.obra))
+      .sort((a, b) => {
+        const k = ord.k
+        const val = (p: ObrasEquipePessoa) => k === 'nome' ? p.nome
+          : k === 'cargo' ? (p.cargo ?? '') : k === 'adm' ? (p.data_admissao ?? '')
+            : k === 'aloj' ? (p.alojamento ?? '') : (p.base_ponto ?? '')
+        const cmp = String(val(a)).localeCompare(String(val(b)), 'pt-BR')
+        return (cmp !== 0 ? cmp : a.nome.localeCompare(b.nome, 'pt-BR')) * ord.dir
+      })
+  }, [pessoas, q, fFuncao, fBase, fAloj, fObra, ord])
+
+  const semAloj = lista.filter(p => !p.alojamento).length
+  const semPonto = lista.filter(p => !p.ultimo_ponto).length
+  const card = isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'
+  const txt = isDark ? 'text-slate-200' : 'text-slate-700'
+  const sub = isDark ? 'text-slate-500' : 'text-slate-400'
+  const TH = 'text-left text-[10px] uppercase tracking-widest font-bold px-3 py-2.5'
+  const TD = 'px-3 py-2 text-xs'
+  const fmt = (d?: string | null) => d ? new Date(d + 'T12:00').toLocaleDateString('pt-BR') : '—'
+  const Th = ({ label, k, cls = '' }: { label: string; k: typeof ord.k; cls?: string }) => (
+    <th className={`${TH} ${cls} cursor-pointer select-none`}
+      onClick={() => setOrd(o => o.k === k ? { k, dir: o.dir === 1 ? -1 : 1 } : { k, dir: 1 })}>
+      <span className={`inline-flex items-center gap-1 ${ord.k === k ? 'text-sky-500' : ''}`}>
+        {label}{ord.k === k && <span className="text-[8px]">{ord.dir === 1 ? '▲' : '▼'}</span>}
+      </span>
+    </th>
+  )
+
+  if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="animate-spin text-sky-500" size={24} /></div>
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[180px] max-w-[320px]">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="nome, função ou matrícula..."
+            className={`w-full rounded-xl border pl-8 pr-2.5 py-1.5 text-[11px] ${isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`} />
+        </div>
+        <MultiSelect label="Função" options={opts.funcao} selected={fFuncao}
+          onToggle={v => togFiltro(v, setFFuncao)} onClear={() => setFFuncao(new Set())} isDark={isDark} compacto />
+        <MultiSelect label="Base" options={opts.base} selected={fBase}
+          onToggle={v => togFiltro(v, setFBase)} onClear={() => setFBase(new Set())} isDark={isDark} compacto />
+        <MultiSelect label="Alojamento" options={opts.aloj} selected={fAloj}
+          onToggle={v => togFiltro(v, setFAloj)} onClear={() => setFAloj(new Set())} isDark={isDark} compacto />
+        <MultiSelect label="Obra" options={opts.obra} selected={fObra}
+          onToggle={v => togFiltro(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} compacto />
+        <span className={`text-[11px] font-semibold ml-auto ${sub}`}>
+          <b className={txt}>{lista.length}</b> pessoa(s)
+          {semAloj > 0 && <> · {semAloj} sem alojamento</>}
+          {semPonto > 0 && <> · {semPonto} sem ponto</>}
+        </span>
+      </div>
+
+      <div className={`rounded-2xl border overflow-hidden ${card}`}>
+        {lista.length === 0 ? (
+          <div className={`text-center py-14 text-sm ${sub}`}>Ninguém encontrado com esses filtros.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead><tr className={isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'}>
+                <Th label="Colaborador" k="nome" />
+                <Th label="Função" k="cargo" cls="hidden md:table-cell" />
+                <Th label="Admissão" k="adm" cls="hidden sm:table-cell" />
+                <Th label="Alojamento" k="aloj" />
+                <Th label="Base (último ponto)" k="base" />
+                <th className={`${TH} hidden lg:table-cell`}>Obra</th>
+              </tr></thead>
+              <tbody>{lista.map(p => (
+                <tr key={p.colaborador_id} className={`border-t ${isDark ? 'border-white/[0.05] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50/70'}`}>
+                  <td className={TD}>
+                    <div className="flex items-center gap-2">
+                      <Avatar nome={p.nome} fotoUrl={p.foto_url ?? undefined} isDark={isDark} size={26} />
+                      <div className="min-w-0">
+                        <p className={`font-semibold truncate ${txt}`} title={p.nome}>{p.nome}</p>
+                        {p.matricula && <p className={`text-[10px] ${sub}`}>mat. {p.matricula}</p>}
+                      </div>
+                    </div>
+                  </td>
+                  <td className={`${TD} hidden md:table-cell ${sub}`}>{p.cargo ?? '—'}</td>
+                  <td className={`${TD} hidden sm:table-cell ${sub}`}>{fmt(p.data_admissao)}</td>
+                  <td className={TD}>
+                    {p.alojamento
+                      ? <div className="min-w-0">
+                        <p className={`truncate ${txt}`} title={`${p.alojamento}${p.alojamento_cidade ? ` — ${p.alojamento_cidade}` : ''}`}>{p.alojamento}</p>
+                        {p.leito && <p className={`text-[10px] ${sub}`}>{p.leito}</p>}
+                      </div>
+                      : <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600">sem alojamento</span>}
+                  </td>
+                  <td className={TD}>
+                    {p.base_ponto
+                      ? <div className="min-w-0">
+                        <p className={`truncate ${txt}`}>{p.base_ponto}</p>
+                        <p className={`text-[10px] ${sub}`}>{fmt(p.ultimo_ponto)}</p>
+                      </div>
+                      : <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'}`}>sem ponto</span>}
+                  </td>
+                  <td className={`${TD} hidden lg:table-cell ${sub}`}>
+                    <span className="block truncate max-w-[220px]" title={p.obra ?? ''}>{p.obra ?? '—'}</span>
+                  </td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // Popover de pessoas disponíveis (busca + lista) para os botões "+"
 function PickerPopover({ isDark, items, onPick, onClose }: {

@@ -37,8 +37,8 @@ export default function ObrasLayout() {
       },
     },
     { to: '/obras/gestao', icon: ClipboardList, label: 'Gestão de Obras', mobileLabel: 'Gestão' },
-    { to: '/obras/equipe', icon: Users2, label: 'Alocação de Equipes', mobileLabel: 'Equipe' },
-    { to: '/obras/alocacao-recursos', icon: Truck, label: 'Alocação de Recursos', mobileLabel: 'Recursos' },
+    { to: '/obras/equipe', icon: Users2, label: 'Equipe', mobileLabel: 'Equipe' },
+    { to: '/obras/alocacao-recursos', icon: Truck, label: 'Recursos', mobileLabel: 'Recursos' },
   ]
 
   return (
