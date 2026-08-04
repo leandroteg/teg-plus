@@ -2824,15 +2824,66 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
         </div>
 
         <div className="p-5 space-y-4">
+          {/* O número grande é o que SAI DO CAIXA (o mesmo que entra no lote e
+              nos totais da lista). O valor de face fica riscado ao lado, e o
+              detalhamento embaixo explica a diferença. */}
           <div className="flex items-center justify-between">
-            <p className={`text-2xl font-extrabold ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}>
-              {fmtFull(cp.valor_original)}
-            </p>
+            <div className="min-w-0">
+              <p className={`text-2xl font-extrabold ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}>
+                {fmtFull(valorAPagarCP(cp))}
+              </p>
+              {temAjusteCP(cp) && (
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Título <span className="line-through">{fmtFull(cp.valor_original)}</span> · valor a pagar
+                </p>
+              )}
+            </div>
             <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ${STATUS_ACCENT[stageStatus]?.bgActive || 'bg-slate-100'} ${STATUS_ACCENT[stageStatus]?.textActive || 'text-slate-700'}`}>
               <span className={`w-2 h-2 rounded-full ${STATUS_ACCENT[stageStatus]?.dot}`} />
               {stage?.label ?? cp.status}
             </span>
           </div>
+
+          {/* Composição do valor a pagar — só quando algo mexe no número */}
+          {temAjusteCP(cp) && (
+            <div className={`rounded-xl px-3 py-2.5 space-y-1 text-xs ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50 border border-slate-200'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Composição do valor a pagar
+              </p>
+              <div className="flex justify-between">
+                <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Título</span>
+                <span className="font-semibold">{fmtFull(cp.valor_original)}</span>
+              </div>
+              {Number(cp.valor_desconto ?? 0) > 0 && (
+                <div className="flex justify-between text-emerald-600">
+                  <span>Desconto</span>
+                  <span className="font-semibold">− {fmtFull(cp.valor_desconto ?? 0)}</span>
+                </div>
+              )}
+              {Number(cp.valor_juros_multa ?? 0) > 0 && (
+                <div className="flex justify-between text-rose-600">
+                  <span>Juros/multa</span>
+                  <span className="font-semibold">+ {fmtFull(cp.valor_juros_multa ?? 0)}</span>
+                </div>
+              )}
+              {cp.imposto_deduzir && Number(cp.imposto_valor ?? 0) > 0 && (
+                <div className="flex justify-between text-violet-600">
+                  <span>Imposto retido{cp.imposto_tipo ? ` (${cp.imposto_tipo})` : ''}</span>
+                  <span className="font-semibold">− {fmtFull(cp.imposto_valor ?? 0)}</span>
+                </div>
+              )}
+              {Number((cp as any).valor_adiantamento_abatido ?? 0) > 0 && (
+                <div className="flex justify-between text-amber-600">
+                  <span>Adiantamento abatido</span>
+                  <span className="font-semibold">− {fmtFull((cp as any).valor_adiantamento_abatido ?? 0)}</span>
+                </div>
+              )}
+              <div className={`flex justify-between font-bold pt-1 border-t ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                <span>Vai para o lote</span>
+                <span className="text-emerald-600">{fmtFull(valorAPagarCP(cp))}</span>
+              </div>
+            </div>
+          )}
 
           {/* Origem badge */}
           {cp.origem === 'logistica' && (

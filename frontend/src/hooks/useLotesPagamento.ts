@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type { ContaPagar, LotePagamento, LoteItem } from '../types/financeiro'
+import { valorAPagarCP } from '../types/financeiro'
 
 const SELECT_CP = `
   *,
@@ -249,7 +250,11 @@ export function useCriarLote() {
       for (const [key, grupo] of grupos) {
         const { data: numData } = await supabase.rpc('generate_numero_lote')
         const numeroLote = (numData as string) || `LP-${Date.now()}`
-        const valorTotal = grupo.reduce((s, c) => s + (c.valor_original ?? 0), 0)
+        // O lote paga o valor LÍQUIDO (original − desconto + juros/multa −
+        // imposto retido − adiantamento abatido), o mesmo número que a lista e
+        // o card do título mostram. Usar valor_original mandava para pagamento
+        // a face do título, ignorando desconto negociado e retenção.
+        const valorTotal = grupo.reduce((s, c) => s + valorAPagarCP(c), 0)
 
         const { data: lote, error: lErr } = await supabase
           .from('fin_lotes_pagamento')
@@ -268,7 +273,7 @@ export function useCriarLote() {
 
         const { error: iErr } = await supabase
           .from('fin_lote_itens')
-          .insert(grupo.map(cp => ({ lote_id: lote.id, cp_id: cp.id, valor: cp.valor_original ?? 0 })))
+          .insert(grupo.map(cp => ({ lote_id: lote.id, cp_id: cp.id, valor: valorAPagarCP(cp) })))
         if (iErr) throw iErr
 
         const { error: uErr } = await supabase
@@ -559,7 +564,7 @@ export function useAdicionarItensLote() {
 
       const { error } = await supabase
         .from('fin_lote_itens')
-        .insert(cps.map(cp => ({ lote_id: loteId, cp_id: cp.id, valor: cp.valor_original ?? 0 })))
+        .insert(cps.map(cp => ({ lote_id: loteId, cp_id: cp.id, valor: valorAPagarCP(cp) })))
       if (error) throw error
 
       await supabase
