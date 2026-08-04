@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Package, Send, CheckCircle2, XCircle,
-  Clock, User, MessageCircle, Trash2, Plus, Undo2, ChevronDown, ChevronUp,
+  Clock, User, MessageCircle, Trash2, Plus, Undo2, ChevronDown, ChevronUp, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -16,6 +16,7 @@ import {
   useRemoverItemLote,
   useAdicionarItensLote,
   useDevolverLoteEdicao,
+  useDesfazerLote,
   useCPsParaPagamento,
 } from '../../hooks/useLotesPagamento'
 import type { StatusLote, DecisaoLoteItem, LoteItem } from '../../types/financeiro'
@@ -86,6 +87,10 @@ export default function LoteDetalhe() {
   const removerItem = useRemoverItemLote()
   const adicionarItens = useAdicionarItensLote()
   const devolverEdicao = useDevolverLoteEdicao()
+  const desfazerLote = useDesfazerLote()
+  const [showDesfazer, setShowDesfazer] = useState(false)
+  const [motivoDesfazer, setMotivoDesfazer] = useState('')
+  const [desfazerErro, setDesfazerErro] = useState('')
   // CPs confirmadas (fora de lote) disponiveis pra incluir neste lote
   const { data: cpsConfirmadas = [] } = useCPsParaPagamento(['confirmado'])
   const [showAdicionar, setShowAdicionar] = useState(false)
@@ -184,6 +189,18 @@ export default function LoteDetalhe() {
   const empresaLote = loteEmpresaId ? empresas.find(e => e.id === loteEmpresaId) : null
   const cpsDisponiveis = cpsConfirmadas.filter(cp => (((cp as any).empresa_id as string | null) ?? null) === loteEmpresaId)
   const isResolvido = ['aprovado', 'parcialmente_aprovado', 'cancelado', 'pago'].includes(lote.status)
+  // Desfazer enquanto o lote não virou dinheiro (o RPC revalida no banco)
+  const podeDesfazer = ['montando', 'enviado_aprovacao', 'parcialmente_aprovado', 'aprovado'].includes(lote.status)
+
+  const handleDesfazer = async () => {
+    setDesfazerErro('')
+    try {
+      const r = await desfazerLote.mutateAsync({ loteId: lote.id, motivo: motivoDesfazer.trim() || undefined })
+      navigate(`/financeiro/contas-a-pagar?lote_desfeito=${encodeURIComponent(r.lote)}`)
+    } catch (e) {
+      setDesfazerErro(e instanceof Error ? e.message : 'Erro ao desfazer o lote')
+    }
+  }
   // Financeiro pode responder quando lote está em montagem (legado) ou
   // em aprovação com pergunta pendente do aprovador (novo fluxo).
   const podeResponder = (isMontando || isEmAprovacao) && perguntaPendente
@@ -403,6 +420,54 @@ export default function LoteDetalhe() {
             {enviarAprovacao.isPending ? 'Enviando...' : 'Enviar para Aprovação'}
           </button>
         </div>
+      )}
+
+      {/* Desfazer o lote inteiro: títulos voltam para Confirmados e o número
+          fica registrado como cancelado. Bloqueado se algo já foi pago. */}
+      {podeDesfazer && (
+        showDesfazer ? (
+          <div className={`rounded-xl border-2 p-4 space-y-3 ${isDark ? 'border-rose-500/40 bg-rose-500/10' : 'border-rose-300 bg-rose-50'}`}>
+            <div>
+              <p className={`text-sm font-bold ${isDark ? 'text-rose-200' : 'text-rose-700'}`}>
+                Desfazer o lote {lote.numero_lote}?
+              </p>
+              <p className={`text-xs mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                Os {itens.length} título(s) voltam para <strong>Confirmados</strong> e podem ser remontados em
+                outro lote. O número do lote fica registrado como cancelado — não some do histórico.
+              </p>
+            </div>
+            <input
+              value={motivoDesfazer}
+              onChange={e => setMotivoDesfazer(e.target.value)}
+              placeholder="Motivo (opcional): ex. remontar com outros títulos"
+              className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-white border border-slate-200 text-slate-700'}`}
+            />
+            {desfazerErro && <p className="text-xs text-rose-500">{desfazerErro}</p>}
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setShowDesfazer(false); setMotivoDesfazer(''); setDesfazerErro('') }}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold ${isDark ? 'text-slate-300 hover:bg-white/10' : 'text-slate-600 hover:bg-white'}`}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDesfazer}
+                disabled={desfazerLote.isPending}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold disabled:opacity-60"
+              >
+                {desfazerLote.isPending ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                Desfazer lote
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowDesfazer(true)}
+            className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg border-2 transition-colors ${isDark ? 'border-rose-500/30 text-rose-300 hover:bg-rose-500/10' : 'border-rose-200 text-rose-600 hover:bg-rose-50'}`}
+          >
+            <Trash2 size={14} /> Desfazer lote
+          </button>
+        )
       )}
 
       {/* Em aprovação: o financeiro pode puxar o lote de volta pra editar itens.

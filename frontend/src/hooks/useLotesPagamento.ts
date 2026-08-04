@@ -607,6 +607,33 @@ export function useDevolverLoteEdicao() {
   })
 }
 
+// ── Mutation: Desfazer lote (títulos voltam para Confirmados) ───────────────
+// RPC mig 213: valida estágio, recusa se algum título já foi pago/está em
+// pagamento, expira a aprovação pendente e mantém o lote como 'cancelado'
+// (o número já circulou — não se apaga).
+
+export function useDesfazerLote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ loteId, motivo }: { loteId: string; motivo?: string }) => {
+      const { data, error } = await supabase.rpc('fin_lote_desfazer', {
+        p_lote_id: loteId,
+        p_motivo: motivo ?? null,
+      })
+      if (error) throw new Error(error.message)
+      return data as { lote: string; titulos_liberados: number }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
+      qc.invalidateQueries({ queryKey: ['cps-para-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+    },
+  })
+}
+
 export function useEnviarRemessaPagamentoBatch() {
   const qc = useQueryClient()
   return useMutation({

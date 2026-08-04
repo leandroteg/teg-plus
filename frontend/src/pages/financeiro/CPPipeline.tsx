@@ -59,7 +59,7 @@ import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 // ══ Formatters ══════════════════════════════════════════════════
 
 const fmt = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const fmtFull = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -230,6 +230,9 @@ type NovaSolicitacaoExtraForm = {
   centro_custo: string
   classe_financeira: string
   valor: string
+  desconto: string
+  juros_multa: string
+  empresa_id: string
   data_vencimento: string
   fornecedor_id: string
   fornecedor_cnpj: string
@@ -249,6 +252,7 @@ type NovaPrevisaoPagamentoForm = {
   fornecedor_id: string
   fornecedor_nome: string
   valor: string
+  empresa_id: string
   centro_custo: string
   classe_financeira: string
   recorrente: boolean
@@ -256,6 +260,7 @@ type NovaPrevisaoPagamentoForm = {
   recorrenciaFim: string
   dataVencimento: string
   desconto: string
+  jurosMulta: string
   temImposto: boolean
   impostoTipo: string
   impostoAliquota: string
@@ -273,6 +278,9 @@ const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
   centro_custo: '',
   classe_financeira: '',
   valor: '',
+  desconto: '',
+  juros_multa: '',
+  empresa_id: '',
   data_vencimento: new Date().toISOString().slice(0, 10),
   fornecedor_id: '',
   fornecedor_cnpj: '',
@@ -296,6 +304,8 @@ const EMPTY_PREVISAO_FORM: NovaPrevisaoPagamentoForm = {
   recorrenciaFim: '',
   dataVencimento: new Date().toISOString().split('T')[0],
   desconto: '',
+  jurosMulta: '',
+  empresa_id: '',
   temImposto: false,
   impostoTipo: 'ISS',
   impostoAliquota: '',
@@ -806,6 +816,15 @@ function NovaSolicitacaoExtraordinariaModal({
     && Number(form.valor) > 0
     && form.data_vencimento.length > 0
     && form.fornecedor_id.length > 0
+    && form.empresa_id.length > 0
+
+  const empresas = useLookupEmpresas()
+  // Valor a pagar = valor − desconto + juros/multa (mesma fórmula da baixa)
+  const valorLiquidoExtra = Math.max(0, Math.round((
+    (Number(form.valor || 0) || 0)
+    - (Number(form.desconto || 0) || 0)
+    + (Number(form.juros_multa || 0) || 0)
+  ) * 100) / 100)
 
   const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
     isDark
@@ -930,6 +949,9 @@ function NovaSolicitacaoExtraordinariaModal({
         centro_custo: form.centro_custo,
         classe_financeira: form.classe_financeira,
         valor: Number(form.valor),
+        desconto: Number(form.desconto || 0) || 0,
+        jurosMulta: Number(form.juros_multa || 0) || 0,
+        empresaId: form.empresa_id || undefined,
         solicitanteNome: perfil?.nome,
         fornecedorId: form.fornecedor_id || undefined,
         fornecedorNome: form.favorecido || undefined,
@@ -1103,6 +1125,35 @@ function NovaSolicitacaoExtraordinariaModal({
               <label className={labelCls}>Data de Vencimento *</label>
               <input type="date" value={form.data_vencimento} onChange={e => setField('data_vencimento', e.target.value)} className={inputCls} />
             </div>
+          </div>
+
+          {/* Desconto e juros/multa — mesma regra da baixa da CP */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className={labelCls}>Desconto (R$)</label>
+              <input type="number" min="0" step="0.01" value={form.desconto} onChange={e => setField('desconto', e.target.value)} className={inputCls} placeholder="0,00" />
+            </div>
+            <div>
+              <label className={labelCls}>Juros/multa (R$)</label>
+              <input type="number" min="0" step="0.01" value={form.juros_multa} onChange={e => setField('juros_multa', e.target.value)} className={inputCls} placeholder="0,00" />
+            </div>
+            <div>
+              <label className={labelCls}>Valor a pagar</label>
+              <div className={`${inputCls} flex items-center font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                {valorLiquidoExtra.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </div>
+            </div>
+          </div>
+
+          {/* Filial pagadora — sem ela o título cai em "Sem empresa" no filtro */}
+          <div>
+            <label className={labelCls}>Filial pagadora *</label>
+            <select value={form.empresa_id} onChange={e => setField('empresa_id', e.target.value)} className={inputCls}>
+              <option value="">Selecione...</option>
+              {empresas.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.codigo} — {emp.nome_fantasia || emp.razao_social}</option>
+              ))}
+            </select>
           </div>
 
           <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
@@ -1284,6 +1335,7 @@ function NovaPrevisaoPagamentoModal({
   const { perfil } = useAuth()
   const centrosCusto = useLookupCentrosCusto()
   const classesFinanceiras = useLookupClassesFinanceiras()
+  const empresas = useLookupEmpresas()
   const criarPrevisaoMut = useCriarPrevisaoPagamentoCP()
   const editarPrevisaoMut = useEditarPrevisaoPagamentoCP()
   const editMode = Boolean(previsao)
@@ -1313,10 +1365,12 @@ function NovaPrevisaoPagamentoModal({
       fornecedor_id: previsao.fornecedor_id ?? '',
       fornecedor_nome: previsao.fornecedor_nome ?? '',
       valor: String(previsao.valor_original ?? ''),
+      empresa_id: (previsao as any).empresa_id ?? '',
       centro_custo: previsao.centro_custo ?? '',
       classe_financeira: previsao.classe_financeira ?? '',
       dataVencimento: previsao.data_vencimento ?? '',
       desconto: previsao.valor_desconto ? String(previsao.valor_desconto) : '',
+      jurosMulta: (previsao as any).valor_juros_multa ? String((previsao as any).valor_juros_multa) : '',
       temImposto: Number((previsao as any).imposto_valor ?? 0) > 0,
       impostoTipo: (previsao as any).imposto_tipo ?? '',
       impostoAliquota: (previsao as any).imposto_aliquota ? String((previsao as any).imposto_aliquota) : '',
@@ -1349,11 +1403,12 @@ function NovaPrevisaoPagamentoModal({
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  // Valor a pagar = valor − desconto − imposto retido (quando marcado p/ deduzir)
+  // Valor a pagar = valor − desconto + juros/multa − imposto retido
   const impostoValorNum = form.temImposto ? Number(form.impostoValor || 0) || 0 : 0
   const valorLiquido = Math.max(0, Math.round((
     (Number(form.valor || 0) || 0)
     - (Number(form.desconto || 0) || 0)
+    + (Number(form.jurosMulta || 0) || 0)
     - (form.impostoDeduzir ? impostoValorNum : 0)
   ) * 100) / 100)
 
@@ -1385,6 +1440,7 @@ function NovaPrevisaoPagamentoModal({
     && form.classe_financeira.length > 0
     && Number(form.valor) > 0
     && form.dataVencimento.length > 0
+    && form.empresa_id.length > 0
     && (!form.recorrente || form.recorrenciaFim.length > 0)
 
   async function handleCriar() {
@@ -1414,6 +1470,8 @@ function NovaPrevisaoPagamentoModal({
           classe_financeira: form.classe_financeira,
           dataVencimento: form.dataVencimento,
           desconto: Number(form.desconto || 0) || 0,
+          jurosMulta: Number(form.jurosMulta || 0) || 0,
+          empresaId: form.empresa_id || undefined,
           imposto,
           arquivos,
         })
@@ -1431,6 +1489,8 @@ function NovaPrevisaoPagamentoModal({
           dataVencimento: form.dataVencimento,
           solicitanteNome: perfil?.nome,
           desconto: Number(form.desconto || 0) || 0,
+          jurosMulta: Number(form.jurosMulta || 0) || 0,
+          empresaId: form.empresa_id || undefined,
           imposto,
           arquivos,
         })
@@ -1676,11 +1736,15 @@ function NovaPrevisaoPagamentoModal({
             </div>
           </div>
 
-          {/* Desconto e imposto previstos */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Desconto, juros/multa e valor líquido previstos */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className={labelCls}>Desconto previsto (R$)</label>
               <input type="number" min="0" step="0.01" value={form.desconto} onChange={e => setField('desconto', e.target.value)} className={inputCls} placeholder="0,00" />
+            </div>
+            <div>
+              <label className={labelCls}>Juros/multa (R$)</label>
+              <input type="number" min="0" step="0.01" value={form.jurosMulta} onChange={e => setField('jurosMulta', e.target.value)} className={inputCls} placeholder="0,00" />
             </div>
             <div>
               <label className={labelCls}>Valor previsto a pagar</label>
@@ -1688,6 +1752,17 @@ function NovaPrevisaoPagamentoModal({
                 {valorLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </div>
             </div>
+          </div>
+
+          {/* Filial pagadora — sem ela o título cai em "Sem empresa" no filtro */}
+          <div>
+            <label className={labelCls}>Filial pagadora *</label>
+            <select value={form.empresa_id} onChange={e => setField('empresa_id', e.target.value)} className={inputCls}>
+              <option value="">Selecione...</option>
+              {empresas.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.codigo} — {emp.nome_fantasia || emp.razao_social}</option>
+              ))}
+            </select>
           </div>
 
           <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
@@ -4208,6 +4283,14 @@ export default function CPPipeline() {
             icon: Send,
             loading: enviarLoteMut.isPending,
             disabled: enviarLoteMut.isPending,
+          },
+          // Inserir/remover títulos e desfazer moram no detalhe do lote — ação
+          // destrutiva não fica a um clique de distância numa linha de lista.
+          secondary: {
+            label: 'Editar',
+            onClick: () => navigate(`/financeiro/lotes/${summary.lote.id}`),
+            tone: 'bg-slate-600 hover:bg-slate-700',
+            icon: Pencil,
           },
         }
       case 'aprovado_pgto':
