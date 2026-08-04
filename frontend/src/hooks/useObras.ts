@@ -681,6 +681,8 @@ export interface ObrasEquipePessoa {
   matricula: string | null
   data_admissao: string | null
   foto_url: string | null
+  /** PJ ou cargo de confiança: não bate ponto por definição */
+  isento_ponto: boolean
   /** etapa crua da admissão (Headcount manda na fonte; o rótulo é do Obras) */
   adm_etapa: string | null
   adm_geset: string | null

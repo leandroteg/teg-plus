@@ -315,7 +315,7 @@ function PessoasView({ isDark }: { isDark: boolean }) {
     return {
       funcao: uniq(pessoas.map(p => p.cargo)),
       // "sem registro" é filtro de verdade: é assim que o DP acha o furo
-      base: [...uniq(pessoas.map(p => p.base_ponto)), { value: '—', label: '— sem ponto' }],
+      base: [...uniq(pessoas.map(p => p.base_ponto)), { value: '—', label: '— sem ponto / N/A' }],
       aloj: [...uniq(pessoas.map(p => p.alojamento)), { value: '—', label: '— sem alojamento' }],
       obra: [...uniq(pessoas.map(p => p.obra)), { value: '—', label: '— sem obra' }],
       status: uniq(pessoas.map(p => statusObra(p).label)),
@@ -344,7 +344,7 @@ function PessoasView({ isDark }: { isDark: boolean }) {
   }, [pessoas, q, fFuncao, fBase, fAloj, fObra, fStatus, ord])
 
   const semAloj = lista.filter(p => !p.alojamento).length
-  const semPonto = lista.filter(p => !p.ultimo_ponto).length
+  const semPonto = lista.filter(p => !p.ultimo_ponto && !p.isento_ponto).length
   const card = isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'
   const txt = isDark ? 'text-slate-200' : 'text-slate-700'
   const sub = isDark ? 'text-slate-500' : 'text-slate-400'
@@ -433,7 +433,11 @@ function PessoasView({ isDark }: { isDark: boolean }) {
                         <p className={`truncate ${txt}`}>{p.base_ponto}</p>
                         <p className={`text-[10px] ${sub}`}>{fmt(p.ultimo_ponto)}</p>
                       </div>
-                      : <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'}`}>sem ponto</span>}
+                      /* PJ e cargo de confiança não batem por definição — marcar como
+                         "sem ponto" sugeriria falha e afogaria quem realmente sumiu */
+                      : p.isento_ponto
+                        ? <span className={`text-[10px] font-bold ${sub}`}>N/A</span>
+                        : <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-500">sem ponto</span>}
                   </td>
                   <td className={`${TD} hidden lg:table-cell ${sub}`}>
                     {p.papel ? (
