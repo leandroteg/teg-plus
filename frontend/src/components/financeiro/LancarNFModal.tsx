@@ -12,6 +12,7 @@ import { X, Receipt, Loader2, Search, Upload, Check } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLancarNFRecebimento, useOscsParaNF } from '../../hooks/useFinanceiro'
+import { useLookupEmpresas } from '../../hooks/useLookups'
 
 const CEMIG = { nome: 'CEMIG DISTRIBUIÇÃO S.A.', cnpj: '06.981.180/0001-16' }
 /** prazo padrão da CEMIG — confirmado nas NFs de junho e julho/26 */
@@ -39,6 +40,7 @@ export default function LancarNFModal({ onClose, onCriado }: { onClose: () => vo
     || (user as { email?: string } | null)?.email || 'Financeiro'
 
   const { data: oscs = [], isLoading: loadOscs } = useOscsParaNF()
+  const empresas = useLookupEmpresas()
   const lancar = useLancarNFRecebimento()
 
   const [cliente, setCliente] = useState(CEMIG.nome)
@@ -52,6 +54,9 @@ export default function LancarNFModal({ onClose, onCriado }: { onClose: () => vo
   const [venc, setVenc] = useState(somaDias(hoje(), PRAZO_DIAS))
   const [vencManual, setVencManual] = useState(false)
   const [valor, setValor] = useState('')
+  const [desconto, setDesconto] = useState('')
+  const [jurosMulta, setJurosMulta] = useState('')
+  const [empresaId, setEmpresaId] = useState('')
   const [obs, setObs] = useState('')
   const [danfe, setDanfe] = useState<File | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -66,7 +71,11 @@ export default function LancarNFModal({ onClose, onCriado }: { onClose: () => vo
   const osc = oscs.find(o => o.id === oscId)
 
   const valorNum = paraNumero(valor)
-  const podeSalvar = !!nf.trim() && valorNum > 0 && !!emissao && !!venc && !lancar.isPending
+  const descontoNum = paraNumero(desconto)
+  const jurosNum = paraNumero(jurosMulta)
+  // A receber = valor − desconto + juros/multa (mesma fórmula da CP)
+  const valorReceber = Math.max(0, Math.round((valorNum - descontoNum + jurosNum) * 100) / 100)
+  const podeSalvar = !!nf.trim() && valorNum > 0 && !!emissao && !!venc && !!empresaId && !lancar.isPending
 
   async function salvar() {
     setErro(null)
@@ -74,7 +83,9 @@ export default function LancarNFModal({ onClose, onCriado }: { onClose: () => vo
       await lancar.mutateAsync({
         cliente_nome: cliente.trim(), cliente_cnpj: cnpj.trim() || undefined,
         numero_nf: nf.trim(), serie_nf: serie.trim() || undefined, chave_nfe: chave.trim() || undefined,
-        valor_original: valorNum, data_emissao: emissao, data_vencimento: venc,
+        valor_original: valorNum, valor_desconto: descontoNum, valor_juros_multa: jurosNum,
+        empresa_id: empresaId || null,
+        data_emissao: emissao, data_vencimento: venc,
         osc_id: osc?.id ?? null, projeto_id: osc?.obra_id ?? null,
         natureza: osc?.tipo ? osc.tipo.charAt(0).toUpperCase() + osc.tipo.slice(1) : null,
         centro_custo: osc?.polo ?? null,
@@ -162,6 +173,29 @@ export default function LancarNFModal({ onClose, onCriado }: { onClose: () => vo
               {!vencManual && <p className={`text-[10px] mt-0.5 ${sub}`}>emissão + {PRAZO_DIAS} dias</p>}
             </div>
             <div><label className={lab}>Valor líquido *</label><input value={valor} onChange={e => setValor(e.target.value)} className={inp} placeholder="0,00" inputMode="decimal" /></div>
+          </div>
+
+          {/* Desconto e juros/multa — a receber = valor − desconto + juros */}
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={lab}>Desconto (R$)</label><input value={desconto} onChange={e => setDesconto(e.target.value)} className={inp} placeholder="0,00" inputMode="decimal" /></div>
+            <div><label className={lab}>Juros/multa (R$)</label><input value={jurosMulta} onChange={e => setJurosMulta(e.target.value)} className={inp} placeholder="0,00" inputMode="decimal" /></div>
+            <div>
+              <label className={lab}>A receber</label>
+              <div className={`${inp} font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                {valorReceber.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </div>
+            </div>
+          </div>
+
+          {/* Filial emitente/recebedora (mig 214) */}
+          <div>
+            <label className={lab}>Filial recebedora *</label>
+            <select value={empresaId} onChange={e => setEmpresaId(e.target.value)} className={inp}>
+              <option value="">Selecione...</option>
+              {empresas.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.codigo} — {emp.nome_fantasia || emp.razao_social}</option>
+              ))}
+            </select>
           </div>
 
           <div>

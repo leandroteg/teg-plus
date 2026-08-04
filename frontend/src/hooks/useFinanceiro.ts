@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import { gerarNomeAmigavelAnexo } from '../utils/nomeAmigavelAnexo'
 import type {
-  ContaPagar, ContaReceber, Fornecedor,
+  ContaPagar, ContaReceber, Fornecedor, DadosPagamento,
   FinanceiroDashboardData, FinanceiroKPIs,
 } from '../types/financeiro'
 import { STATUS_CP_FORA_DO_FINANCEIRO } from '../types/financeiro'
@@ -27,16 +27,24 @@ function getSupabaseErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+/**
+ * Normaliza os dados para pagamento antes de gravar em dados_pagamento (mig 215):
+ * campo vazio não vira string vazia no JSONB. Sem nenhum campo preenchido,
+ * grava `{}` — é assim que as telas sabem que não há dado informado.
+ */
+export function normalizarDadosPagamento(dados?: DadosPagamento | null): DadosPagamento {
+  if (!dados) return {}
+  const limpo: DadosPagamento = {}
+  for (const campo of ['favorecido', 'banco_nome', 'agencia', 'conta', 'pix_tipo', 'pix_chave'] as const) {
+    const valor = dados[campo]?.trim()
+    if (valor) limpo[campo] = valor
+  }
+  return limpo
+}
+
 function appendExtraRequestDetailsToObservacoes(
   observacoesBase: string,
-  dadosBancarios?: {
-    favorecido?: string
-    banco_nome?: string
-    agencia?: string
-    conta?: string
-    pix_tipo?: string
-    pix_chave?: string
-  },
+  dadosBancarios?: DadosPagamento,
   anexos?: Array<{ nome: string; url: string }>,
 ) {
   const detalhes: string[] = [observacoesBase]
@@ -292,6 +300,9 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       centro_custo,
       classe_financeira,
       valor,
+      desconto,
+      jurosMulta,
+      empresaId,
       dataVencimento,
       solicitanteNome,
       fornecedorId,
@@ -305,19 +316,15 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       centro_custo: string
       classe_financeira: string
       valor: number
+      desconto?: number
+      jurosMulta?: number
+      empresaId?: string
       dataVencimento?: string
       solicitanteNome?: string
       fornecedorId?: string
       fornecedorNome?: string
       fornecedorCnpj?: string
-      dadosBancarios?: {
-        favorecido?: string
-        banco_nome?: string
-        agencia?: string
-        conta?: string
-        pix_tipo?: string
-        pix_chave?: string
-      }
+      dadosBancarios?: DadosPagamento
       arquivos?: File[]
     }) => {
       const hoje = new Date().toISOString().split('T')[0]
@@ -345,6 +352,12 @@ export function useCriarSolicitacaoExtraordinariaCP() {
           status: 'confirmado',
           descricao: descricao.trim(),
           observacoes: observacoesBase,
+          empresa_id: empresaId || null,
+          // mig 215: estruturado. O espelho em observacoes continua abaixo só
+          // para quem lê a CP como texto (aprovação, e-mail, remessa).
+          dados_pagamento: normalizarDadosPagamento(dadosBancarios),
+          ...(desconto ? { valor_desconto: desconto } : {}),
+          ...(jurosMulta ? { valor_juros_multa: jurosMulta } : {}),
         })
         .select('id')
         .single()
@@ -450,14 +463,19 @@ export function useCriarPrevisaoPagamentoCP() {
       dataVencimento,
       solicitanteNome,
       desconto,
+      jurosMulta,
+      empresaId,
       imposto,
       arquivos,
       fornecedorId,
       fornecedorNome,
+      dadosPagamento,
     }: {
       nome: string
       fornecedorId?: string
       fornecedorNome?: string
+      /** Dados para pagamento do beneficiário (mig 215) */
+      dadosPagamento?: DadosPagamento
       valor: number
       centro_custo: string
       classe_financeira: string
@@ -467,6 +485,8 @@ export function useCriarPrevisaoPagamentoCP() {
       dataVencimento: string
       solicitanteNome?: string
       desconto?: number
+      jurosMulta?: number
+      empresaId?: string
       imposto?: { tipo: string; aliquota: number; valor: number; deduzir: boolean }
       arquivos?: Array<{ file: File; tipo: 'nota_fiscal' | 'boleto' | 'outro' }>
     }) => {
@@ -493,7 +513,10 @@ export function useCriarPrevisaoPagamentoCP() {
           status: 'previsto',
           descricao: nome.trim(),
           observacoes,
+          empresa_id: empresaId || null,
+          dados_pagamento: normalizarDadosPagamento(dadosPagamento),
           ...(desconto ? { valor_desconto: desconto } : {}),
+          ...(jurosMulta ? { valor_juros_multa: jurosMulta } : {}),
           ...(imposto && imposto.valor > 0
             ? {
                 imposto_tipo: imposto.tipo,
@@ -563,17 +586,22 @@ export function useEditarPrevisaoPagamentoCP() {
   return useMutation({
     mutationFn: async ({
       cpId, nome, valor, centro_custo, classe_financeira, dataVencimento,
-      desconto, imposto, arquivos, fornecedorId, fornecedorNome,
+      desconto, jurosMulta, empresaId, imposto, arquivos, fornecedorId, fornecedorNome,
+      dadosPagamento,
     }: {
       cpId: string
       nome: string
       fornecedorId?: string
       fornecedorNome?: string
+      /** Dados para pagamento do beneficiário (mig 215) */
+      dadosPagamento?: DadosPagamento
       valor: number
       centro_custo: string
       classe_financeira: string
       dataVencimento: string
       desconto?: number
+      jurosMulta?: number
+      empresaId?: string
       imposto?: { tipo: string; aliquota: number; valor: number; deduzir: boolean }
       arquivos?: Array<{ file: File; tipo: 'nota_fiscal' | 'boleto' | 'outro' }>
     }) => {
@@ -610,6 +638,9 @@ export function useEditarPrevisaoPagamentoCP() {
           classe_financeira,
           descricao: nome.trim(),
           valor_desconto: desconto ?? 0,
+          valor_juros_multa: jurosMulta ?? 0,
+          empresa_id: empresaId || null,
+          dados_pagamento: normalizarDadosPagamento(dadosPagamento),
           imposto_tipo: imposto && imposto.valor > 0 ? imposto.tipo : null,
           imposto_aliquota: imposto && imposto.valor > 0 ? (imposto.aliquota || null) : null,
           imposto_valor: imposto && imposto.valor > 0 ? imposto.valor : null,
@@ -1258,16 +1289,27 @@ export function useLancarNFRecebimento() {
       cliente_nome: string; cliente_cnpj?: string
       numero_nf: string; serie_nf?: string; chave_nfe?: string
       valor_original: number
+      /** mig 213 — a receber = valor_original − desconto + juros/multa */
+      valor_desconto?: number; valor_juros_multa?: number
+      /** mig 214 — filial recebedora */
+      empresa_id?: string | null
       data_emissao: string; data_vencimento: string
       osc_id?: string | null; projeto_id?: string | null
       natureza?: string | null; centro_custo?: string | null
       descricao?: string; observacoes?: string
       criado_por_nome?: string
+      /** mig 215 — dados bancários do cliente pagador */
+      dados_pagamento?: DadosPagamento
       danfeFile?: File
     }) => {
-      const { danfeFile, ...campos } = v
+      const { danfeFile, dados_pagamento, ...campos } = v
       const { data, error } = await supabase.from('fin_contas_receber')
-        .insert({ ...campos, status: 'nf_emitida', bloqueio_tipo: 'sem_bloqueio' })
+        .insert({
+          ...campos,
+          dados_pagamento: normalizarDadosPagamento(dados_pagamento),
+          status: 'nf_emitida',
+          bloqueio_tipo: 'sem_bloqueio',
+        })
         .select('id').single()
       if (error) throw error
       const crId = (data as { id: string }).id
