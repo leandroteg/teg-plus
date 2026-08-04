@@ -11,7 +11,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
-import { usePontoResumoIntervalo, usePontoHorasExtrasIntervalo, usePontoColabAtivos, janelaPadrao } from '../../hooks/usePonto'
+import { usePontoResumoIntervalo, usePontoColabAtivos, janelaPadrao } from '../../hooks/usePonto'
 import { intervalToMin } from '../../lib/ponto'
 import { SpotlightMetric, MiniInfoCard } from '../../components/rh/DPPainelCards'
 import DPFolhaPainel from './DPFolhaPainel'
@@ -48,13 +48,13 @@ export default function DPPainel() {
   const [ate, setAte] = useState(() => padrao().fim)
 
   const { data: resumo = [], isLoading } = usePontoResumoIntervalo(de, ate)
-  const { data: he = [] } = usePontoHorasExtrasIntervalo(de, ate)
   const { data: ativos } = usePontoColabAtivos()
   const pico = ativos?.pico ?? 0
   const headcount = ativos?.headcount ?? 0
 
   const agg = useMemo(() => {
     let hhMin = 0, exMin = 0, hhPagavel = 0, emAberto = 0, foraHorario = 0
+    let diasBatidos = 0, diasRetif = 0, faltasMin = 0, cargaMin = 0
     const ccMap = new Map<string, { nome: string; min: number }>()
     const baseMap = new Map<string, { nome: string; emAberto: number; diasBatidos: number; exMin: number; hhMin: number }>()
     const comBatida = new Set<string>(), comApur = new Set<string>()
@@ -72,6 +72,13 @@ export default function DPPainel() {
       if (!banco) { exMin += exV; hhPagavel += hh } // hora extra A PAGAR + base do %
       emAberto += r.dias_em_aberto_real || 0
       foraHorario += r.dias_fora_horario_real || 0
+      // retificação conta o dia com QUALQUER batida manual; falta é medida em
+      // horas sobre a carga prevista — dia não serve de denominador porque meio
+      // período e dia inteiro pesariam igual
+      diasBatidos += r.dias_batidos || 0
+      diasRetif += r.dias_retificados || 0
+      faltasMin += intervalToMin(r.faltas)
+      cargaMin += intervalToMin(r.carga ?? null)
       // anota os cards de HH/extras, então acompanha o mesmo critério deles
       if (r.colaborador_id && (r.dias_batidos || 0) > 0) comBatida.add(r.colaborador_id)
       if (r.colaborador_id && hh > 0) comApur.add(r.colaborador_id)
@@ -97,10 +104,13 @@ export default function DPPainel() {
       .filter(b => !ehBanco(b.nome))
       .map(b => ({ nome: b.nome, absMin: b.exMin, pct: b.hhMin > 0 ? (b.exMin / b.hhMin) * 100 : 0 }))
       .filter(b => b.absMin > 0).sort((a, b) => b.pct - a.pct)
-    return { hhMin, exMin, hhPagavel, emAberto, foraHorario, porCC, abertoPorBase, extraPorBase, comBatida: comBatida.size, comApur: comApur.size }
+    const pctRetif = diasBatidos > 0 ? (diasRetif / diasBatidos) * 100 : 0
+    const pctFaltas = cargaMin > 0 ? (faltasMin / cargaMin) * 100 : 0
+    return { hhMin, exMin, hhPagavel, emAberto, foraHorario, porCC, abertoPorBase, extraPorBase,
+      comBatida: comBatida.size, comApur: comApur.size,
+      diasBatidos, diasRetif, faltasMin, cargaMin, pctRetif, pctFaltas }
   }, [resumo])
 
-  const heAprovar = he.filter(h => h.aprov_status === 'pendente' || h.aprov_status === 'em_aprovacao').length
   const maxCC = Math.max(...agg.porCC.map(c => c.min), 1)
   const maxAbertoPct = Math.max(...agg.abertoPorBase.map(b => b.pct), 1)
   const maxExtraPct = Math.max(...agg.extraPorBase.map(b => b.pct), 1)
@@ -180,10 +190,12 @@ export default function DPPainel() {
             <div className="grid grid-cols-3 gap-2">
               <MiniInfoCard label="Em Aberto" value={agg.emAberto} icon={Clock}
                 iconTone={agg.emAberto > 0 ? 'text-red-500' : 'text-slate-400'} note={agg.emAberto > 0 ? 'regularizar' : 'tudo ok'} isDark={isDark} />
-              <MiniInfoCard label="Fora do Horário" value={agg.foraHorario} icon={AlarmClock}
-                iconTone={agg.foraHorario > 0 ? 'text-rose-500' : 'text-slate-400'} note="dias-pessoa" isDark={isDark} />
-              <MiniInfoCard label="HE a Aprovar" value={heAprovar} icon={AlertTriangle}
-                iconTone={heAprovar > 0 ? 'text-amber-500' : 'text-slate-400'} note="pendentes" isDark={isDark} />
+              <MiniInfoCard label="Faltas" value={fmtPct(agg.pctFaltas)} icon={AlarmClock}
+                iconTone={agg.pctFaltas >= 5 ? 'text-rose-500' : 'text-slate-400'}
+                note={`${hAbbr(agg.faltasMin)} de ${hAbbr(agg.cargaMin)}`} isDark={isDark} />
+              <MiniInfoCard label="Retificações" value={fmtPct(agg.pctRetif)} icon={AlertTriangle}
+                iconTone={agg.pctRetif >= 20 ? 'text-amber-500' : 'text-slate-400'}
+                note={`${agg.diasRetif.toLocaleString('pt-BR')} de ${agg.diasBatidos.toLocaleString('pt-BR')} dias`} isDark={isDark} />
             </div>
           </div>
         </section>

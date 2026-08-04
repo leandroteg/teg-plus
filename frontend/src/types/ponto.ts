@@ -38,6 +38,10 @@ export interface PontoResumoMes {
   dispositivo: string | null
   dispositivo_base_id: string | null
   fora_base: boolean | null
+  /** dia com QUALQUER batida lançada à mão (Origem 2) — só no resumo por intervalo */
+  dias_retificados?: number
+  /** jornada prevista somada — denominador do % de faltas */
+  carga?: string | null
 }
 
 export interface PontoDia {
