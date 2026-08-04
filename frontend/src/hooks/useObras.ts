@@ -681,6 +681,11 @@ export interface ObrasEquipePessoa {
   matricula: string | null
   data_admissao: string | null
   foto_url: string | null
+  /** etapa crua da admissão (Headcount manda na fonte; o rótulo é do Obras) */
+  adm_etapa: string | null
+  adm_geset: string | null
+  /** status do Headcount — fallback de quem foi admitido antes do fluxo existir */
+  status_hc: string | null
   base_cadastro_id: string | null
   base_cadastro: string | null
   base_ponto_id: string | null

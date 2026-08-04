@@ -275,6 +275,24 @@ const PAPEL_PLURAL: Record<PapelEquipe, string> = {
 // Frente de trabalho da equipe (definida na alocação, varia por obra)
 const FUNCOES_EQUIPE = ['Supressão', 'Fundação', 'Montagem', 'Lançamento']
 
+
+// Status vem da etapa da admissão (Headcount) — aqui só se traduz o rótulo para o
+// vocabulário da obra. Nada é gravado: quem manda na fonte continua sendo o RH.
+function statusObra(p: Pick<ObrasEquipePessoa, 'adm_etapa' | 'adm_geset' | 'status_hc'>): { label: string; cls: string } {
+  const { adm_etapa: etapa, adm_geset: geset } = p
+  if (geset === 'aguardando_liberacao') return { label: 'Pendente GESET', cls: 'bg-amber-500/15 text-amber-600' }
+  if (etapa === 'liberado') return { label: 'Liberado', cls: 'bg-emerald-500/15 text-emerald-600' }
+  if (etapa === 'integracao') return { label: 'Integração', cls: 'bg-teal-500/15 text-teal-600' }
+  if (etapa === 'mobilizacao') return { label: 'Mobilização', cls: 'bg-orange-500/15 text-orange-600' }
+  if (etapa) return { label: 'Em admissão', cls: 'bg-slate-500/15 text-slate-500' }
+  // 289 dos 348 entraram antes do fluxo de admissão existir: para esses o
+  // Headcount é a única fonte. A tela já não lista inativo, então na prática cai
+  // sempre em Ativo — o Inativo fica como rede se a regra da lista mudar.
+  return p.status_hc === 'ativo'
+    ? { label: 'Ativo', cls: 'bg-sky-500/15 text-sky-600' }
+    : { label: 'Inativo', cls: 'bg-slate-500/15 text-slate-500' }
+}
+
 // ── Lista: todo o efetivo ativo ─────────────────────────────────────────────────
 // Responde "quem eu tenho e onde essa pessoa está" juntando três módulos. A base
 // mostrada é a do ÚLTIMO PONTO (relógio onde bateu), não a do cadastro: são
@@ -287,6 +305,7 @@ function PessoasView({ isDark }: { isDark: boolean }) {
   const [fBase, setFBase] = useState<Set<string>>(new Set())
   const [fAloj, setFAloj] = useState<Set<string>>(new Set())
   const [fObra, setFObra] = useState<Set<string>>(new Set())
+  const [fStatus, setFStatus] = useState<Set<string>>(new Set())
   const [ord, setOrd] = useState<{ k: 'nome' | 'cargo' | 'adm' | 'aloj' | 'base'; dir: 1 | -1 }>({ k: 'nome', dir: 1 })
 
   const opts = useMemo(() => {
@@ -299,6 +318,7 @@ function PessoasView({ isDark }: { isDark: boolean }) {
       base: [...uniq(pessoas.map(p => p.base_ponto)), { value: '—', label: '— sem ponto' }],
       aloj: [...uniq(pessoas.map(p => p.alojamento)), { value: '—', label: '— sem alojamento' }],
       obra: [...uniq(pessoas.map(p => p.obra)), { value: '—', label: '— sem obra' }],
+      status: uniq(pessoas.map(p => statusObra(p).label)),
     }
   }, [pessoas])
 
@@ -311,7 +331,8 @@ function PessoasView({ isDark }: { isDark: boolean }) {
         || (p.cargo ?? '').toLowerCase().includes(busca)
         || (p.matricula ?? '').toLowerCase().includes(busca))
         && casa(fFuncao, p.cargo) && casa(fBase, p.base_ponto)
-        && casa(fAloj, p.alojamento) && casa(fObra, p.obra))
+        && casa(fAloj, p.alojamento) && casa(fObra, p.obra)
+        && casa(fStatus, statusObra(p).label))
       .sort((a, b) => {
         const k = ord.k
         const val = (p: ObrasEquipePessoa) => k === 'nome' ? p.nome
@@ -320,7 +341,7 @@ function PessoasView({ isDark }: { isDark: boolean }) {
         const cmp = String(val(a)).localeCompare(String(val(b)), 'pt-BR')
         return (cmp !== 0 ? cmp : a.nome.localeCompare(b.nome, 'pt-BR')) * ord.dir
       })
-  }, [pessoas, q, fFuncao, fBase, fAloj, fObra, ord])
+  }, [pessoas, q, fFuncao, fBase, fAloj, fObra, fStatus, ord])
 
   const semAloj = lista.filter(p => !p.alojamento).length
   const semPonto = lista.filter(p => !p.ultimo_ponto).length
@@ -357,6 +378,8 @@ function PessoasView({ isDark }: { isDark: boolean }) {
           onToggle={v => togFiltro(v, setFAloj)} onClear={() => setFAloj(new Set())} isDark={isDark} compacto />
         <MultiSelect label="Obra" options={opts.obra} selected={fObra}
           onToggle={v => togFiltro(v, setFObra)} onClear={() => setFObra(new Set())} isDark={isDark} compacto />
+        <MultiSelect label="Status" options={opts.status} selected={fStatus}
+          onToggle={v => togFiltro(v, setFStatus)} onClear={() => setFStatus(new Set())} isDark={isDark} compacto />
         <span className={`text-[11px] font-semibold ml-auto ${sub}`}>
           <b className={txt}>{lista.length}</b> pessoa(s)
           {semAloj > 0 && <> · {semAloj} sem alojamento</>}
@@ -374,6 +397,7 @@ function PessoasView({ isDark }: { isDark: boolean }) {
                 <Th label="Colaborador" k="nome" />
                 <Th label="Função" k="cargo" cls="hidden md:table-cell" />
                 <Th label="Admissão" k="adm" cls="hidden sm:table-cell" />
+                <th className={TH}>Status</th>
                 <Th label="Alojamento" k="aloj" />
                 <Th label="Último Ponto" k="base" />
                 <th className={`${TH} hidden lg:table-cell`}>Alocação</th>
@@ -391,6 +415,10 @@ function PessoasView({ isDark }: { isDark: boolean }) {
                   </td>
                   <td className={`${TD} hidden md:table-cell ${sub}`}>{p.cargo ?? '—'}</td>
                   <td className={`${TD} hidden sm:table-cell ${sub}`}>{fmt(p.data_admissao)}</td>
+                  <td className={TD}>{(() => {
+                    const st = statusObra(p)
+                    return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${st.cls}`}>{st.label}</span>
+                  })()}</td>
                   <td className={TD}>
                     {p.alojamento
                       ? <div className="min-w-0">
