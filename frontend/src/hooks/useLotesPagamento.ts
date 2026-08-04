@@ -327,7 +327,7 @@ export function useEnviarLoteAprovacao() {
       const loteData = new Date().toLocaleDateString('pt-BR')
       const entidadeNumero = `${lote.numero_lote} • ${loteData} • ${lote.valor_total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
 
-      await supabase
+      const { error: aprovacaoErr } = await supabase
         .from('apr_aprovacoes')
         .insert({
           modulo: 'fin',
@@ -341,6 +341,17 @@ export function useEnviarLoteAprovacao() {
           observacao: `Lote de pagamento ${lote.numero_lote} — ${lote.qtd_itens} itens — ${lote.valor_total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
           data_limite: new Date(Date.now() + 72 * 3600_000).toISOString(),
         })
+
+      // Sem esta checagem o lote virava 'enviado_aprovacao' e o AprovAí ficava
+      // vazio: a RLS barrava o INSERT (mig 223) e ninguém ficava sabendo.
+      // Volta o lote pra montagem — melhor reenviar do que dar por enviado.
+      if (aprovacaoErr) {
+        await supabase
+          .from('fin_lotes_pagamento')
+          .update({ status: 'montando', updated_at: new Date().toISOString() })
+          .eq('id', loteId)
+        throw new Error(`O lote não foi enviado: falha ao criar a aprovação (${aprovacaoErr.message})`)
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
