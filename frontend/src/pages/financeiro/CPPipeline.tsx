@@ -6,7 +6,7 @@ import {
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
   ChevronLeft, ChevronRight, ArrowRight,
-  Plus, Save, Loader2, RefreshCw, Landmark,
+  Plus, Save, Loader2, RefreshCw, Landmark, Pencil,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -20,6 +20,7 @@ import {
   useFornecedorByReference,
   useCriarSolicitacaoExtraordinariaCP,
   useCriarPrevisaoPagamentoCP,
+  useEditarPrevisaoPagamentoCP,
   useDocumentosCP,
   useObras,
   useExtratoCandidatos,
@@ -1265,15 +1266,21 @@ function NovaPrevisaoPagamentoModal({
   isDark,
   onClose,
   onSuccess,
+  previsao,
 }: {
   isDark: boolean
   onClose: () => void
   onSuccess: () => void
+  /** Presente = modo edição de um Pagamento Previsto existente */
+  previsao?: ContaPagar
 }) {
   const { perfil } = useAuth()
   const centrosCusto = useLookupCentrosCusto()
   const classesFinanceiras = useLookupClassesFinanceiras()
   const criarPrevisaoMut = useCriarPrevisaoPagamentoCP()
+  const editarPrevisaoMut = useEditarPrevisaoPagamentoCP()
+  const editMode = Boolean(previsao)
+  const mut = editMode ? editarPrevisaoMut : criarPrevisaoMut
   const [form, setForm] = useState<NovaPrevisaoPagamentoForm>(EMPTY_PREVISAO_FORM)
   const [erro, setErro] = useState('')
   const [ccBusca, setCcBusca] = useState('')
@@ -1289,6 +1296,27 @@ function NovaPrevisaoPagamentoModal({
   const [showFornecedorCadastro, setShowFornecedorCadastro] = useState(false)
   // Previsão gravada mas anexo falhou — bloqueia novo submit p/ não duplicar
   const [previsaoJaCriada, setPrevisaoJaCriada] = useState(false)
+
+  // Modo edição: hidrata o formulário com o título existente
+  useEffect(() => {
+    if (!previsao) return
+    setForm({
+      ...EMPTY_PREVISAO_FORM,
+      nome: previsao.descricao ?? '',
+      fornecedor_id: previsao.fornecedor_id ?? '',
+      fornecedor_nome: previsao.fornecedor_nome ?? '',
+      valor: String(previsao.valor_original ?? ''),
+      centro_custo: previsao.centro_custo ?? '',
+      classe_financeira: previsao.classe_financeira ?? '',
+      dataVencimento: previsao.data_vencimento ?? '',
+      desconto: previsao.valor_desconto ? String(previsao.valor_desconto) : '',
+      temImposto: Number((previsao as any).imposto_valor ?? 0) > 0,
+      impostoTipo: (previsao as any).imposto_tipo ?? '',
+      impostoAliquota: (previsao as any).imposto_aliquota ? String((previsao as any).imposto_aliquota) : '',
+      impostoValor: (previsao as any).imposto_valor ? String((previsao as any).imposto_valor) : '',
+      impostoDeduzir: Boolean((previsao as any).imposto_deduzir),
+    })
+  }, [previsao])
 
   // Fornecedor sai do cadastro (busca por nome ou CNPJ) — nada de digitar
   // nome livre, que gerava CP sem vínculo com o catálogo.
@@ -1357,38 +1385,55 @@ function NovaPrevisaoPagamentoModal({
       return
     }
     setErro('')
+    const imposto = form.temImposto
+      ? {
+          tipo: form.impostoTipo,
+          aliquota: Number(form.impostoAliquota || 0) || 0,
+          valor: impostoValorNum,
+          deduzir: form.impostoDeduzir,
+        }
+      : undefined
     try {
-      await criarPrevisaoMut.mutateAsync({
-        nome: form.nome,
-        fornecedorId: form.fornecedor_id,
-        fornecedorNome: form.fornecedor_nome,
-        valor: Number(form.valor),
-        centro_custo: form.centro_custo,
-        classe_financeira: form.classe_financeira,
-        recorrente: form.recorrente,
-        periodicidade: form.recorrente ? form.periodicidade : undefined,
-        recorrenciaFim: form.recorrente ? form.recorrenciaFim : undefined,
-        dataVencimento: form.dataVencimento,
-        solicitanteNome: perfil?.nome,
-        desconto: Number(form.desconto || 0) || 0,
-        imposto: form.temImposto
-          ? {
-              tipo: form.impostoTipo,
-              aliquota: Number(form.impostoAliquota || 0) || 0,
-              valor: impostoValorNum,
-              deduzir: form.impostoDeduzir,
-            }
-          : undefined,
-        arquivos,
-      })
+      if (editMode && previsao) {
+        await editarPrevisaoMut.mutateAsync({
+          cpId: previsao.id,
+          nome: form.nome,
+          fornecedorId: form.fornecedor_id,
+          fornecedorNome: form.fornecedor_nome,
+          valor: Number(form.valor),
+          centro_custo: form.centro_custo,
+          classe_financeira: form.classe_financeira,
+          dataVencimento: form.dataVencimento,
+          desconto: Number(form.desconto || 0) || 0,
+          imposto,
+          arquivos,
+        })
+      } else {
+        await criarPrevisaoMut.mutateAsync({
+          nome: form.nome,
+          fornecedorId: form.fornecedor_id,
+          fornecedorNome: form.fornecedor_nome,
+          valor: Number(form.valor),
+          centro_custo: form.centro_custo,
+          classe_financeira: form.classe_financeira,
+          recorrente: form.recorrente,
+          periodicidade: form.recorrente ? form.periodicidade : undefined,
+          recorrenciaFim: form.recorrente ? form.recorrenciaFim : undefined,
+          dataVencimento: form.dataVencimento,
+          solicitanteNome: perfil?.nome,
+          desconto: Number(form.desconto || 0) || 0,
+          imposto,
+          arquivos,
+        })
+      }
       onSuccess()
       onClose()
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Erro ao criar previsão de pagamento'
+      const msg = error instanceof Error ? error.message : 'Erro ao salvar previsão de pagamento'
       setErro(msg)
-      // Falha só nos anexos: a previsão JÁ existe. Sem travar o botão, um novo
+      // Falha só nos anexos: o título JÁ foi gravado. Sem travar o botão, um novo
       // clique criaria uma segunda previsão do mesmo título.
-      if (msg.startsWith('Previsão criada')) {
+      if (msg.startsWith('Previsão criada') || msg.startsWith('Alterações salvas')) {
         setPrevisaoJaCriada(true)
         onSuccess()
       }
@@ -1400,8 +1445,14 @@ function NovaPrevisaoPagamentoModal({
       <div className={`rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
         <div className={`flex items-center justify-between px-6 py-4 sticky top-0 z-10 ${isDark ? 'border-b border-white/[0.06] bg-[#1e293b]' : 'border-b border-slate-100 bg-white'}`}>
           <div>
-            <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Nova Previsão de Pagamento</h2>
-            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>A previsão será criada em Previstos para acompanhamento financeiro</p>
+            <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              {editMode ? 'Editar Pagamento Previsto' : 'Nova Previsão de Pagamento'}
+            </h2>
+            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              {editMode
+                ? 'Edição permitida enquanto o título estiver em Previstos'
+                : 'A previsão será criada em Previstos para acompanhamento financeiro'}
+            </p>
           </div>
           <button onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
             <X size={16} />
@@ -1411,7 +1462,11 @@ function NovaPrevisaoPagamentoModal({
         <div className="p-6 space-y-4">
           <div className={`rounded-xl border px-4 py-3 ${isDark ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-emerald-200 bg-emerald-50'}`}>
             <p className={`text-xs font-bold ${isDark ? 'text-emerald-200' : 'text-emerald-700'}`}>Planejamento</p>
-            <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Use esta tela para antecipar despesas esperadas e montar o pipeline financeiro com antecedência.</p>
+            <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+              {editMode
+                ? 'Anexos já enviados continuam no título; os que você adicionar aqui entram junto.'
+                : 'Use esta tela para antecipar despesas esperadas e montar o pipeline financeiro com antecedência.'}
+            </p>
           </div>
 
           {/* Beneficiário: quem recebe (fornecedor PJ ou PF do cadastro) */}
@@ -1749,12 +1804,12 @@ function NovaPrevisaoPagamentoModal({
             {!previsaoJaCriada && (
               <button
                 type="button"
-                disabled={!canSubmit || criarPrevisaoMut.isPending}
+                disabled={!canSubmit || mut.isPending}
                 onClick={handleCriar}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold transition-all hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {criarPrevisaoMut.isPending ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-                Criar previsão
+                {mut.isPending ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                {editMode ? 'Salvar alterações' : 'Criar previsão'}
               </button>
             )}
           </div>
@@ -2812,6 +2867,11 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
             </button>
+            {cp.status === 'previsto' && cp.natureza === 'previsao_pagamento' && perfil?.edita_previsao_fin && (
+              <button onClick={() => onAction('editarPrevisao', cp)} className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all flex items-center justify-center gap-2 ${isDark ? 'border-amber-500/40 text-amber-300 hover:bg-amber-500/10' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}`}>
+                <Pencil size={15} /> Editar
+              </button>
+            )}
             {cp.status === 'previsto' && (
               <button onClick={() => onAction('confirmar', cp)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
                 <CheckCircle2 size={15} /> Confirmar
@@ -3447,6 +3507,8 @@ export default function CPPipeline() {
   const [activeTab, setActiveTab] = useState<PipelineStageId>('previsto')
   const [busca, setBusca] = useState('')
   const [detailCP, setDetailCP] = useState<ContaPagar | null>(null)
+  // Pagamento previsto aberto p/ edição (só quem tem sys_perfis.edita_previsao_fin)
+  const [previsaoEmEdicao, setPrevisaoEmEdicao] = useState<ContaPagar | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [sortField, setSortField] = useState<SortField>('vencimento')
@@ -3993,6 +4055,7 @@ export default function CPPipeline() {
       case 'pagar': handlePagar([cp.id]); break
       case 'sincronizar': handleSincronizarOmie([cp.id]); break
       case 'conciliar': handleConciliar([cp.id]); break
+      case 'editarPrevisao': setPrevisaoEmEdicao(cp); break
     }
   }
 
@@ -4653,6 +4716,15 @@ export default function CPPipeline() {
           )}
         </div>
       </div>
+
+      {previsaoEmEdicao && (
+        <NovaPrevisaoPagamentoModal
+          isDark={isDark}
+          previsao={previsaoEmEdicao}
+          onClose={() => setPrevisaoEmEdicao(null)}
+          onSuccess={() => showToast('success', 'Pagamento previsto atualizado')}
+        />
+      )}
 
       {showNovaSolicitacao && (
         novaSolicitacaoKind === 'previsao' ? (

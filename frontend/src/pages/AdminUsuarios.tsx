@@ -739,6 +739,7 @@ function UserDetailPanel({
   const [comprador, setComprador] = useState<boolean>(user.comprador ?? false)
   const [salaTecnica, setSalaTecnica] = useState<boolean>((user as any).sala_tecnica ?? false)
   const [aprovaCancelamentoFin, setAprovaCancelamentoFin] = useState<boolean>(user.aprova_cancelamento_fin ?? false)
+  const [editaPrevisaoFin, setEditaPrevisaoFin] = useState<boolean>((user as any).edita_previsao_fin ?? false)
   const [podeCancelarPedidoFlag, setPodeCancelarPedidoFlag] = useState<boolean>(user.pode_cancelar_pedido ?? false)
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
   const [ativo,   setAtivo]   = useState(user.ativo)
@@ -777,7 +778,7 @@ function UserDetailPanel({
   const aplicarCopia = async (origem: { id: string; nome: string }) => {
     const { data: o } = await supabase
       .from('sys_perfis')
-      .select('role, papel_global, permissoes_especiais, modulos, alcada_nivel, pode_receber, almoxarife, comprador, sala_tecnica, aprova_cancelamento_fin, pode_cancelar_pedido')
+      .select('role, papel_global, permissoes_especiais, modulos, alcada_nivel, pode_receber, almoxarife, comprador, sala_tecnica, aprova_cancelamento_fin, edita_previsao_fin, pode_cancelar_pedido')
       .eq('id', origem.id)
       .maybeSingle()
     if (!o) return
@@ -791,6 +792,7 @@ function UserDetailPanel({
     setComprador((o as any).comprador ?? false)
     setSalaTecnica((o as any).sala_tecnica ?? false)
     setAprovaCancelamentoFin((o as any).aprova_cancelamento_fin ?? false)
+    setEditaPrevisaoFin((o as any).edita_previsao_fin ?? false)
     setPodeCancelarPedidoFlag((o as any).pode_cancelar_pedido ?? false)
     setCopiadoDe(origem.nome)
     setShowCopiar(false)
@@ -838,6 +840,7 @@ function UserDetailPanel({
       comprador,
       sala_tecnica: salaTecnica,
       aprova_cancelamento_fin: aprovaCancelamentoFin,
+      edita_previsao_fin: editaPrevisaoFin,
       pode_cancelar_pedido: podeCancelarPedidoFlag,
       modulos,
       permissoes_especiais: applyModuloPapeisOnPermissoes(permEspeciais, moduloPapeis),
@@ -854,6 +857,7 @@ function UserDetailPanel({
     setComprador(user.comprador ?? false)
     setSalaTecnica((user as any).sala_tecnica ?? false)
     setAprovaCancelamentoFin(user.aprova_cancelamento_fin ?? false)
+    setEditaPrevisaoFin((user as any).edita_previsao_fin ?? false)
     setPodeCancelarPedidoFlag(user.pode_cancelar_pedido ?? false)
     setAlcada(user.alcada_nivel)
     setAtivo(user.ativo)
@@ -1119,6 +1123,19 @@ function UserDetailPanel({
               />
               <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 Aprova cancelamento financeiro — pode aprovar/recusar cancelamento de Contas a Pagar/Receber
+              </span>
+            </label>
+
+            {/* Edita Pagamento Previsto (equipe do Financeiro) */}
+            <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none p-2 rounded-lg ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-slate-50 hover:bg-slate-100'}`}>
+              <input
+                type="checkbox"
+                checked={editaPrevisaoFin}
+                onChange={e => setEditaPrevisaoFin(e.target.checked)}
+                className="accent-primary"
+              />
+              <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                Edita Pagamento Previsto — altera valor, vencimento, natureza e anexos enquanto está em Previstos
               </span>
             </label>
 

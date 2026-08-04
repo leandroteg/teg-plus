@@ -164,6 +164,8 @@ export interface Perfil {
   sala_tecnica: boolean
   /** Pode aprovar/recusar solicitações de cancelamento de documentos financeiros (CP/CR). */
   aprova_cancelamento_fin: boolean
+  /** Pode editar Pagamentos Previstos (CP previsao_pagamento ainda em 'previsto'). */
+  edita_previsao_fin: boolean
   /** Pode cancelar pedido de compra (supervisor de Compras) — cancela o pedido e cascateia os CP. */
   pode_cancelar_pedido: boolean
   ultimo_acesso: string | null

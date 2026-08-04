@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { useContasPagar, useMarcarCPPago, useAprovarPagamento, useFornecedorByReference } from '../../hooks/useFinanceiro'
+import { useContasPagar, useMarcarCPPago, useAprovarPagamento, useFornecedorByReference, useDocumentosCP } from '../../hooks/useFinanceiro'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import { useRegistrarPagamento } from '../../hooks/usePedidos'
@@ -80,6 +80,53 @@ function AnexoIcon({ mime }: { mime: string | null }) {
   if (mime.startsWith('image/')) return <FileText size={13} className="text-blue-500" />
   if (mime.includes('sheet') || mime.includes('excel')) return <FileText size={13} className="text-green-600" />
   return <Paperclip size={13} className="text-slate-400" />
+}
+
+/**
+ * Documentos da própria CP (fin_documentos): é onde vivem os anexos de
+ * Previsão de Pagamento, Pagamento Extraordinário e afins — títulos que não
+ * têm pedido de compra e por isso não aparecem em AnexosList.
+ */
+function DocumentosCPList({ cpId }: { cpId: string }) {
+  const { data: docs = [], isLoading } = useDocumentosCP(cpId)
+
+  if (isLoading) return (
+    <div className="flex justify-center py-3">
+      <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+  if (docs.length === 0) return null
+
+  return (
+    <div className="space-y-1.5">
+      {docs.map(d => (
+        <a
+          key={d.id}
+          href={d.arquivo_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-white border-slate-200 hover:border-slate-300 transition-all hover:shadow-sm group"
+        >
+          <AnexoIcon mime={d.arquivo_url.toLowerCase().endsWith('.pdf') ? 'application/pdf' : null} />
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-semibold truncate text-slate-700">{d.nome_arquivo}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[9px] font-semibold rounded-full px-1.5 py-0.5 bg-slate-100 text-slate-500">
+                {d.tipo === 'nota_fiscal' ? 'Nota Fiscal' : d.tipo === 'boleto' ? 'Boleto' : 'Documento'}
+              </span>
+              <span className="text-[9px] rounded-full px-1.5 py-0.5 font-semibold bg-purple-100 text-purple-600">
+                Financeiro
+              </span>
+              <span className="text-[9px] text-slate-400">
+                {new Date(d.uploaded_at).toLocaleDateString('pt-BR')}
+              </span>
+            </div>
+          </div>
+          <ExternalLink size={11} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
+        </a>
+      ))}
+    </div>
+  )
 }
 
 function AnexosList({ pedidoId }: { pedidoId: string }) {
@@ -931,38 +978,36 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
             />
           )}
 
-          {/* Anexos */}
-          {cp.pedido_id && (
-            <>
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
-                  <Paperclip size={11} />
-                  Anexos
-                </p>
-                {canApprove && (
-                  <button
-                    onClick={() => onAprovarPgto(cp)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500 text-white
-                      text-[10px] font-bold hover:bg-orange-600 transition-all"
-                  >
-                    <ShieldCheck size={10} />
-                    Autorizar Pgto
-                  </button>
-                )}
-                {canPay && !isPago && (
-                  <button
-                    onClick={() => onRegistrarPgto(cp)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white
-                      text-[10px] font-bold hover:bg-emerald-700 transition-all"
-                  >
-                    <Banknote size={10} />
-                    Registrar Pagamento
-                  </button>
-                )}
-              </div>
-              <AnexosList pedidoId={cp.pedido_id} />
-            </>
-          )}
+          {/* Anexos — o cabeçalho e as ações NÃO dependem de pedido: título sem
+              pedido (previsão, extraordinário, medição) também precisa deles. */}
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+              <Paperclip size={11} />
+              Anexos
+            </p>
+            {canApprove && (
+              <button
+                onClick={() => onAprovarPgto(cp)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500 text-white
+                  text-[10px] font-bold hover:bg-orange-600 transition-all"
+              >
+                <ShieldCheck size={10} />
+                Autorizar Pgto
+              </button>
+            )}
+            {canPay && !isPago && (
+              <button
+                onClick={() => onRegistrarPgto(cp)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white
+                  text-[10px] font-bold hover:bg-emerald-700 transition-all"
+              >
+                <Banknote size={10} />
+                Registrar Pagamento
+              </button>
+            )}
+          </div>
+          {cp.pedido_id && <AnexosList pedidoId={cp.pedido_id} />}
+          <DocumentosCPList cpId={cp.id} />
 
           {/* Documento da medição (contas geradas por con_faturar_medicao não têm pedido) */}
           {cp.medicao_id && <MedicaoDocLink medicaoId={cp.medicao_id} />}

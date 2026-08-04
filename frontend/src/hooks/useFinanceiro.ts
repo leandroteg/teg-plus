@@ -550,6 +550,104 @@ export function useCriarPrevisaoPagamentoCP() {
   })
 }
 
+// ── Editar Previsão de Pagamento ────────────────────────────────────────────
+// Só enquanto o título ainda é uma previsão (status 'previsto'): a partir de
+// Confirmados ele entra na esteira de lote/aprovação e o caminho passa a ser o
+// cancelamento com aprovação (mig 194). Permissão: sys_perfis.edita_previsao_fin.
+
+export function useEditarPrevisaoPagamentoCP() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      cpId, nome, valor, centro_custo, classe_financeira, dataVencimento,
+      desconto, imposto, arquivos, fornecedorId, fornecedorNome,
+    }: {
+      cpId: string
+      nome: string
+      fornecedorId?: string
+      fornecedorNome?: string
+      valor: number
+      centro_custo: string
+      classe_financeira: string
+      dataVencimento: string
+      desconto?: number
+      imposto?: { tipo: string; aliquota: number; valor: number; deduzir: boolean }
+      arquivos?: Array<{ file: File; tipo: 'nota_fiscal' | 'boleto' | 'outro' }>
+    }) => {
+      const { data: atual, error: readErr } = await supabase
+        .from('fin_contas_pagar')
+        .select('id, status')
+        .eq('id', cpId)
+        .single()
+      if (readErr) throw new Error(getSupabaseErrorMessage(readErr, 'Erro ao carregar a previsão'))
+      if (atual.status !== 'previsto') {
+        throw new Error('Esta previsão já saiu de Previstos e não pode mais ser editada. Use o cancelamento com aprovação.')
+      }
+
+      const { error } = await supabase
+        .from('fin_contas_pagar')
+        .update({
+          fornecedor_id: fornecedorId || null,
+          fornecedor_nome: (fornecedorNome || nome).trim(),
+          valor_original: valor,
+          data_vencimento: dataVencimento,
+          centro_custo,
+          classe_financeira,
+          descricao: nome.trim(),
+          valor_desconto: desconto ?? 0,
+          imposto_tipo: imposto && imposto.valor > 0 ? imposto.tipo : null,
+          imposto_aliquota: imposto && imposto.valor > 0 ? (imposto.aliquota || null) : null,
+          imposto_valor: imposto && imposto.valor > 0 ? imposto.valor : null,
+          imposto_deduzir: imposto && imposto.valor > 0 ? imposto.deduzir : false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', cpId)
+        .eq('status', 'previsto')
+      if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao salvar a previsão'))
+
+      // Anexos novos são acrescentados (os já existentes continuam)
+      const falhas: string[] = []
+      for (const item of arquivos ?? []) {
+        const arquivo = item.file
+        const ext = arquivo.name.split('.').pop()?.toLowerCase() || 'bin'
+        const path = `cp/${cpId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        const up = await supabase.storage.from('financeiro-docs').upload(path, arquivo, {
+          contentType: arquivo.type || undefined,
+        })
+        if (up.error) {
+          falhas.push(`${arquivo.name}: ${getSupabaseErrorMessage(up.error, 'falha no upload')}`)
+          continue
+        }
+        const { data: urlData } = supabase.storage.from('financeiro-docs').getPublicUrl(path)
+        let nomeExibicao = arquivo.name
+        try {
+          nomeExibicao = await gerarNomeAmigavelAnexo(arquivo, item.tipo, nome.trim())
+        } catch { /* mantém o nome original */ }
+        const { error: docErr } = await supabase.from('fin_documentos').insert({
+          entity_type: 'cp',
+          entity_id: cpId,
+          tipo: item.tipo,
+          nome_arquivo: nomeExibicao,
+          arquivo_url: urlData.publicUrl,
+          mime_type: arquivo.type || null,
+          tamanho_bytes: arquivo.size || null,
+        })
+        if (docErr) falhas.push(`${arquivo.name}: ${docErr.message}`)
+      }
+      if (falhas.length > 0) {
+        throw new Error(`Alterações salvas, mas houve falha nos anexos: ${falhas.join(' | ')}`)
+      }
+
+      return { id: cpId }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['fin-documentos'] })
+    },
+  })
+}
+
 export function useAprovarPagamento() {
   const qc = useQueryClient()
   return useMutation({
