@@ -5,7 +5,7 @@
 import { randomUUID } from 'node:crypto'
 import { supabase } from './supabase.js'
 import { config } from './config.js'
-import { err } from './log.js'
+import { log, err } from './log.js'
 
 const ABERTOS = ['aberto', 'em_atendimento', 'aguardando_usuario']
 
@@ -211,6 +211,7 @@ export async function getStatusChanges(sinceISO) {
     if (agora - ultima < config.statusSettleMs) { corte = i; break }
   }
   const maduras = rows.slice(0, corte)
+  if (corte < rows.length) log(`status: ${rows.length - corte} mudança(s) ainda esfriando (${config.statusSettleMs / 1000}s)`)
 
   // Agrupa por chamado: o solicitante recebe UMA mensagem, com o status final.
   // Ida-e-volta (termina onde começou) não notifica nada.

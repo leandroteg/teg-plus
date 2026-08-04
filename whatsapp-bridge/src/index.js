@@ -9,6 +9,10 @@ import * as evo from './evolution.js'
 import { handleMessagesUpsert } from './inbound.js'
 import { aiEnabled, aiRouter } from './ai.js'
 
+// Versão do código: vai para o log de boot E para ti_whatsapp.worker_versao,
+// então dá para conferir por SQL se um deploy aplicou mesmo o código novo.
+const BUILD = '1.1.0-status-notify'
+
 // Estado local espelhado em ti_whatsapp (o painel do TEG+ lê de lá).
 let local = { status: 'disconnected', numero: null }
 function setLocal(patch) { local = { ...local, ...patch } }
@@ -75,7 +79,7 @@ const app = express()
 // então o payload é sempre pequeno. Margem p/ metadados grandes sem aceitar gigantes.
 app.use(express.json({ limit: '10mb' }))
 
-app.get('/health', (_req, res) => res.json({ ok: true, ...local }))
+app.get('/health', (_req, res) => res.json({ ok: true, versao: BUILD, ...local }))
 
 app.post(['/webhook', '/webhook/:ev'], async (req, res) => {
   if (config.webhookToken) {
@@ -206,11 +210,13 @@ async function loopLimpeza() {
 
 // ─── Boot ────────────────────────────────────────────────────────────────────
 async function main() {
-  log('TEG+ WhatsApp bridge iniciando…')
+  log(`TEG+ WhatsApp bridge ${BUILD} iniciando…`)
   log('Supabase:', config.supabaseUrl, '| Evolution:', config.evolutionUrl, '| instância:', config.evolutionInstance)
   log('agente IA (n8n):', aiEnabled() ? `LIGADO → ${config.n8nWebhookUrl}` : 'desligado (fluxo clássico)')
+  log(`aviso de mudança de status: LIGADO (agrupa após ${config.statusSettleMs / 1000}s de silêncio)`)
   try { log('conta externa:', await db.getExternoPerfilId()) } catch (e) { err(e.message) }
 
+  await db.syncStatus({ worker_versao: BUILD }) // carimba a versão p/ conferência por SQL
   await reconcile()
 
   app.listen(config.port, () => log(`webhook ouvindo na porta ${config.port} (POST /webhook)`))
