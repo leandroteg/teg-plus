@@ -6,7 +6,7 @@ import {
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
   ChevronLeft, ChevronRight, ArrowRight,
-  Plus, Save, Loader2, RefreshCw, Landmark, Pencil, Undo2,
+  Plus, Save, Loader2, RefreshCw, Landmark, Pencil, Undo2, AlertCircle,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -828,14 +828,21 @@ function NovaSolicitacaoExtraordinariaModal({
   const [fornecedorSelecionado, setFornecedorSelecionado] = useState<Fornecedor | null>(null)
   const [showFornecedorCadastro, setShowFornecedorCadastro] = useState(false)
 
-  const canSubmit = form.descricao.trim().length > 0
-    && form.justificativa.trim().length > 0
-    && form.centro_custo.length > 0
-    && form.classe_financeira.length > 0
-    && Number(form.valor) > 0
-    && form.data_vencimento.length > 0
-    && form.fornecedor_id.length > 0
-    && form.empresa_id.length > 0
+  // Mesma ideia da previsão: dizer o que falta, não só desabilitar o botão
+  const pendencias = useMemo(() => {
+    const faltando: string[] = []
+    if (!form.descricao.trim()) faltando.push('Descrição')
+    if (!form.justificativa.trim()) faltando.push('Justificativa')
+    if (!form.fornecedor_id) faltando.push('Favorecido')
+    if (!(Number(form.valor) > 0)) faltando.push('Valor')
+    if (!form.data_vencimento) faltando.push('Vencimento')
+    if (!form.centro_custo) faltando.push('Centro de Custo')
+    if (!form.classe_financeira) faltando.push('Natureza Orçamentária Financeira')
+    if (!form.empresa_id) faltando.push('Filial pagadora')
+    return faltando
+  }, [form])
+
+  const canSubmit = pendencias.length === 0
 
   const empresas = useLookupEmpresas()
   // Valor a pagar = valor − desconto + juros/multa (mesma fórmula da baixa)
@@ -1330,7 +1337,13 @@ function NovaSolicitacaoExtraordinariaModal({
           )}
         </div>
 
-        <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+        <div className={`px-6 py-4 flex flex-wrap items-center justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+          {pendencias.length > 0 && (
+            <div className={`mr-auto flex items-start gap-2 rounded-xl border px-3 py-2 text-xs ${isDark ? 'border-amber-500/25 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+              <AlertCircle size={14} className="mt-px shrink-0" />
+              <span>Falta preencher: <strong>{pendencias.join(', ')}</strong></span>
+            </div>
+          )}
           <button onClick={onClose} className={`px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
             Cancelar
           </button>
@@ -1497,14 +1510,23 @@ function NovaPrevisaoPagamentoModal({
   const centroSelecionado = centrosCusto.find(cc => getLookupValue(cc.codigo, cc.descricao) === form.centro_custo)
   const classeSelecionada = classesFinanceiras.find(classe => getLookupValue(classe.codigo, classe.descricao) === form.classe_financeira)
 
-  const canSubmit = form.nome.trim().length > 0
-    && form.fornecedor_id.length > 0
-    && form.centro_custo.length > 0
-    && form.classe_financeira.length > 0
-    && Number(form.valor) > 0
-    && form.dataVencimento.length > 0
-    && form.empresa_id.length > 0
-    && (!form.recorrente || form.recorrenciaFim.length > 0)
+  // Lista o que falta em vez de só apagar o botão: o obrigatório está espalhado
+  // pelo formulário (Filial pagadora fica lá embaixo) e quem preenche o topo
+  // não entendia por que "Criar previsão" continuava desabilitado.
+  const pendencias = useMemo(() => {
+    const faltando: string[] = []
+    if (!form.nome.trim()) faltando.push('Descrição')
+    if (!form.fornecedor_id) faltando.push('Beneficiário')
+    if (!(Number(form.valor) > 0)) faltando.push('Valor')
+    if (!form.dataVencimento) faltando.push(editMode ? 'Vencimento' : 'Primeiro vencimento')
+    if (!form.centro_custo) faltando.push('Centro de Custo')
+    if (!form.classe_financeira) faltando.push('Natureza Orçamentária Financeira')
+    if (!form.empresa_id) faltando.push('Filial pagadora')
+    if (form.recorrente && !form.recorrenciaFim) faltando.push('Até quando termina')
+    return faltando
+  }, [form, editMode])
+
+  const canSubmit = pendencias.length === 0
 
   async function handleCriar() {
     if (!canSubmit) return
@@ -2025,6 +2047,15 @@ function NovaPrevisaoPagamentoModal({
           {erro && (
             <div className={`rounded-xl border px-4 py-3 text-sm ${isDark ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-red-200 bg-red-50 text-red-700'}`}>
               {erro}
+            </div>
+          )}
+
+          {!previsaoJaCriada && pendencias.length > 0 && (
+            <div className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs ${isDark ? 'border-amber-500/25 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+              <AlertCircle size={14} className="mt-px shrink-0" />
+              <span>
+                Falta preencher: <strong>{pendencias.join(', ')}</strong>
+              </span>
             </div>
           )}
 
