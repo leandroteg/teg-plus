@@ -104,6 +104,7 @@ export default function DPPainel() {
       diasBatidos: b.dias_batidos || 0,
       exMin: intervalToMin(b.extras_validos),
       hhMin: intervalToMin(b.hh_trabalhada),
+      m50: intervalToMin(b.ex50), m70: intervalToMin(b.ex70), m100: intervalToMin(b.ex100),
     }))
     const abertoPorBase = rows
       .map(b => ({ nome: b.nome, abs: b.emAberto, pct: b.diasBatidos > 0 ? (b.emAberto / b.diasBatidos) * 100 : 0 }))
@@ -111,14 +112,15 @@ export default function DPPainel() {
     // horas extras a pagar: exclui banco de horas
     const extraPorBase = rows
       .filter(b => !ehBanco(b.nome))
-      .map(b => ({ nome: b.nome, absMin: b.exMin, pct: b.hhMin > 0 ? (b.exMin / b.hhMin) * 100 : 0 }))
-      .filter(b => b.absMin > 0).sort((a, b) => b.pct - a.pct)
+      .map(b => ({ nome: b.nome, absMin: b.exMin, m50: b.m50, m70: b.m70, m100: b.m100,
+        pct: b.hhMin > 0 ? (b.exMin / b.hhMin) * 100 : 0 }))
+      .filter(b => b.absMin > 0).sort((a, b) => b.absMin - a.absMin)
     return { abertoPorBase, extraPorBase }
   }, [porBase])
 
   const maxCC = Math.max(...agg.porCC.map(c => c.min), 1)
   const maxAbertoPct = Math.max(...porBaseView.abertoPorBase.map(b => b.pct), 1)
-  const maxExtraPct = Math.max(...porBaseView.extraPorBase.map(b => b.pct), 1)
+  const maxExtraMin = Math.max(...porBaseView.extraPorBase.map(b => b.absMin), 1)
   const pctExtra = agg.hhPagavel > 0 ? Math.round((agg.exMin / agg.hhPagavel) * 100) : null
   const pctAtivos = headcount > 0 ? Math.round((pico / headcount) * 100) : 0
 
@@ -276,9 +278,16 @@ export default function DPPainel() {
               <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                 <Timer size={14} className="text-orange-500" /> Horas Extras por Base
               </h2>
-              <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>a pagar · base do relógio onde bateu · exclui dia em aberto e banco de horas</p>
+              <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>a pagar · base do relógio onde bateu · ordenado por volume · exclui dia em aberto e banco de horas</p>
             </div>
-            <button onClick={() => nav('/rh/dp/ponto')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold shrink-0">Ponto <ChevronRight size={11} /></button>
+            <div className="flex items-center gap-2 shrink-0">
+              {([['50%', 'bg-amber-300'], ['70%', 'bg-orange-500'], ['100%', 'bg-rose-600']] as const).map(([l, cor]) => (
+                <span key={l} className={`inline-flex items-center gap-1 text-[9px] font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <i className={`w-2 h-2 rounded-sm ${cor}`} />{l}
+                </span>
+              ))}
+              <button onClick={() => nav('/rh/dp/ponto')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold">Ponto <ChevronRight size={11} /></button>
+            </div>
           </div>
           {porBaseView.extraPorBase.length === 0 ? (
             <div className="py-10 text-center">
@@ -292,10 +301,20 @@ export default function DPPainel() {
                   <span title={b.nome}
                     className={`w-[104px] sm:w-[170px] shrink-0 text-[11px] font-semibold leading-tight ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{b.nome}</span>
                   <div className={`flex-1 h-5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-                    <div className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-600 transition-all duration-500" style={{ width: `${Math.max((b.pct / maxExtraPct) * 100, 4)}%` }} />
+                    {/* comprimento = horas totais; dentro dele, a divisão por alíquota */}
+                    <div className="h-full flex rounded-full overflow-hidden transition-all duration-500"
+                      style={{ width: `${Math.max((b.absMin / maxExtraMin) * 100, 4)}%` }}>
+                      {([['m50', 'bg-amber-300'], ['m70', 'bg-orange-500'], ['m100', 'bg-rose-600']] as const).map(([k, cor]) => {
+                        const parte = b[k]
+                        if (parte <= 0) return null
+                        return <div key={k} className={cor} title={`${k.slice(1)}%: ${hAbbr(parte)}`}
+                          style={{ width: `${(parte / b.absMin) * 100}%` }} />
+                      })}
+                    </div>
                   </div>
                   <span className={`w-[46px] text-right text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{hAbbr(b.absMin)}</span>
-                  <span className="w-[46px] text-right text-[11px] font-extrabold text-orange-500">{fmtPct(b.pct)}</span>
+                  <span className="w-[46px] text-right text-[11px] font-extrabold text-orange-500"
+                    title="hora extra sobre a HH trabalhada da base">{fmtPct(b.pct)}</span>
                 </li>
               ))}
             </ul>

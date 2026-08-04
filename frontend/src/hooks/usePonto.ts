@@ -536,6 +536,10 @@ export interface PontoBaseAgg {
   dias_em_aberto: number
   hh_trabalhada: string | null
   extras_validos: string | null
+  /** a hora extra separada por alíquota — 100% (domingo/feriado) é a que custa o dobro */
+  ex50: string | null
+  ex70: string | null
+  ex100: string | null
 }
 
 export function usePontoPorBaseIntervalo(ini: string, fim: string) {
