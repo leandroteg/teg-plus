@@ -11,6 +11,8 @@ type NovaSolicitacaoAdiantamentoPayload = {
   favorecido_email?: string
   /** Chave PIX do favorecido — vai para a CP gerada na aprovação. */
   chave_pix?: string
+  /** Banco do favorecido — sai no termo de repasse junto com a chave PIX. */
+  banco?: string
   /** Comprovantes/orçamentos anexados à solicitação. */
   arquivos?: File[]
   data_limite_prestacao?: string
@@ -134,6 +136,7 @@ export function useCriarSolicitacaoAdiantamento() {
           favorecido_nome: payload.favorecido_nome.trim(),
           favorecido_email: payload.favorecido_email?.trim() || null,
           chave_pix: payload.chave_pix?.trim() || null,
+          banco: payload.banco?.trim() || null,
           centro_custo: payload.centro_custo || null,
           centro_custo_id: payload.centro_custo_id || null,
           classe_financeira: payload.classe_financeira || null,

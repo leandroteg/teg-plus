@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send, AlertCircle, ChevronRight, Save, Loader2, Paperclip, FileText, KeyRound } from 'lucide-react'
+import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send, AlertCircle, ChevronRight, Save, Loader2, Paperclip, FileText, KeyRound, Printer } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCadCentrosCusto, useCadClasses, useCadFornecedores } from '../../hooks/useCadastros'
@@ -11,6 +11,7 @@ import { UpperTextarea } from '../../components/UpperInput'
 import SearchableSelect from '../../components/SearchableSelect'
 import type { SelectOption } from '../../components/SearchableSelect'
 import type { StatusDespesaAdiantamento } from '../../types'
+import { imprimirTermoAdiantamento } from '../../utils/termoAdiantamento'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -51,6 +52,7 @@ const EMPTY_FORM = {
   favorecido_nome: '',
   favorecido_email: '',
   chave_pix: '',
+  banco: '',
   finalidade: '',
   justificativa: '',
   valor_solicitado: 0,
@@ -222,10 +224,11 @@ export default function DespesasAdiantamentos() {
 
     setErro('')
     try {
-      await criar.mutateAsync({
+      const criado = await criar.mutateAsync({
         favorecido_nome: form.favorecido_nome,
         favorecido_email: form.favorecido_email || undefined,
         chave_pix: form.chave_pix || undefined,
+        banco: form.banco || undefined,
         arquivos,
         finalidade: form.finalidade,
         justificativa: form.justificativa,
@@ -237,6 +240,24 @@ export default function DespesasAdiantamentos() {
         observacoes: form.observacoes,
       })
       setShowModal(false)
+
+      // Termo de repasse abre na hora para assinatura (substitui o do Totvs RM)
+      imprimirTermoAdiantamento({
+        numero: criado?.numero ?? '',
+        favorecido_nome: form.favorecido_nome,
+        favorecido_email: form.favorecido_email || undefined,
+        valor_solicitado: Number(form.valor_solicitado),
+        finalidade: form.finalidade,
+        justificativa: form.justificativa,
+        observacoes: form.observacoes,
+        chave_pix: form.chave_pix,
+        banco: form.banco,
+        centro_custo: form.centro_custo,
+        data_pagamento: form.data_pagamento || undefined,
+        data_limite_prestacao: form.data_limite_prestacao || undefined,
+        solicitante_nome: perfil?.nome,
+      }, perfil?.nome).catch(() => { /* impressão é best-effort */ })
+
       setForm(EMPTY_FORM)
       setArquivos([])
     } catch (error) {
@@ -534,6 +555,21 @@ export default function DespesasAdiantamentos() {
                   Vai junto para o Financeiro na conta a pagar gerada após a aprovação.
                 </p>
               </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-500">
+                  Banco
+                  <span className={`ml-1.5 font-normal ${dark ? 'text-slate-500' : 'text-slate-400'}`}>(opcional)</span>
+                </label>
+                <input
+                  value={form.banco}
+                  onChange={e => setForm(prev => ({ ...prev, banco: e.target.value }))}
+                  className={inputCls}
+                  placeholder="Ex.: 341 Itaú / Nubank / Caixa"
+                />
+                <p className={`mt-1 text-[11px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Sai no termo de repasse junto com a chave PIX.
+                </p>
+              </div>
               <div className="md:col-span-2">
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Observações</label>
                 <UpperTextarea rows={2} value={form.observacoes} onChange={e => setForm(prev => ({ ...prev, observacoes: e.target.value }))} className={inputCls} placeholder="Informações complementares para o financeiro" />
@@ -633,8 +669,9 @@ function DetalheAdiantamento({
   salvando, onSalvarClasse, onClose,
 }: {
   item: { id: string; numero: string; finalidade: string; favorecido_nome: string; solicitante_nome?: string
+    favorecido_email?: string | null; justificativa?: string | null; observacoes?: string | null
     gestor_nome?: string | null; valor_solicitado: number; status: StatusDespesaAdiantamento
-    centro_custo?: string | null; classe_financeira?: string | null; chave_pix?: string | null
+    centro_custo?: string | null; classe_financeira?: string | null; chave_pix?: string | null; banco?: string | null
     data_pagamento?: string | null; data_limite_prestacao?: string | null; fin_conta_pagar_id?: string | null }
   dark: boolean
   classes: { id: string; codigo?: string | null; descricao?: string | null }[]
@@ -659,9 +696,33 @@ function DetalheAdiantamento({
             <h2 className={`text-xl font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>{item.numero}</h2>
             <p className={`mt-1 text-sm ${rotulo}`}>{item.finalidade}</p>
           </div>
-          <button type="button" onClick={onClose} className={`rounded-full p-2 ${dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-100'}`}>
-            <XCircle size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => imprimirTermoAdiantamento({
+                numero: item.numero,
+                favorecido_nome: item.favorecido_nome,
+                favorecido_email: item.favorecido_email,
+                valor_solicitado: Number(item.valor_solicitado),
+                finalidade: item.finalidade,
+                justificativa: item.justificativa,
+                observacoes: item.observacoes,
+                chave_pix: item.chave_pix,
+                banco: item.banco,
+                centro_custo: item.centro_custo,
+                data_pagamento: item.data_pagamento,
+                data_limite_prestacao: item.data_limite_prestacao,
+                solicitante_nome: item.solicitante_nome,
+              })}
+              title="Imprimir termo de repasse"
+              className={`rounded-full p-2 ${dark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              <Printer size={17} />
+            </button>
+            <button type="button" onClick={onClose} className={`rounded-full p-2 ${dark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-500 hover:bg-slate-100'}`}>
+              <XCircle size={18} />
+            </button>
+          </div>
         </div>
 
         <div className={`mt-4 divide-y ${dark ? 'divide-white/5' : 'divide-slate-100'}`}>
@@ -684,6 +745,9 @@ function DetalheAdiantamento({
               {item.chave_pix || 'não informada'}
             </span>
           </div>
+          {item.banco && (
+            <div className={linha}><span className={rotulo}>Banco</span><span className={valor}>{item.banco}</span></div>
+          )}
           {item.fin_conta_pagar_id && (
             <div className={linha}>
               <span className={rotulo}>Financeiro</span>
