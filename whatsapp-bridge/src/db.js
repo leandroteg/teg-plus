@@ -24,6 +24,17 @@ export async function getExternoPerfilId() {
   return data.id
 }
 
+// Conta de sistema que assina os avisos automáticos dentro do chamado.
+let assistenteIdCache = null
+export async function getAssistentePerfilId() {
+  if (assistenteIdCache) return assistenteIdCache
+  const { data, error } = await supabase.from('sys_perfis').select('id').eq('email', config.assistenteEmail).maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error(`Conta do assistente não encontrada (${config.assistenteEmail}). Aplique a migração ti_perfil_assistente_virtual.`)
+  assistenteIdCache = data.id
+  return data.id
+}
+
 // Casa o telefone com um funcionário cadastrado (últimos 8 dígitos). null se não achar.
 export async function findRequesterByPhone(phone) {
   const key = phoneKey(phone)
@@ -167,6 +178,9 @@ export async function getOutboundReplies(sinceISO) {
     .limit(200)
   if (error) throw error
   const rows = data ?? []
+  // Avisos automáticos do assistente vão SEM o cabeçalho "*Resposta no CH-x*"
+  // (ele anunciaria uma resposta humana que não houve).
+  const assistenteId = await getAssistentePerfilId().catch(() => null)
   const out = []
   for (const c of rows) {
     const ch = one(c.chamado)
@@ -175,9 +189,62 @@ export async function getOutboundReplies(sinceISO) {
     const sol = one(ch.solicitante)
     const tel = (ch.contato_externo && ch.contato_externo.telefone) || (sol && sol.telefone)
     if (!tel) continue
-    out.push({ to: tel, numero: ch.numero, mensagem: c.mensagem, createdAt: c.created_at })
+    out.push({
+      to: tel, numero: ch.numero, mensagem: c.mensagem, createdAt: c.created_at,
+      doAssistente: assistenteId != null && c.autor_id === assistenteId,
+    })
   }
   return { out, lastSeen: rows.length ? rows[rows.length - 1].created_at : null }
+}
+
+// ─── Acompanhamento: chamados esperando a equipe há tempo demais ─────────────
+// Devolve chamados AINDA NA FILA (status 'aberto' e sem atendente — quem já foi
+// assumido ou virou 'aguardando_usuario' recebeu aviso pelo loopStatus e dizer
+// "está na fila" o contradiria) em que o último movimento é do solicitante e já
+// passou `esperaMin` sem ninguém da equipe responder.
+export async function getChamadosSemResposta({ esperaMin, maxAvisos, assistenteId }) {
+  const esperaMs = esperaMin * 60 * 1000
+  const corteISO = new Date(Date.now() - esperaMs).toISOString()
+  const { data, error } = await supabase.from('ti_chamados')
+    .select(`id, numero, titulo, created_at, solicitante_id, contato_externo,
+      solicitante:sys_perfis!ti_chamados_solicitante_id_fkey(telefone),
+      comentarios:ti_chamado_comentarios!ti_chamado_comentarios_chamado_id_fkey(autor_id, interno, created_at)`)
+    .eq('status', 'aberto')
+    .is('atendente_id', null)
+    .lte('created_at', corteISO)
+    .order('created_at', { ascending: false })
+    .limit(100)
+  if (error) throw error
+
+  const out = []
+  const maxISO = (arr) => (arr.length ? arr.reduce((a, b) => (a > b ? a : b)) : null)
+  for (const c of data ?? []) {
+    const sol = one(c.solicitante)
+    const tel = (c.contato_externo && c.contato_externo.telefone) || (sol && sol.telefone)
+    if (!tel) continue
+
+    const coments = (c.comentarios ?? []).filter((x) => !x.interno)
+    // Último movimento do solicitante: a abertura ou o comentário mais recente.
+    const ultimoDoSolicitante = maxISO(coments.filter((x) => x.autor_id === c.solicitante_id).map((x) => x.created_at)) || c.created_at
+
+    // Alguém da equipe respondeu DEPOIS do último movimento dele? Atendimento
+    // humano em curso — não interferir. (Comparar com o histórico inteiro
+    // silenciaria para sempre um chamado já respondido uma vez no passado.)
+    const humanoDepois = coments.some((x) =>
+      x.autor_id !== c.solicitante_id && x.autor_id !== assistenteId && x.created_at > ultimoDoSolicitante)
+    if (humanoDepois) continue
+
+    // Avisos desta rodada de silêncio (o contador reinicia quando ele fala de novo).
+    const avisosDepois = coments.filter((x) => x.autor_id === assistenteId && x.created_at > ultimoDoSolicitante)
+    if (avisosDepois.length >= maxAvisos) continue
+
+    // Espaça os avisos: conta a partir do último evento (fala dele ou aviso nosso).
+    const ultimoEvento = maxISO([ultimoDoSolicitante, ...avisosDepois.map((x) => x.created_at)])
+    if (ultimoEvento > corteISO) continue
+
+    out.push({ id: c.id, numero: c.numero, to: tel, aviso: avisosDepois.length + 1 })
+  }
+  return out
 }
 
 // ─── Saída: mudanças de status → WhatsApp do solicitante ─────────────────────
