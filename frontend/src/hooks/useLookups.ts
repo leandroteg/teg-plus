@@ -21,7 +21,9 @@ export function useLookups() {
       const [obrasRes, ccRes, cfRes, catRes, empRes] = await Promise.all([
         supabase.from('sys_obras').select('id, nome, codigo, status, centro_custo_id, centro_custo:sys_centros_custo!centro_custo_id(codigo, descricao)').eq('status', 'ativa').order('nome'),
         supabase.from('sys_centros_custo').select('id, codigo, descricao').eq('ativo', true).order('codigo'),
-        supabase.from('fin_classes_financeiras').select('id, codigo, descricao, tipo').order('descricao'),
+        // Só as ativas: a mig 200 desativou as 137 classes CLS-* legadas, que
+        // continuavam aparecendo nos seletores. Ordem por código = hierarquia RM.
+        supabase.from('fin_classes_financeiras').select('id, codigo, descricao, tipo').eq('ativo', true).order('codigo'),
         supabase.from('cmp_categorias').select('id, nome').eq('ativo', true).order('nome'),
         supabase.from('sys_empresas').select('id, codigo, razao_social, nome_fantasia, cnpjs').eq('ativo', true).order('razao_social'),
       ])

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
+import { gerarNomeAmigavelAnexo } from '../utils/nomeAmigavelAnexo'
 import type {
   ContaPagar, ContaReceber, Fornecedor,
   FinanceiroDashboardData, FinanceiroKPIs,
@@ -348,13 +349,17 @@ export function useCriarSolicitacaoExtraordinariaCP() {
 
       for (const arquivo of arquivos ?? []) {
         const ext = arquivo.name.split('.').pop()?.toLowerCase() || 'bin'
-        const path = `financeiro/extraordinarios/${numeroDocumento}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-        const uploadResult = await supabase.storage.from('tesouraria-extratos').upload(path, arquivo)
+        // bucket financeiro-docs (mig 207) — antes apontava p/ 'tesouraria-extratos',
+        // que nunca existiu: todo anexo falhava em silêncio.
+        const path = `extraordinarios/${numeroDocumento}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        const uploadResult = await supabase.storage.from('financeiro-docs').upload(path, arquivo, {
+          contentType: arquivo.type || undefined,
+        })
         if (uploadResult.error) {
           uploadFalhas.push(`${arquivo.name}: ${getSupabaseErrorMessage(uploadResult.error, 'falha no upload')}`)
           continue
         }
-        const { data: urlData } = supabase.storage.from('tesouraria-extratos').getPublicUrl(path)
+        const { data: urlData } = supabase.storage.from('financeiro-docs').getPublicUrl(path)
         uploadedArquivos.push({ nome: arquivo.name, url: urlData.publicUrl })
 
         // Registra também em fin_documentos — é de lá que o AprovAí e demais
@@ -401,6 +406,33 @@ export function useCriarSolicitacaoExtraordinariaCP() {
 // â”€â”€ Aprovar Pagamento (AP): aguardando_aprovacao â†’ aprovado_pgto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Autorização de Pagamento: o financeiro aprova a CP para pagamento efetivo.
 
+/** Documentos anexados a uma CP (fin_documentos) — NF, boleto, outros. */
+export interface DocumentoCP {
+  id: string
+  tipo: string
+  nome_arquivo: string
+  arquivo_url: string
+  uploaded_at: string
+}
+
+export function useDocumentosCP(cpId?: string) {
+  return useQuery<DocumentoCP[]>({
+    queryKey: ['fin-documentos', cpId],
+    enabled: !!cpId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fin_documentos')
+        .select('id, tipo, nome_arquivo, arquivo_url, uploaded_at')
+        .eq('entity_type', 'cp')
+        .eq('entity_id', cpId!)
+        .order('uploaded_at', { ascending: false })
+      if (error) return []
+      return (data ?? []) as DocumentoCP[]
+    },
+    staleTime: 60_000,
+  })
+}
+
 export function useCriarPrevisaoPagamentoCP() {
   const qc = useQueryClient()
   return useMutation({
@@ -414,6 +446,9 @@ export function useCriarPrevisaoPagamentoCP() {
       recorrenciaFim,
       dataVencimento,
       solicitanteNome,
+      desconto,
+      imposto,
+      arquivos,
     }: {
       nome: string
       valor: number
@@ -424,6 +459,9 @@ export function useCriarPrevisaoPagamentoCP() {
       recorrenciaFim?: string
       dataVencimento: string
       solicitanteNome?: string
+      desconto?: number
+      imposto?: { tipo: string; aliquota: number; valor: number; deduzir: boolean }
+      arquivos?: Array<{ file: File; tipo: 'nota_fiscal' | 'boleto' | 'outro' }>
     }) => {
       const observacoes = [
         'Previsão de pagamento registrada manualmente.',
@@ -447,15 +485,62 @@ export function useCriarPrevisaoPagamentoCP() {
           status: 'previsto',
           descricao: nome.trim(),
           observacoes,
+          ...(desconto ? { valor_desconto: desconto } : {}),
+          ...(imposto && imposto.valor > 0
+            ? {
+                imposto_tipo: imposto.tipo,
+                imposto_aliquota: imposto.aliquota || null,
+                imposto_valor: imposto.valor,
+                imposto_deduzir: imposto.deduzir,
+              }
+            : {}),
         })
         .select('id')
         .single()
       if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao criar previsão de pagamento'))
+
+      // Anexos (NF/boleto/outros) → bucket financeiro-docs + fin_documentos.
+      // NF e boleto ganham nome legível (mesma regra dos anexos de Pedido).
+      const falhas: string[] = []
+      for (const item of arquivos ?? []) {
+        const arquivo = item.file
+        const ext = arquivo.name.split('.').pop()?.toLowerCase() || 'bin'
+        const path = `cp/${data.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        const up = await supabase.storage.from('financeiro-docs').upload(path, arquivo, {
+          contentType: arquivo.type || undefined,
+        })
+        if (up.error) {
+          falhas.push(`${arquivo.name}: ${getSupabaseErrorMessage(up.error, 'falha no upload')}`)
+          continue
+        }
+        const { data: urlData } = supabase.storage.from('financeiro-docs').getPublicUrl(path)
+
+        let nomeExibicao = arquivo.name
+        try {
+          nomeExibicao = await gerarNomeAmigavelAnexo(arquivo, item.tipo, nome.trim())
+        } catch { /* mantém o nome original */ }
+
+        const { error: docErr } = await supabase.from('fin_documentos').insert({
+          entity_type: 'cp',
+          entity_id: data.id,
+          tipo: item.tipo,
+          nome_arquivo: nomeExibicao,
+          arquivo_url: urlData.publicUrl,
+          mime_type: arquivo.type || null,
+          tamanho_bytes: arquivo.size || null,
+        })
+        if (docErr) falhas.push(`${arquivo.name}: ${docErr.message}`)
+      }
+      if (falhas.length > 0) {
+        throw new Error(`Previsão criada, mas houve falha nos anexos: ${falhas.join(' | ')}`)
+      }
+
       return data
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['fin-documentos'] })
     },
   })
 }
