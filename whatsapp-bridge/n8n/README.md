@@ -17,27 +17,37 @@ bridge ──POST /webhook/teg-ai-atendimento──► n8n (debounce → agente 
   `n8n` (senão, troque `chamadowhatsapp_n8n` nas URLs). Sem n8n? Instale pelo
   template do Easypanel dentro do projeto.
 - Um token compartilhado novo (gere 64 hex aleatórios). Ele vai em DOIS lugares:
-  - Environment do serviço **n8n**: `AI_SHARED_TOKEN=<token>`
+  - **Credencial Header Auth do n8n** (ver tabela abaixo) — usada tanto para
+    validar o webhook quanto para autenticar as chamadas ao bridge.
   - Environment do serviço **whatsapp-bridge**: `AI_SHARED_TOKEN=<token>` e
     `N8N_WEBHOOK_URL=http://chamadowhatsapp_n8n:5678/webhook/teg-ai-atendimento`
-  - (Deploy nos dois; o bridge loga "agente IA (n8n): LIGADO" no boot.)
+    (Deploy; o bridge loga "agente IA (n8n): LIGADO" no boot.)
+
+> Nada de `$env` nas expressões: o n8n 2.x bloqueia/instabiliza acesso a
+> variáveis de ambiente em nós, então o token trafega por credencial.
 
 ## Credenciais no n8n (criar antes de importar)
 
 | Credencial | Tipo | Valores |
 |---|---|---|
+| Token bridge | Header Auth | Name `x-ai-token`, Value = o token compartilhado |
 | Anthropic | Anthropic API | a ANTHROPIC_API_KEY da TEG (a mesma usada no assistente do Supabase) |
-| Redis Evolution | Redis | host `chamadowhatsapp_evolution-api-redis`, porta `6379`, senha = a do `CACHE_REDIS_URI` do serviço evolution-api |
-| Postgres Evolution | Postgres | copie host/db/usuário/senha do `DATABASE_CONNECTION_URI` do serviço evolution-api (host `chamadowhatsapp_evolution-api-db`, porta 5432). A memória usa a tabela própria `n8n_ai_memoria_helpdesk` (criada sozinha) |
+| Redis Evolution | Redis | host `chamadowhatsapp_evolution-api-redis`, porta `6379`, senha = a do `CACHE_REDIS_URI` do serviço evolution-api, **Database Number 1** |
+| Postgres Evolution | Postgres | copie host/db/usuário/senha do `DATABASE_CONNECTION_URI` do serviço evolution-api (host `chamadowhatsapp_evolution-api-db`, porta 5432), **Max Connections 5** (o banco é compartilhado com a Evolution). A memória usa a tabela própria `n8n_ai_memoria_helpdesk` (criada sozinha) |
 
 ## Importar e ligar
 
 1. n8n → Workflows → **Import from File** → `fluxo-agente-ia-helpdesk.json`.
-2. Abra cada nó com credencial (Claude, BufferMsg/LeBuffer1/LeBuffer2/LimpaBuffer,
-   Memoria) e selecione a credencial criada. No nó **Claude**, confirme o modelo
-   na lista (Claude Sonnet 5; para custo mínimo, Haiku).
-3. **Activate** no workflow (webhook de produção fica ativo).
+2. Aponte as credenciais nos nós: **Webhook_Bridge** + as 3 tools +
+   **RespondeWhatsApp** → Header Auth; **Claude** → Anthropic; os 4 nós Redis
+   → Redis; **Memoria** → Postgres. No nó Claude, confirme o modelo na lista
+   (Claude Sonnet 5; para custo mínimo, Haiku).
+3. **Publish** (n8n 2.x; era "Activate") — o webhook de produção fica ativo.
 4. Preencha os envs do bridge (acima) e dê Deploy nele.
+
+Teste rápido de autenticação (de fora): um POST no webhook **sem** o header
+`x-ai-token` deve responder **403**. Se responder 200, a credencial Header Auth
+não foi aplicada ao nó Webhook_Bridge.
 
 ## Comportamento
 

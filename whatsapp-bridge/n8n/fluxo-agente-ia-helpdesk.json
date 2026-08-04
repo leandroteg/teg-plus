@@ -5,6 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "teg-ai-atendimento",
+        "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
@@ -12,42 +13,8 @@
       "name": "Webhook_Bridge",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-1640, 0],
+      "position": [-1440, 0],
       "webhookId": "b7c31d37-ai01-4000-8000-tegai0000001"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
-          "conditions": [
-            {
-              "id": "c0nd0001-0000-4000-8000-000000000001",
-              "leftValue": "={{ $json.headers['x-ai-token'] }}",
-              "rightValue": "={{ $env.AI_SHARED_TOKEN }}",
-              "operator": { "type": "string", "operation": "equals" }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "a1b2c3d4-0002-4000-8000-000000000002",
-      "name": "ValidaToken",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [-1440, 0]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={\"error\":\"unauthorized\"}",
-        "options": { "responseCode": 401 }
-      },
-      "id": "a1b2c3d4-0018-4000-8000-000000000018",
-      "name": "Respond_401",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [-1240, 144]
     },
     {
       "parameters": {
@@ -60,7 +27,7 @@
       "name": "BufferMsg",
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
-      "position": [-1240, -16]
+      "position": [-1240, 0]
     },
     {
       "parameters": {
@@ -72,7 +39,7 @@
       "name": "Respond_OK",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [-1064, -16]
+      "position": [-1064, 0]
     },
     {
       "parameters": {
@@ -84,7 +51,7 @@
       "name": "LeBuffer1",
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
-      "position": [-888, -16]
+      "position": [-888, 0]
     },
     {
       "parameters": { "amount": 15 },
@@ -92,7 +59,7 @@
       "name": "Espera",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [-712, -16],
+      "position": [-712, 0],
       "webhookId": "b7c31d37-ai02-4000-8000-tegai0000002"
     },
     {
@@ -105,7 +72,7 @@
       "name": "LeBuffer2",
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
-      "position": [-536, -16]
+      "position": [-536, 0]
     },
     {
       "parameters": {
@@ -115,7 +82,7 @@
       "name": "Consolida",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-360, -32]
+      "position": [-360, -16]
     },
     {
       "parameters": {
@@ -126,7 +93,7 @@
       "name": "LimpaBuffer",
       "type": "n8n-nodes-base.redis",
       "typeVersion": 1,
-      "position": [-184, -32]
+      "position": [-184, -16]
     },
     {
       "parameters": {
@@ -140,7 +107,7 @@
       "name": "AGENTE_IA",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3,
-      "position": [0, -32]
+      "position": [0, -16]
     },
     {
       "parameters": {
@@ -156,7 +123,7 @@
       "name": "Claude",
       "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
-      "position": [-96, 192]
+      "position": [-96, 208]
     },
     {
       "parameters": {
@@ -169,38 +136,30 @@
       "name": "Memoria",
       "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
       "typeVersion": 1.3,
-      "position": [48, 192]
+      "position": [48, 208]
     },
     {
       "parameters": {
         "toolDescription": "Lista os setores ativos da TEG para classificar o chamado. Use quando precisar oferecer/validar o setor do solicitante.",
         "method": "GET",
         "url": "http://chamadowhatsapp_whatsapp-bridge:3000/ai/setores",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-ai-token", "value": "={{ $env.AI_SHARED_TOKEN }}" }
-          ]
-        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "options": {}
       },
       "id": "a1b2c3d4-0013-4000-8000-000000000013",
       "name": "listar_setores",
       "type": "n8n-nodes-base.httpRequestTool",
       "typeVersion": 4.2,
-      "position": [208, 192]
+      "position": [208, 208]
     },
     {
       "parameters": {
         "toolDescription": "Abre um chamado no Helpdesk de T.I. da TEG. Use SOMENTE quando já tiver título claro, descrição do problema e (se possível) o setor. Retorna o número do chamado (ex.: CH-0035) — informe-o ao usuário. Se retornar reutilizado=true, já havia chamado aberto desta conversa.",
         "method": "POST",
         "url": "http://chamadowhatsapp_whatsapp-bridge:3000/ai/abrir-chamado",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-ai-token", "value": "={{ $env.AI_SHARED_TOKEN }}" }
-          ]
-        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ digits: $('Consolida').first().json.digits, name: $('Consolida').first().json.nome, titulo: $fromAI('titulo', 'Título curto e claro do problema (4 a 80 caracteres)', 'string'), descricao: $fromAI('descricao', 'Descrição completa: o que acontece, desde quando, equipamento/sistema afetado', 'string'), setor: $fromAI('setor', 'Nome do setor do solicitante (um dos retornados por listar_setores); string vazia se não souber', 'string') }) }}",
@@ -210,26 +169,22 @@
       "name": "abrir_chamado",
       "type": "n8n-nodes-base.httpRequestTool",
       "typeVersion": 4.2,
-      "position": [352, 192]
+      "position": [352, 208]
     },
     {
       "parameters": {
         "toolDescription": "Consulta o status de um chamado existente pelo número, validando que pertence ao telefone desta conversa. Use quando o usuário perguntar sobre um chamado (ex.: 'e o meu CH-0034?'). Passe apenas os dígitos do número.",
         "method": "GET",
         "url": "={{ 'http://chamadowhatsapp_whatsapp-bridge:3000/ai/status-chamado?numero=' + encodeURIComponent($fromAI('numero', 'Número do chamado, somente dígitos (ex.: 34)', 'string')) + '&digits=' + $('Consolida').first().json.digits }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-ai-token", "value": "={{ $env.AI_SHARED_TOKEN }}" }
-          ]
-        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "options": {}
       },
       "id": "a1b2c3d4-0015-4000-8000-000000000015",
       "name": "status_chamado",
       "type": "n8n-nodes-base.httpRequestTool",
       "typeVersion": 4.2,
-      "position": [496, 192]
+      "position": [496, 208]
     },
     {
       "parameters": {
@@ -239,18 +194,14 @@
       "name": "DivideResposta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [224, -32]
+      "position": [224, -16]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "http://chamadowhatsapp_whatsapp-bridge:3000/ai/responder",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "x-ai-token", "value": "={{ $env.AI_SHARED_TOKEN }}" }
-          ]
-        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"to\": \"{{ $json.digits }}\",\n  \"text\": {{ JSON.stringify($json.texto) }}\n}",
@@ -262,13 +213,12 @@
       "name": "RespondeWhatsApp",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [448, -32],
+      "position": [448, -16],
       "retryOnFail": true
     }
   ],
   "connections": {
-    "Webhook_Bridge": { "main": [[{ "node": "ValidaToken", "type": "main", "index": 0 }]] },
-    "ValidaToken": { "main": [[{ "node": "BufferMsg", "type": "main", "index": 0 }], [{ "node": "Respond_401", "type": "main", "index": 0 }]] },
+    "Webhook_Bridge": { "main": [[{ "node": "BufferMsg", "type": "main", "index": 0 }]] },
     "BufferMsg": { "main": [[{ "node": "Respond_OK", "type": "main", "index": 0 }]] },
     "Respond_OK": { "main": [[{ "node": "LeBuffer1", "type": "main", "index": 0 }]] },
     "LeBuffer1": { "main": [[{ "node": "Espera", "type": "main", "index": 0 }]] },
