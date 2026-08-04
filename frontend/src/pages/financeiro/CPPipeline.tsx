@@ -1405,9 +1405,9 @@ function NovaPrevisaoPagamentoModal({
             <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Use esta tela para antecipar despesas esperadas e montar o pipeline financeiro com antecedência.</p>
           </div>
 
-          {/* Fornecedor: só do cadastro (busca por nome ou CNPJ) */}
+          {/* Beneficiário: quem recebe (fornecedor PJ ou PF do cadastro) */}
           <div className="relative">
-            <label className={labelCls}>Fornecedor *</label>
+            <label className={labelCls}>Beneficiário *</label>
             {form.fornecedor_id ? (
               <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 border ${isDark ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-emerald-200 bg-emerald-50'}`}>
                 <span className={`text-sm font-semibold truncate ${isDark ? 'text-emerald-200' : 'text-emerald-800'}`}>
@@ -1430,7 +1430,7 @@ function NovaPrevisaoPagamentoModal({
                   onFocus={() => setFornOpen(true)}
                   onBlur={() => setTimeout(() => setFornOpen(false), 150)}
                   className={inputCls}
-                  placeholder="Buscar por nome ou CNPJ..."
+                  placeholder="Buscar beneficiário por nome, CNPJ ou CPF..."
                 />
                 {fornOpen && fornBusca.trim() && (
                   <div className={`absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-2xl border shadow-xl ${isDark ? 'border-white/[0.08] bg-slate-950' : 'border-slate-200 bg-white'}`}>
@@ -1451,14 +1451,14 @@ function NovaPrevisaoPagamentoModal({
                       </button>
                     ))}
                     {fornecedoresFiltrados.length === 0 && (
-                      <p className="px-3 py-2 text-[11px] text-slate-400">Nenhum fornecedor encontrado.</p>
+                      <p className="px-3 py-2 text-[11px] text-slate-400">Nenhum beneficiário encontrado.</p>
                     )}
                     <button
                       type="button"
                       onMouseDown={() => { setFornOpen(false); setShowFornecedorCadastro(true) }}
                       className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold border-t ${isDark ? 'border-white/[0.06] text-emerald-300 hover:bg-white/[0.04]' : 'border-slate-100 text-emerald-600 hover:bg-emerald-50'}`}
                     >
-                      <Plus size={13} /> Cadastrar novo fornecedor
+                      <Plus size={13} /> Cadastrar novo beneficiário (PJ ou PF)
                     </button>
                   </div>
                 )}
@@ -1749,6 +1749,27 @@ function NovaPrevisaoPagamentoModal({
           </div>
         </div>
       </div>
+      <FornecedorCadastroModal
+        open={showFornecedorCadastro}
+        dark={isDark}
+        title="Cadastrar beneficiário"
+        description="Use o CNPJ (PJ) ou informe o CPF (PF) para cadastrar quem vai receber este pagamento."
+        initialData={{
+          // Semeia com o que foi digitado na busca: dígitos viram CNPJ/CPF, texto vira razão social
+          cnpj: soDigitosBusca.length >= 11 ? formatCpfCnpj(fornBusca) : '',
+          razao_social: soDigitosBusca.length >= 11 ? '' : fornBusca.trim(),
+          nome_fantasia: '',
+          telefone: '',
+          email: '',
+        }}
+        onClose={() => setShowFornecedorCadastro(false)}
+        onSaved={(fornecedor) => {
+          setShowFornecedorCadastro(false)
+          setField('fornecedor_id', fornecedor.id)
+          setField('fornecedor_nome', fornecedor.nome_fantasia || fornecedor.razao_social || '')
+          setFornBusca('')
+        }}
+      />
     </div>
   )
 }
