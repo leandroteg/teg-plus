@@ -230,62 +230,58 @@ export function useCriarLote() {
       criadoPor: string
       observacao?: string
     }) => {
-      // Busca sempre do banco (precisa da empresa_id de cada CP)
+      // Busca sempre do banco: o valor a pagar precisa de desconto, juros/multa,
+      // imposto retido e adiantamento abatido — não só do valor_original.
       const { data } = await supabase
         .from('fin_contas_pagar')
-        .select('id, valor_original, empresa_id')
+        .select('id, valor_original, empresa_id, valor_desconto, valor_juros_multa, imposto_valor, imposto_deduzir, valor_adiantamento_abatido')
         .in('id', cpIds)
-      const cpList = (data ?? []) as { id: string; valor_original: number; empresa_id: string | null }[]
+      const cpList = (data ?? []) as Array<{ id: string; empresa_id: string | null } & Parameters<typeof valorAPagarCP>[0]>
 
-      // 1 lote = 1 empresa pagadora (CNPJ). Selecao mista e dividida em um
-      // lote por empresa; CP sem empresa (legado) forma grupo proprio.
-      const grupos = new Map<string, typeof cpList>()
-      for (const cp of cpList) {
-        const key = cp.empresa_id ?? 'sem_empresa'
-        if (!grupos.has(key)) grupos.set(key, [])
-        grupos.get(key)!.push(cp)
-      }
+      // Um lote só, mesmo com empresas pagadoras diferentes (pedido do user
+      // 04/ago). Antes a seleção mista era quebrada em um lote por empresa, o
+      // que multiplicava aprovações para um pagamento só.
+      const { data: numData } = await supabase.rpc('generate_numero_lote')
+      const numeroLote = (numData as string) || `LP-${Date.now()}`
 
-      const lotes: LotePagamento[] = []
-      for (const [key, grupo] of grupos) {
-        const { data: numData } = await supabase.rpc('generate_numero_lote')
-        const numeroLote = (numData as string) || `LP-${Date.now()}`
-        // O lote paga o valor LÍQUIDO (original − desconto + juros/multa −
-        // imposto retido − adiantamento abatido), o mesmo número que a lista e
-        // o card do título mostram. Usar valor_original mandava para pagamento
-        // a face do título, ignorando desconto negociado e retenção.
-        const valorTotal = grupo.reduce((s, c) => s + valorAPagarCP(c), 0)
+      // O lote paga o valor LÍQUIDO (original − desconto + juros/multa −
+      // imposto retido − adiantamento abatido), o mesmo número que a lista e
+      // o card do título mostram. Usar valor_original mandava para pagamento
+      // a face do título, ignorando desconto negociado e retenção.
+      const valorTotal = cpList.reduce((s, c) => s + valorAPagarCP(c), 0)
 
-        const { data: lote, error: lErr } = await supabase
-          .from('fin_lotes_pagamento')
-          .insert({
-            numero_lote: numeroLote,
-            criado_por: criadoPor,
-            valor_total: valorTotal,
-            qtd_itens: grupo.length,
-            status: 'montando',
-            observacao,
-            empresa_id: key === 'sem_empresa' ? null : key,
-          })
-          .select()
-          .single()
-        if (lErr) throw lErr
+      // Empresa do lote só quando todos os títulos são da mesma; misto fica
+      // nulo e a tela mostra "várias empresas".
+      const empresas = new Set(cpList.map(c => c.empresa_id ?? 'sem_empresa'))
+      const empresaUnica = empresas.size === 1 ? cpList[0]?.empresa_id ?? null : null
 
-        const { error: iErr } = await supabase
-          .from('fin_lote_itens')
-          .insert(grupo.map(cp => ({ lote_id: lote.id, cp_id: cp.id, valor: valorAPagarCP(cp) })))
-        if (iErr) throw iErr
+      const { data: lote, error: lErr } = await supabase
+        .from('fin_lotes_pagamento')
+        .insert({
+          numero_lote: numeroLote,
+          criado_por: criadoPor,
+          valor_total: valorTotal,
+          qtd_itens: cpList.length,
+          status: 'montando',
+          observacao,
+          empresa_id: empresaUnica,
+        })
+        .select()
+        .single()
+      if (lErr) throw lErr
 
-        const { error: uErr } = await supabase
-          .from('fin_contas_pagar')
-          .update({ lote_id: lote.id, status: 'em_lote' })
-          .in('id', grupo.map(cp => cp.id))
-        if (uErr) console.warn('Aviso: lote_id não atualizado nas CPs:', uErr.message)
+      const { error: iErr } = await supabase
+        .from('fin_lote_itens')
+        .insert(cpList.map(cp => ({ lote_id: lote.id, cp_id: cp.id, valor: valorAPagarCP(cp) })))
+      if (iErr) throw iErr
 
-        lotes.push(lote as LotePagamento)
-      }
+      const { error: uErr } = await supabase
+        .from('fin_contas_pagar')
+        .update({ lote_id: lote.id, status: 'em_lote' })
+        .in('id', cpList.map(cp => cp.id))
+      if (uErr) console.warn('Aviso: lote_id não atualizado nas CPs:', uErr.message)
 
-      return lotes
+      return [lote as LotePagamento]
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
@@ -546,22 +542,6 @@ export function useAdicionarItensLote() {
     mutationFn: async ({ loteId, cps }: { loteId: string; cps: { id: string; valor_original: number }[] }) => {
       if (cps.length === 0) return
 
-      // 1 lote = 1 empresa pagadora: so entra CP da mesma empresa do lote
-      const { data: loteRow } = await supabase
-        .from('fin_lotes_pagamento')
-        .select('empresa_id')
-        .eq('id', loteId)
-        .maybeSingle()
-      const { data: cpRows } = await supabase
-        .from('fin_contas_pagar')
-        .select('id, empresa_id')
-        .in('id', cps.map(c => c.id))
-      const loteEmpresa = (loteRow as { empresa_id?: string | null } | null)?.empresa_id ?? null
-      const divergente = (cpRows ?? []).find(cp => ((cp as any).empresa_id ?? null) !== loteEmpresa)
-      if (divergente) {
-        throw new Error('Este título pertence a outra empresa do grupo — cada lote paga por um único CNPJ. Crie um lote separado para ele.')
-      }
-
       const { error } = await supabase
         .from('fin_lote_itens')
         .insert(cps.map(cp => ({ lote_id: loteId, cp_id: cp.id, valor: valorAPagarCP(cp) })))
@@ -571,6 +551,19 @@ export function useAdicionarItensLote() {
         .from('fin_contas_pagar')
         .update({ lote_id: loteId, status: 'em_lote' })
         .in('id', cps.map(cp => cp.id))
+
+      // O lote aceita empresas diferentes (pedido do user 04/ago). O empresa_id
+      // do lote virou rótulo: vale enquanto todos os títulos forem da mesma
+      // empresa e zera assim que a mistura acontece.
+      const { data: cpRows } = await supabase
+        .from('fin_contas_pagar')
+        .select('empresa_id')
+        .eq('lote_id', loteId)
+      const empresas = new Set((cpRows ?? []).map(c => (c as any).empresa_id ?? 'sem'))
+      await supabase
+        .from('fin_lotes_pagamento')
+        .update({ empresa_id: empresas.size === 1 ? ((cpRows?.[0] as any)?.empresa_id ?? null) : null })
+        .eq('id', loteId)
 
       await syncLoteTotais(loteId)
     },

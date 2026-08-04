@@ -184,10 +184,12 @@ export default function LoteDetalhe() {
 
   const isMontando = lote.status === 'montando'
   const isEmAprovacao = lote.status === 'enviado_aprovacao'
-  // 1 lote = 1 empresa pagadora: so oferece CPs da MESMA empresa do lote
+  // O lote aceita empresas diferentes (pedido do user 04/ago): oferece todas as
+  // CPs confirmadas fora de lote, com a empresa de cada uma visivel na linha.
   const loteEmpresaId = ((lote as any).empresa_id as string | null) ?? null
   const empresaLote = loteEmpresaId ? empresas.find(e => e.id === loteEmpresaId) : null
-  const cpsDisponiveis = cpsConfirmadas.filter(cp => (((cp as any).empresa_id as string | null) ?? null) === loteEmpresaId)
+  const empresasDoLote = new Set(itens.map(i => (i.cp as any)?.empresa_id ?? 'sem'))
+  const cpsDisponiveis = cpsConfirmadas
   const isResolvido = ['aprovado', 'parcialmente_aprovado', 'cancelado', 'pago'].includes(lote.status)
   // Desfazer enquanto o lote não virou dinheiro (o RPC revalida no banco)
   const podeDesfazer = ['montando', 'enviado_aprovacao', 'parcialmente_aprovado', 'aprovado'].includes(lote.status)
@@ -301,7 +303,11 @@ export default function LoteDetalhe() {
             </div>
             <div className="text-xs text-slate-400 mt-1">
               Criado por {lote.criado_por} · {fmtDataFull(lote.created_at)}
-              <span className="font-semibold"> · 🏢 {empresaLote ? (empresaLote.nome_fantasia || empresaLote.razao_social) : 'Empresa pagadora não definida'}</span>
+              <span className="font-semibold"> · 🏢 {empresaLote
+                ? (empresaLote.nome_fantasia || empresaLote.razao_social)
+                : empresasDoLote.size > 1
+                  ? `${empresasDoLote.size} empresas`
+                  : 'Empresa pagadora não definida'}</span>
               {lote.observacao && <span> · 💬 {lote.observacao}</span>}
             </div>
           </div>
@@ -512,8 +518,7 @@ export default function LoteDetalhe() {
           {showAdicionar && (
             cpsDisponiveis.length === 0 ? (
               <p className="px-4 pb-4 text-xs text-slate-400">
-                Nenhuma CP confirmada desta empresa fora de lote no momento.
-                Títulos de outras empresas do grupo entram em lote próprio (1 lote = 1 CNPJ pagador).
+                Nenhuma CP confirmada fora de lote no momento.
               </p>
             ) : (
               <div className="max-h-72 overflow-y-auto border-t border-slate-100 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
