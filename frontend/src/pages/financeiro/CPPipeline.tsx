@@ -20,6 +20,7 @@ import {
   useFornecedorByReference,
   useCriarSolicitacaoExtraordinariaCP,
   useCriarPrevisaoPagamentoCP,
+  useDocumentosCP,
   useObras,
   useExtratoCandidatos,
   useAplicarConciliacaoAuto,
@@ -248,7 +249,17 @@ type NovaPrevisaoPagamentoForm = {
   periodicidade: 'semanal' | 'quinzenal' | 'mensal'
   recorrenciaFim: string
   dataVencimento: string
+  desconto: string
+  temImposto: boolean
+  impostoTipo: string
+  impostoAliquota: string
+  impostoValor: string
+  impostoDeduzir: boolean
 }
+
+/** Tipos de documento aceitos na previsão (espelham fin_documentos.tipo) */
+type TipoDocPrevisao = 'nota_fiscal' | 'boleto' | 'outro'
+type ArquivoPrevisao = { file: File; tipo: TipoDocPrevisao }
 
 const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
   descricao: '',
@@ -276,6 +287,12 @@ const EMPTY_PREVISAO_FORM: NovaPrevisaoPagamentoForm = {
   periodicidade: 'mensal',
   recorrenciaFim: '',
   dataVencimento: new Date().toISOString().split('T')[0],
+  desconto: '',
+  temImposto: false,
+  impostoTipo: 'ISS',
+  impostoAliquota: '',
+  impostoValor: '',
+  impostoDeduzir: false,
 }
 
 function summarizeNames(values: string[], fallback: string) {
@@ -1258,6 +1275,9 @@ function NovaPrevisaoPagamentoModal({
   const [classeBusca, setClasseBusca] = useState('')
   const [ccOpen, setCcOpen] = useState(false)
   const [classeOpen, setClasseOpen] = useState(false)
+  const [arquivos, setArquivos] = useState<ArquivoPrevisao[]>([])
+  const [tipoAnexo, setTipoAnexo] = useState<TipoDocPrevisao>('nota_fiscal')
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
     isDark
@@ -1270,12 +1290,20 @@ function NovaPrevisaoPagamentoModal({
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
+  // Valor a pagar = valor − desconto − imposto retido (quando marcado p/ deduzir)
+  const impostoValorNum = form.temImposto ? Number(form.impostoValor || 0) || 0 : 0
+  const valorLiquido = Math.max(0, Math.round((
+    (Number(form.valor || 0) || 0)
+    - (Number(form.desconto || 0) || 0)
+    - (form.impostoDeduzir ? impostoValorNum : 0)
+  ) * 100) / 100)
+
   const centrosFiltrados = centrosCusto
     .filter(cc => `${cc.codigo} ${cc.descricao}`.toLowerCase().includes(ccBusca.toLowerCase()))
 
-  const classesFiltradas = classesFinanceiras
+  const classesMatches = classesFinanceiras
     .filter(classe => `${classe.codigo} ${classe.descricao}`.toLowerCase().includes(classeBusca.toLowerCase()))
-    .slice(0, 8)
+  const classesFiltradas = classesMatches.slice(0, 50)
 
   const getLookupValue = (codigo?: string | null, descricao?: string | null) =>
     codigo?.trim() || descricao?.trim() || ''
@@ -1315,6 +1343,16 @@ function NovaPrevisaoPagamentoModal({
         recorrenciaFim: form.recorrente ? form.recorrenciaFim : undefined,
         dataVencimento: form.dataVencimento,
         solicitanteNome: perfil?.nome,
+        desconto: Number(form.desconto || 0) || 0,
+        imposto: form.temImposto
+          ? {
+              tipo: form.impostoTipo,
+              aliquota: Number(form.impostoAliquota || 0) || 0,
+              valor: impostoValorNum,
+              deduzir: form.impostoDeduzir,
+            }
+          : undefined,
+        arquivos,
       })
       onSuccess()
       onClose()
@@ -1444,10 +1482,128 @@ function NovaPrevisaoPagamentoModal({
                         </button>
                       )
                     })}
+                    {classesMatches.length > classesFiltradas.length && (
+                      <p className={`px-3 py-2 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Mostrando {classesFiltradas.length} de {classesMatches.length} — digite para filtrar
+                      </p>
+                    )}
+                    {classesMatches.length === 0 && (
+                      <p className={`px-3 py-2 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma natureza encontrada.</p>
+                    )}
                   </div>
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Desconto e imposto previstos */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Desconto previsto (R$)</label>
+              <input type="number" min="0" step="0.01" value={form.desconto} onChange={e => setField('desconto', e.target.value)} className={inputCls} placeholder="0,00" />
+            </div>
+            <div>
+              <label className={labelCls}>Valor previsto a pagar</label>
+              <div className={`${inputCls} flex items-center font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                {valorLiquido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </div>
+            </div>
+          </div>
+
+          <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Imposto</p>
+                <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Retenção prevista sobre este pagamento.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setField('temImposto', !form.temImposto)}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                  form.temImposto ? 'bg-emerald-500' : isDark ? 'bg-white/[0.12]' : 'bg-slate-200'
+                }`}
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${form.temImposto ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
+            {form.temImposto && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className={labelCls}>Tipo</label>
+                    <select value={form.impostoTipo} onChange={e => setField('impostoTipo', e.target.value)} className={inputCls}>
+                      {CP_IMPOSTO_TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Alíquota (%)</label>
+                    <input type="number" min="0" step="0.01" value={form.impostoAliquota} onChange={e => setField('impostoAliquota', e.target.value)} className={inputCls} placeholder="0,00" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Valor (R$)</label>
+                    <input type="number" min="0" step="0.01" value={form.impostoValor} onChange={e => setField('impostoValor', e.target.value)} className={inputCls} placeholder="0,00" />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.impostoDeduzir} onChange={e => setField('impostoDeduzir', e.target.checked)} className="w-4 h-4 rounded accent-emerald-600" />
+                  <span className={`text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Deduzir o imposto do valor a pagar (retenção)</span>
+                </label>
+              </>
+            )}
+          </div>
+
+          {/* Documentos: NF, boleto, outros */}
+          <div className={`rounded-xl border p-4 space-y-2 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Documentos</p>
+                <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>NF, boleto ou outros anexos desta previsão.</p>
+              </div>
+              <select value={tipoAnexo} onChange={e => setTipoAnexo(e.target.value as TipoDocPrevisao)} className={`${inputCls} w-auto`}>
+                <option value="nota_fiscal">Nota Fiscal</option>
+                <option value="boleto">Boleto</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept=".pdf,.xml,.jpg,.jpeg,.png"
+              className="hidden"
+              onChange={e => {
+                const novos = Array.from(e.target.files ?? []).map(file => ({ file, tipo: tipoAnexo }))
+                if (novos.length) setArquivos(prev => [...prev, ...novos])
+                e.target.value = ''
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className={`w-full rounded-xl border-2 border-dashed py-3 text-xs font-semibold transition-colors ${
+                isDark ? 'border-white/[0.1] text-slate-400 hover:border-emerald-500/50' : 'border-slate-300 text-slate-500 hover:border-emerald-400'
+              }`}
+            >
+              Clique para anexar (PDF, XML, JPG, PNG)
+            </button>
+            {arquivos.length > 0 && (
+              <ul className="space-y-1">
+                {arquivos.map((a, i) => (
+                  <li key={i} className={`flex items-center justify-between gap-2 text-[11px] rounded-lg px-2 py-1.5 ${isDark ? 'bg-white/[0.04] text-slate-300' : 'bg-white text-slate-600'}`}>
+                    <span className="truncate">
+                      <span className={`font-semibold mr-1 ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                        {a.tipo === 'nota_fiscal' ? 'NF' : a.tipo === 'boleto' ? 'Boleto' : 'Outro'}
+                      </span>
+                      {a.file.name}
+                    </span>
+                    <button type="button" onClick={() => setArquivos(prev => prev.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-red-500 shrink-0">
+                      <X size={12} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
@@ -1964,6 +2120,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
     ? (cp.remessa_payload as Record<string, any>).manual_request as Record<string, any> | undefined
     : undefined
   const manualAttachments = Array.isArray(manualRequest?.anexos) ? manualRequest?.anexos as Array<{ nome: string; url: string }> : []
+  const { data: docsCP = [] } = useDocumentosCP(cp.id)
   const bankInfo = manualRequest?.dados_bancarios as Record<string, string | undefined> | undefined
   const [approval, setApproval] = useState<null | {
     id: string
@@ -2236,6 +2393,34 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1"><Paperclip size={10} /> Anexos</p>
               <AnexosList pedidoId={cp.pedido_id} isDark={isDark} canUpload={canUploadPedidoAnexo} />
+            </div>
+          )}
+          {/* Documentos da CP (fin_documentos): NF, boleto, outros */}
+          {docsCP.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1"><Paperclip size={10} /> Documentos</p>
+              <div className="space-y-1">
+                {docsCP.map(doc => (
+                  <a
+                    key={doc.id}
+                    href={doc.arquivo_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-200 hover:border-slate-300 text-[10px] group"
+                  >
+                    <Paperclip size={9} className="text-slate-400 shrink-0" />
+                    <span className={`font-bold shrink-0 px-1.5 py-0.5 rounded ${
+                      doc.tipo === 'nota_fiscal' ? 'bg-amber-100 text-amber-700'
+                        : doc.tipo === 'boleto' ? 'bg-cyan-100 text-cyan-700'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {doc.tipo === 'nota_fiscal' ? 'NF' : doc.tipo === 'boleto' ? 'Boleto' : 'Doc'}
+                    </span>
+                    <span className="truncate text-slate-600 font-medium">{doc.nome_arquivo}</span>
+                    <ExternalLink size={8} className="text-slate-300 group-hover:text-slate-500 shrink-0 ml-auto" />
+                  </a>
+                ))}
+              </div>
             </div>
           )}
           {!cp.pedido_id && manualAttachments.length > 0 && (
