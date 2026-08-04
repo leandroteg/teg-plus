@@ -36,9 +36,13 @@ function getSupabaseErrorMessage(error: unknown, fallback: string) {
 export function normalizarDadosPagamento(dados?: DadosPagamento | null): DadosPagamento {
   if (!dados) return {}
   const limpo: DadosPagamento = {}
-  for (const campo of ['favorecido', 'banco_nome', 'agencia', 'conta', 'pix_tipo', 'pix_chave'] as const) {
+  for (const campo of ['favorecido', 'favorecido_documento', 'banco_nome', 'agencia', 'conta', 'pix_tipo', 'pix_chave'] as const) {
     const valor = dados[campo]?.trim()
     if (valor) limpo[campo] = valor
+  }
+  // PF/PJ é enum: qualquer outro valor entraria no JSONB como lixo
+  if (dados.favorecido_tipo === 'pf' || dados.favorecido_tipo === 'pj') {
+    limpo.favorecido_tipo = dados.favorecido_tipo
   }
   return limpo
 }
@@ -51,6 +55,7 @@ function appendExtraRequestDetailsToObservacoes(
   const detalhes: string[] = [observacoesBase]
   const banco = [
     dadosBancarios?.favorecido && `Favorecido: ${dadosBancarios.favorecido}`,
+    dadosBancarios?.favorecido_documento && `CPF/CNPJ: ${dadosBancarios.favorecido_documento}`,
     dadosBancarios?.banco_nome && `Banco: ${dadosBancarios.banco_nome}`,
     dadosBancarios?.agencia && `Agencia: ${dadosBancarios.agencia}`,
     dadosBancarios?.conta && `Conta: ${dadosBancarios.conta}`,
@@ -462,6 +467,64 @@ export function useDocumentosCP(cpId?: string) {
       return (fallback.data ?? []) as DocumentoCP[]
     },
     staleTime: 60_000,
+  })
+}
+
+/**
+ * Anexa documentos a uma CP que já existe, em qualquer etapa.
+ * Cobre o buraco de quem só descobre o documento faltando depois — títulos
+ * criados antes do fix do bucket (o extraordinário subia p/ 'tesouraria-extratos',
+ * que nunca existiu) ficavam sem anexo e sem nenhum caminho de UI pra corrigir.
+ */
+export function useAnexarDocumentosCP() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      cpId,
+      arquivos,
+      fornecedorNome,
+    }: {
+      cpId: string
+      arquivos: ArquivoFinanceiro[]
+      fornecedorNome?: string
+    }) => {
+      const falhas: string[] = []
+      for (const item of arquivos) {
+        const arquivo = item.file
+        const ext = arquivo.name.split('.').pop()?.toLowerCase() || 'bin'
+        const path = `cp/${cpId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        const up = await supabase.storage.from('financeiro-docs').upload(path, arquivo, {
+          contentType: arquivo.type || undefined,
+        })
+        if (up.error) {
+          falhas.push(`${arquivo.name}: ${getSupabaseErrorMessage(up.error, 'falha no upload')}`)
+          continue
+        }
+        const { data: urlData } = supabase.storage.from('financeiro-docs').getPublicUrl(path)
+
+        let nomeExibicao = arquivo.name
+        try {
+          nomeExibicao = await gerarNomeAmigavelAnexo(arquivo, item.tipo, fornecedorNome)
+        } catch { /* mantém o nome original */ }
+
+        const { error: docErr } = await supabase.from('fin_documentos').insert({
+          entity_type: 'cp',
+          entity_id: cpId,
+          tipo: item.tipo,
+          nome_arquivo: nomeExibicao,
+          arquivo_url: urlData.publicUrl,
+          mime_type: arquivo.type || null,
+          tamanho_bytes: arquivo.size || null,
+        })
+        if (docErr) falhas.push(`${arquivo.name}: ${docErr.message}`)
+      }
+      if (falhas.length > 0) throw new Error(`Falha ao anexar: ${falhas.join(' | ')}`)
+      return arquivos.length
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fin-documentos'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+    },
   })
 }
 

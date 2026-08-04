@@ -25,6 +25,7 @@ import {
   useResolverDevolucaoCP,
   useDocumentosCP,
   useRemoverDocumentoFin,
+  useAnexarDocumentosCP,
   useAbatimentosCP,
   useAdiantamentosDisponiveis,
   useAbaterAdiantamento,
@@ -2695,6 +2696,13 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const manualAttachments = Array.isArray(manualRequest?.anexos) ? manualRequest?.anexos as Array<{ nome: string; url: string }> : []
   const { data: docsCP = [] } = useDocumentosCP(cp.id)
   const removerDoc = useRemoverDocumentoFin()
+  // Anexo depois do fato: título sem pedido (previsão/extraordinário) só tinha
+  // como receber documento no momento da criação. Quem já está em lote/pago
+  // ficava sem caminho nenhum pra juntar a NF, o recibo ou o termo que faltou.
+  const anexarDocs = useAnexarDocumentosCP()
+  const [tipoDocNovo, setTipoDocNovo] = useState<TipoDocFinanceiro>('outro')
+  const [erroAnexoCP, setErroAnexoCP] = useState('')
+  const podeAnexarDocCP = !cp.pedido_id && cp.status !== 'cancelado'
   // mig 215: dados_pagamento é a fonte estruturada. O fallback cobre as CPs
   // antigas em que o extraordinário só deixou o rastro em remessa_payload.
   const bankInfo = (cp.dados_pagamento && Object.keys(cp.dados_pagamento).length > 0)
@@ -3027,9 +3035,52 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             </div>
           )}
           {/* Documentos da CP (fin_documentos): NF, boleto, outros */}
-          {docsCP.length > 0 && (
+          {(docsCP.length > 0 || podeAnexarDocCP) && (
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1"><Paperclip size={10} /> Documentos</p>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><Paperclip size={10} /> Documentos</p>
+                {podeAnexarDocCP && (
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={tipoDocNovo}
+                      onChange={e => setTipoDocNovo(e.target.value as TipoDocFinanceiro)}
+                      className={`text-[10px] rounded-lg border px-1.5 py-1 ${isDark ? 'bg-slate-800 border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-600'}`}
+                    >
+                      {TIPOS_DOC_FINANCEIRO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                    <label className={`text-[10px] font-semibold px-2 py-1 rounded-lg cursor-pointer transition-colors ${
+                      anexarDocs.isPending
+                        ? 'opacity-60 cursor-wait bg-slate-100 text-slate-400'
+                        : isDark ? 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    }`}>
+                      {anexarDocs.isPending ? 'Enviando...' : '+ Anexar'}
+                      <input
+                        type="file"
+                        multiple
+                        disabled={anexarDocs.isPending}
+                        className="hidden"
+                        onChange={async e => {
+                          const files = Array.from(e.target.files ?? [])
+                          e.target.value = ''
+                          if (!files.length) return
+                          setErroAnexoCP('')
+                          try {
+                            await anexarDocs.mutateAsync({
+                              cpId: cp.id,
+                              arquivos: files.map(file => ({ file, tipo: tipoDocNovo })),
+                              fornecedorNome: cp.fornecedor_nome ?? undefined,
+                            })
+                          } catch (err) {
+                            setErroAnexoCP(err instanceof Error ? err.message : 'Erro ao anexar o documento')
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+              {erroAnexoCP && <p className="text-[10px] text-rose-500 mb-1">{erroAnexoCP}</p>}
+              {docsCP.length === 0 && <p className="text-[10px] text-slate-400 italic mb-1">Sem documentos anexados.</p>}
               <div className="space-y-1">
                 {docsCP.map(doc => (
                   <div
