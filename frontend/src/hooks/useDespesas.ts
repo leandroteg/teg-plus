@@ -175,7 +175,7 @@ export function useCriarSolicitacaoAdiantamento() {
         const { error: docErr } = await supabase.from('fin_documentos').insert({
           entity_type: 'adiantamento',
           entity_id: adiantamento.id,
-          tipo: 'doc_financeiro',
+          tipo: 'outro',   // fin_documentos.tipo_check nao tem 'doc_financeiro'
           nome_arquivo: arquivo.name,
           arquivo_url: urlData.publicUrl,
           mime_type: arquivo.type || null,
@@ -324,6 +324,8 @@ export function useAnexarDocumentosAdiantamento() {
   const { perfil } = useAuth()
   return useMutation({
     mutationFn: async ({ adiantamentoId, arquivos }: { adiantamentoId: string; arquivos: File[] }) => {
+      // Guarda o MOTIVO de cada falha: "Falha ao anexar: arquivo.pdf" sozinho
+      // não diz se foi o upload, a RLS ou o registro — e ninguém consegue agir.
       const falhas: string[] = []
       for (const arquivo of arquivos) {
         const ext = arquivo.name.split('.').pop()?.toLowerCase() || 'bin'
@@ -331,21 +333,24 @@ export function useAnexarDocumentosAdiantamento() {
         const up = await supabase.storage
           .from('financeiro-docs')
           .upload(path, arquivo, { contentType: arquivo.type || undefined })
-        if (up.error) { falhas.push(arquivo.name); continue }
+        if (up.error) {
+          falhas.push(`${arquivo.name} — upload: ${up.error.message}`)
+          continue
+        }
         const { data: urlData } = supabase.storage.from('financeiro-docs').getPublicUrl(path)
         const { error } = await supabase.from('fin_documentos').insert({
           entity_type: 'adiantamento',
           entity_id: adiantamentoId,
-          tipo: 'doc_financeiro',
+          tipo: 'outro',   // fin_documentos.tipo_check nao tem 'doc_financeiro'
           nome_arquivo: arquivo.name,
           arquivo_url: urlData.publicUrl,
           mime_type: arquivo.type || null,
           tamanho_bytes: arquivo.size || null,
           uploaded_by: perfil?.id ?? null,
         })
-        if (error) falhas.push(arquivo.name)
+        if (error) falhas.push(`${arquivo.name} — registro: ${error.message}`)
       }
-      if (falhas.length > 0) throw new Error(`Falha ao anexar: ${falhas.join(', ')}`)
+      if (falhas.length > 0) throw new Error(`Falha ao anexar: ${falhas.join(' | ')}`)
       return arquivos.length
     },
     onSuccess: () => {
