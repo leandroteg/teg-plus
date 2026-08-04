@@ -265,7 +265,7 @@ export default function DPPainel() {
               {porBaseView.efetivoPorBase.map(b => (
                 <div key={b.nome} className="flex items-center gap-2">
                   <p title={b.nome}
-                    className={`text-[11px] font-semibold shrink-0 w-[96px] leading-tight ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{b.nome}</p>
+                    className={`text-[11px] font-semibold shrink-0 w-[140px] whitespace-nowrap ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{b.nome}</p>
                   <div className={`flex-1 h-6 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
                     <div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-sky-600 transition-all duration-500"
                       style={{ width: `${Math.max((b.efetivo / maxEfetivo) * 100, 4)}%` }} />
