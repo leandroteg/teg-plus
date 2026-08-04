@@ -56,10 +56,14 @@ function norm(s?: string | null) {
     .trim()
 }
 
-/** Monta o endereço no formato usado no cadastro: LOGRADOURO, NUMERO - COMPL - BAIRRO */
+/**
+ * Monta o endereço no formato do cadastro: LOGRADOURO, NUMERO - COMPL - BAIRRO.
+ * Sem logradouro devolve vazio de propósito: a Receita às vezes traz só o
+ * bairro, e sugerir "CENTRO" apagaria um endereço bom que já existe.
+ */
 export function montarEndereco(e?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string }) {
-  if (!e) return ''
-  const base = [e.logradouro?.trim(), e.numero?.trim()].filter(Boolean).join(', ')
+  if (!e?.logradouro?.trim()) return ''
+  const base = [e.logradouro.trim(), e.numero?.trim()].filter(Boolean).join(', ')
   return [base, e.complemento?.trim(), e.bairro?.trim()].filter(Boolean).join(' - ')
 }
 
