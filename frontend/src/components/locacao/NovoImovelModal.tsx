@@ -8,6 +8,7 @@ import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLookupCentrosCusto, useLookupEmpresas } from '../../hooks/useLookups'
+import { UpperInput } from '../UpperInput'
 
 // Tipos de imóvel. HTL (hotel) é hospedagem temporária: sem contrato e com bem menos campos.
 const TIPOS: { key: string; label: string; desc: string; icon: typeof BedDouble; color: string }[] = [
@@ -194,7 +195,7 @@ export default function NovoImovelModal({ onClose, onCreated, viaFluxo = false }
             {/* Identificação */}
             <div>
               <label className={labelCls}>Nome / Código {isHtl ? '*' : ''}</label>
-              <input type="text" value={titulo} onChange={e => setTitulo(e.target.value)}
+              <UpperInput type="text" value={titulo} onChange={e => setTitulo(e.target.value)}
                 placeholder={isHtl ? 'Ex.: Hotel Central' : 'Ex.: ALOJ-ARX-RUA X-100 (opcional)'} className={fieldCls} />
             </div>
 
@@ -202,27 +203,27 @@ export default function NovoImovelModal({ onClose, onCreated, viaFluxo = false }
             <div className="grid grid-cols-3 gap-2">
               <div className="col-span-2">
                 <label className={labelCls}>Endereço</label>
-                <input type="text" value={endereco} onChange={e => setEndereco(e.target.value)} placeholder="Rua / Av." className={fieldCls} />
+                <UpperInput type="text" value={endereco} onChange={e => setEndereco(e.target.value)} placeholder="Rua / Av." className={fieldCls} />
               </div>
               <div>
                 <label className={labelCls}>Número</label>
-                <input type="text" value={numero} onChange={e => setNumero(e.target.value)} className={fieldCls} />
+                <UpperInput type="text" value={numero} onChange={e => setNumero(e.target.value)} className={fieldCls} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className={labelCls}>Complemento</label>
-                <input type="text" value={complemento} onChange={e => setComplemento(e.target.value)} className={fieldCls} />
+                <UpperInput type="text" value={complemento} onChange={e => setComplemento(e.target.value)} className={fieldCls} />
               </div>
               <div>
                 <label className={labelCls}>Bairro</label>
-                <input type="text" value={bairro} onChange={e => setBairro(e.target.value)} className={fieldCls} />
+                <UpperInput type="text" value={bairro} onChange={e => setBairro(e.target.value)} className={fieldCls} />
               </div>
             </div>
             <div className="grid grid-cols-4 gap-2">
               <div className="col-span-2">
                 <label className={labelCls}>Cidade</label>
-                <input type="text" value={cidade} onChange={e => setCidade(e.target.value)} className={fieldCls} />
+                <UpperInput type="text" value={cidade} onChange={e => setCidade(e.target.value)} className={fieldCls} />
               </div>
               <div>
                 <label className={labelCls}>UF</label>
@@ -254,7 +255,7 @@ export default function NovoImovelModal({ onClose, onCreated, viaFluxo = false }
                 {/* Locador */}
                 <div>
                   <label className={labelCls}>Locador</label>
-                  <input type="text" value={locadorNome} onChange={e => setLocadorNome(e.target.value)} placeholder="Nome do proprietário" className={fieldCls} />
+                  <UpperInput type="text" value={locadorNome} onChange={e => setLocadorNome(e.target.value)} placeholder="Nome do proprietário" className={fieldCls} />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -319,7 +320,7 @@ export default function NovoImovelModal({ onClose, onCreated, viaFluxo = false }
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className={labelCls}>Nº do contrato</label>
-                      <input type="text" value={contratoNumero} onChange={e => setContratoNumero(e.target.value)} placeholder="Auto (ALG-…)" className={fieldCls} />
+                      <UpperInput type="text" value={contratoNumero} onChange={e => setContratoNumero(e.target.value)} placeholder="Auto (ALG-…)" className={fieldCls} />
                     </div>
                     <div>
                       <label className={labelCls}>Início *</label>

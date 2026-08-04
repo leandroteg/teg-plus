@@ -55,17 +55,23 @@ function ImovelDetailModal({ imovel: imovelProp, aditivos, vistorias, onClose, i
   const { data: solicitacoes = [] } = useSolicitacoesLocacao({ imovel_id: imovel.id })
 
   const setF = (k: keyof LocImovel, v: any) => setForm(f => ({ ...f, [k]: v }))
-  const txt = (label: string, k: keyof LocImovel, opts: { full?: boolean; type?: string } = {}) => (
-    <div className={opts.full ? 'col-span-2' : ''}>
-      <label className={labelCls}>{label}</label>
-      <input
-        type={opts.type || 'text'}
-        value={(form[k] ?? '') as string | number}
-        onChange={e => setF(k, opts.type === 'number' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value)}
-        className={inputCls}
-      />
-    </div>
-  )
+  // Texto do cadastro vai em caixa alta (padrão da casa) — só número e contato
+  // escapam: e-mail em caixa alta fica ilegível.
+  const txt = (label: string, k: keyof LocImovel, opts: { full?: boolean; type?: string; raw?: boolean } = {}) => {
+    const Campo = opts.type === 'number' || opts.raw ? 'input' : UpperInput
+    return (
+      <div className={opts.full ? 'col-span-2' : ''}>
+        <label className={labelCls}>{label}</label>
+        <Campo
+          type={opts.type || 'text'}
+          value={(form[k] ?? '') as string | number}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            setF(k, opts.type === 'number' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value)}
+          className={inputCls}
+        />
+      </div>
+    )
+  }
   const startEdit = () => {
     setForm({
       descricao: current.descricao, endereco: current.endereco, numero: current.numero,
@@ -346,7 +352,7 @@ function ImovelDetailModal({ imovel: imovelProp, aditivos, vistorias, onClose, i
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 {txt('Locador / Proprietário', 'locador_nome', { full: true })}
                 {txt('CPF / CNPJ', 'locador_cpf_cnpj')}
-                {txt('Contato', 'locador_contato')}
+                {txt('Contato', 'locador_contato', { raw: true })}
               </div>
             </div>
 

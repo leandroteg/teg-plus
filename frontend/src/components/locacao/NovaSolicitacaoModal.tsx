@@ -3,6 +3,7 @@ import { X, Wrench, RefreshCw, Loader2, Paperclip, ShieldAlert } from 'lucide-re
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useImoveis, useCriarSolicitacaoLocacao } from '../../hooks/useLocacao'
+import { UpperInput, UpperTextarea } from '../UpperInput'
 import type { TipoSolicitacao, UrgenciaSolicitacao } from '../../types/locacao'
 
 const TIPOS: { key: TipoSolicitacao; label: string; desc: string; icon: typeof Wrench; iconColor: string }[] = [
@@ -138,7 +139,7 @@ export default function NovaSolicitacaoModal({ onClose, tipoInicial }: Props) {
             {/* Titulo */}
             <div>
               <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Titulo *</label>
-              <input
+              <UpperInput
                 required
                 type="text"
                 placeholder="Descreva brevemente a solicitacao..."
@@ -151,7 +152,7 @@ export default function NovaSolicitacaoModal({ onClose, tipoInicial }: Props) {
             {/* Descricao */}
             <div>
               <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Descricao</label>
-              <textarea
+              <UpperTextarea
                 rows={3}
                 placeholder="Detalhes adicionais..."
                 value={descricao}
