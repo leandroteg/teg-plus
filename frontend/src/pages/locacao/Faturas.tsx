@@ -137,7 +137,15 @@ function InlineEditForm({
     (fatura?.valor_confirmado ?? fatura?.valor_previsto)?.toString()
     ?? (isAluguelNovo && imovel.valor_aluguel_mensal ? String(imovel.valor_aluguel_mensal) : '')
   )
-  const [status, setStatus] = useState<StatusFatura>(fatura?.status ?? 'previsto')
+  // Conta nova que nao e aluguel = conta que CHEGOU, ja nasce 'lancado'. Aluguel
+  // novo e previsao do contrato, continua 'previsto'.
+  const [status, setStatus] = useState<StatusFatura>(
+    fatura?.status ?? (tipo === 'aluguel' ? 'previsto' : 'lancado')
+  )
+  // 'enviado_pagamento' e 'pago' sao consequencia do Financeiro, nunca escolha
+  // manual: marcar na mao deixava a fatura como enviada SEM Conta a Pagar
+  // nenhuma (foi o que a mig 191 teve que reparar em 9 faturas).
+  const statusTravado = isEdit && ['enviado_pagamento', 'pago'].includes(fatura!.status)
 
   const saving = criarFatura.isPending || atualizarFatura.isPending
 
@@ -178,7 +186,7 @@ function InlineEditForm({
 
   return (
     <tr className={isDark ? 'bg-indigo-500/[0.06]' : 'bg-indigo-50/60'}>
-      <td colSpan={4} className="px-4 py-3">
+      <td colSpan={6} className="px-4 py-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[100px]">
             <label className={`text-[10px] font-semibold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -196,11 +204,20 @@ function InlineEditForm({
             <label className={`text-[10px] font-semibold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Status
             </label>
-            <select value={status} onChange={e => setStatus(e.target.value as StatusFatura)} className={inputCls}>
+            <select
+              value={status}
+              onChange={e => setStatus(e.target.value as StatusFatura)}
+              disabled={statusTravado}
+              title={statusTravado ? 'Status controlado pelo Financeiro. Use "Desfazer envio" para voltar a editar.' : undefined}
+              className={`${inputCls} disabled:opacity-60 disabled:cursor-not-allowed`}
+            >
               <option value="previsto">Previsto</option>
               <option value="lancado">Lancado</option>
-              <option value="enviado_pagamento">Enviado Pgto</option>
-              <option value="pago">Pago</option>
+              {statusTravado && (
+                <option value={fatura!.status}>
+                  {STATUS_FATURA_LABEL[fatura!.status]?.label ?? fatura!.status}
+                </option>
+              )}
             </select>
           </div>
           <div className="flex gap-2">
@@ -285,7 +302,7 @@ function DescontosAluguel({ fatura, isDark }: { fatura: LocFatura; isDark: boole
 
   return (
     <tr className={isDark ? 'bg-amber-500/[0.05]' : 'bg-amber-50/50'}>
-      <td colSpan={4} className="px-4 py-3">
+      <td colSpan={6} className="px-4 py-3">
         <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
           Descontos no aluguel
         </p>
@@ -568,6 +585,34 @@ function ImovelFaturasModal({
     }
   }
 
+  // Anexo manual por fatura — o fluxo da IA só cobre quem manda o documento
+  // ANTES; quem lançou o valor na mão não tinha como juntar o boleto depois.
+  const [anexandoId, setAnexandoId] = useState<string | null>(null)
+  const anexoFaturaRef = useRef<HTMLInputElement>(null)
+  const faturaAlvoRef = useRef<LocFatura | null>(null)
+
+  function pedirAnexo(fat: LocFatura) {
+    faturaAlvoRef.current = fat
+    anexoFaturaRef.current?.click()
+  }
+
+  async function anexarNaFatura(file?: File | null) {
+    const fat = faturaAlvoRef.current
+    if (!fat || !file || !imovel) return
+    setAnexandoId(fat.id)
+    try {
+      const comp = (fat.mes_referencia ?? fat.competencia ?? modalCompetencia + '-01').slice(0, 7)
+      const path = await uploadFaturaAnexo(imovel.id, comp, file)
+      await atualizarFatura.mutateAsync({ id: fat.id, boleto_url: path } as never)
+    } catch (err: any) {
+      alert(`Erro ao anexar: ${err?.message ?? 'desconhecido'}`)
+    } finally {
+      setAnexandoId(null)
+      faturaAlvoRef.current = null
+      if (anexoFaturaRef.current) anexoFaturaRef.current.value = ''
+    }
+  }
+
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
   const border = isDark ? 'border-white/[0.06]' : 'border-slate-100'
@@ -585,6 +630,31 @@ function ImovelFaturasModal({
     () => allFaturas.filter(f => f.imovel_id === imovel.id && mesDaFatura(f) === modalCompetencia),
     [allFaturas, imovel.id, modalCompetencia],
   )
+
+  // O envio deixa de ser "o mes inteiro": cada linha elegivel tem checkbox.
+  // Guardamos o que foi DESMARCADO (nao o que foi marcado) para que uma conta
+  // lancada agora ja entre marcada, sem efeito de sincronizacao.
+  const elegiveis = useMemo(
+    () => mesFaturas.filter(f => ['previsto', 'lancado'].includes(f.status) && getFaturaValor(f) > 0),
+    [mesFaturas],
+  )
+  const [desmarcadas, setDesmarcadas] = useState<Set<string>>(new Set())
+  useEffect(() => { setDesmarcadas(new Set()) }, [imovel.id, modalCompetencia])
+  const selecionadas = useMemo(
+    () => elegiveis.filter(f => !desmarcadas.has(f.id)),
+    [elegiveis, desmarcadas],
+  )
+  const toggleFatura = (id: string) =>
+    setDesmarcadas(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const toggleTodas = () =>
+    setDesmarcadas(prev =>
+      elegiveis.every(f => prev.has(f.id)) ? new Set() : new Set(elegiveis.map(f => f.id)),
+    )
 
   const faturaByTipo = useMemo(() => {
     const map: Partial<Record<TipoFatura, LocFatura>> = {}
@@ -659,6 +729,15 @@ function ImovelFaturasModal({
               <ChevronRight size={16} />
             </button>
           </div>
+
+          {/* Anexo manual de uma fatura específica (clipe na linha) */}
+          <input
+            ref={anexoFaturaRef}
+            type="file"
+            accept="application/pdf,image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={e => anexarNaFatura(e.target.files?.[0])}
+          />
 
           {/* Lançar contas por anexo (IA) — salva automaticamente */}
           <div className={`rounded-xl border p-3 ${isDark ? 'border-indigo-500/20 bg-indigo-500/[0.04]' : 'border-indigo-200 bg-indigo-50/40'}`}>
@@ -797,6 +876,17 @@ function ImovelFaturasModal({
             <table className="w-full text-xs">
               <thead>
                 <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
+                  <th className="w-8 text-center px-2 py-2">
+                    <input
+                      type="checkbox"
+                      checked={elegiveis.length > 0 && selecionadas.length === elegiveis.length}
+                      ref={el => { if (el) el.indeterminate = selecionadas.length > 0 && selecionadas.length < elegiveis.length }}
+                      onChange={toggleTodas}
+                      disabled={elegiveis.length === 0}
+                      title="Marcar/desmarcar todas as faturas que podem ir ao Financeiro"
+                      className="cursor-pointer accent-indigo-600 disabled:cursor-not-allowed"
+                    />
+                  </th>
                   <th className="text-left px-4 py-2 font-semibold">TIPO</th>
                   <th className="text-center px-2 py-2 font-semibold">MÊS REF.</th>
                   <th className="text-center px-2 py-2 font-semibold">VENC.</th>
@@ -807,10 +897,22 @@ function ImovelFaturasModal({
               {tiposVisiveis.map(tipo => {
                 const fat = faturaByTipo[tipo] || null
                 const isEditing = editingRow?.tipo === tipo
+                const elegivel = !!fat && elegiveis.some(e => e.id === fat.id)
 
                 return (
                   <tbody key={tipo}>
                     <tr className={`border-t ${isDark ? 'border-white/[0.04]' : 'border-slate-100'} ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'} transition-colors`}>
+                      <td className="w-8 text-center px-2 py-2.5">
+                        {elegivel && (
+                          <input
+                            type="checkbox"
+                            checked={!desmarcadas.has(fat!.id)}
+                            onChange={() => toggleFatura(fat!.id)}
+                            title="Incluir esta fatura no envio ao Financeiro"
+                            className="cursor-pointer accent-indigo-600"
+                          />
+                        )}
+                      </td>
                       <td className={`px-4 py-2.5 font-semibold ${txtMain}`}>{TIPO_FATURA_LABEL[tipo]}</td>
                       {fat ? (
                         <>
@@ -841,7 +943,7 @@ function ImovelFaturasModal({
                                   <Percent size={11} /> {descAluguel.length ? `${descAluguel.length}` : 'desc.'}
                                 </button>
                               )}
-                              {fat.boleto_url && (
+                              {fat.boleto_url ? (
                                 <span className="inline-flex items-center">
                                   <button
                                     onClick={() => abrirAnexo(fat.boleto_url, `${TIPO_FATURA_LABEL[tipo]} — ${fmtCurrency(getFaturaValor(fat))}`)}
@@ -860,6 +962,17 @@ function ImovelFaturasModal({
                                     </button>
                                   )}
                                 </span>
+                              ) : (
+                                <button
+                                  onClick={() => pedirAnexo(fat)}
+                                  disabled={anexandoId === fat.id}
+                                  className={`p-1 rounded transition-colors disabled:opacity-50 ${isDark ? 'hover:bg-white/10 text-slate-500 hover:text-indigo-300' : 'hover:bg-indigo-50 text-slate-400 hover:text-indigo-500'}`}
+                                  title="Anexar boleto/conta desta fatura"
+                                >
+                                  {anexandoId === fat.id
+                                    ? <Loader2 size={12} className="animate-spin" />
+                                    : <Paperclip size={12} />}
+                                </button>
                               )}
                               <span className="inline-flex items-center gap-1">
                                 <span className={`w-1.5 h-1.5 rounded-full ${isOverdue(fat) ? STATUS_DOT.vencido : STATUS_DOT[fat.status] || 'bg-slate-400'}`} />
@@ -1021,14 +1134,20 @@ function ImovelFaturasModal({
           <div className="flex justify-end gap-2">
             <button
               onClick={async () => {
-                const elegiveis = mesFaturas.filter(f => ['previsto', 'lancado'].includes(f.status) && getFaturaValor(f) > 0)
-                if (elegiveis.length === 0) {
-                  alert('Nenhuma fatura elegível neste mês (precisa estar em "previsto" ou "lançado" com valor > 0).')
+                if (selecionadas.length === 0) {
+                  alert(
+                    elegiveis.length === 0
+                      ? 'Nenhuma fatura elegível neste mês (precisa estar em "previsto" ou "lançado" com valor > 0).'
+                      : 'Marque ao menos uma fatura para enviar.',
+                  )
                   return
                 }
-                if (!confirm(`Enviar ${elegiveis.length} fatura(s) deste imóvel para o Financeiro? Cria uma Conta a Pagar para cada.`)) return
+                const resumo = selecionadas
+                  .map(f => `• ${TIPO_FATURA_LABEL[f.tipo]} — ${fmtCurrency(getFaturaValor(f))}`)
+                  .join('\n')
+                if (!confirm(`Enviar ${selecionadas.length} fatura(s) para o Financeiro? Cria uma Conta a Pagar para cada.\n\n${resumo}`)) return
                 try {
-                  const r = await enviarFinanceiro.mutateAsync({ faturaIds: elegiveis.map(f => f.id) })
+                  const r = await enviarFinanceiro.mutateAsync({ faturaIds: selecionadas.map(f => f.id) })
                   const MOTIVO_LABEL: Record<string, string> = {
                     ja_enviada: 'Já enviada anteriormente',
                     status_invalido: 'Status fora de previsto/lançado',
@@ -1044,10 +1163,14 @@ function ImovelFaturasModal({
                   alert(`Erro ao enviar: ${err?.message ?? 'desconhecido'}`)
                 }
               }}
-              disabled={enviarFinanceiro.isPending}
+              disabled={enviarFinanceiro.isPending || selecionadas.length === 0}
+              title={selecionadas.length === 0 ? 'Marque as faturas que devem virar Conta a Pagar' : undefined}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Send size={13} /> {enviarFinanceiro.isPending ? 'Enviando...' : 'Enviar p/ Financeiro'}
+              <Send size={13} />
+              {enviarFinanceiro.isPending
+                ? 'Enviando...'
+                : `Enviar p/ Financeiro${selecionadas.length > 0 ? ` (${selecionadas.length})` : ''}`}
             </button>
           </div>
         </div>
