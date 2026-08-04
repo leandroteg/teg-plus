@@ -436,6 +436,8 @@ export interface NovaCotacaoPayload {
 export type StatusDespesaAdiantamento =
   | 'solicitado' | 'aprovado' | 'rejeitado'
   | 'prestacao_pendente' | 'prestacao_enviada' | 'concluido'
+  // Desfecho carimbado pelo Financeiro (mig 216)
+  | 'pago' | 'cancelado'
 
 export interface DespesaAdiantamento {
   id: string

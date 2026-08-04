@@ -446,14 +446,20 @@ export function useDocumentosCP(cpId?: string) {
     queryKey: ['fin-documentos', cpId],
     enabled: !!cpId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      // RPC (mig 216): traz também os anexos do adiantamento que gerou a CP —
+      // a RLS de desp_adiantamentos esconde a linha de quem trabalha no
+      // Financeiro, então o vínculo não pode ser resolvido no cliente.
+      const { data, error } = await supabase.rpc('fin_documentos_cp', { p_cp_id: cpId })
+      if (!error) return (data ?? []) as DocumentoCP[]
+
+      const fallback = await supabase
         .from('fin_documentos')
         .select('id, tipo, nome_arquivo, arquivo_url, uploaded_at')
         .eq('entity_type', 'cp')
         .eq('entity_id', cpId!)
         .order('uploaded_at', { ascending: false })
-      if (error) return []
-      return (data ?? []) as DocumentoCP[]
+      if (fallback.error) return []
+      return (fallback.data ?? []) as DocumentoCP[]
     },
     staleTime: 60_000,
   })

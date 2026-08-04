@@ -40,6 +40,8 @@ const STATUS_STYLE: Record<StatusDespesaAdiantamento, string> = {
   prestacao_pendente: 'bg-sky-100 text-sky-700',
   prestacao_enviada: 'bg-indigo-100 text-indigo-700',
   concluido: 'bg-slate-100 text-slate-700',
+  pago: 'bg-teal-100 text-teal-700',
+  cancelado: 'bg-slate-200 text-slate-600 line-through',
 }
 
 const STATUS_LABEL: Record<StatusDespesaAdiantamento, string> = {
@@ -49,6 +51,8 @@ const STATUS_LABEL: Record<StatusDespesaAdiantamento, string> = {
   prestacao_pendente: 'Prestação pendente',
   prestacao_enviada: 'Prestação enviada',
   concluido: 'Concluído',
+  pago: 'Pago pelo Financeiro',
+  cancelado: 'Cancelado no Financeiro',
 }
 
 const EMPTY_FORM = {
@@ -362,7 +366,7 @@ export default function DespesasAdiantamentos() {
             </div>
           )}
           {adiantamentos.map(item => {
-            const semClasse = !item.classe_financeira && item.status !== 'rejeitado' && item.status !== 'concluido'
+            const semClasse = !item.classe_financeira && !['rejeitado', 'concluido', 'cancelado'].includes(item.status)
             return (
               <div
                 key={item.id}

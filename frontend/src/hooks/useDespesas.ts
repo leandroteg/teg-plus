@@ -255,7 +255,8 @@ export function podeEditarAdiantamento(
   isAdmin = false,
 ) {
   if (!adiantamento) return false
-  if (['concluido', 'rejeitado'].includes(adiantamento.status ?? '')) return false
+  // Cancelado/pago no Financeiro tambem fecha a edicao: o dinheiro ja teve desfecho.
+  if (['concluido', 'rejeitado', 'pago', 'cancelado'].includes(adiantamento.status ?? '')) return false
   return isAdmin || (!!perfilId && adiantamento.solicitante_id === perfilId)
 }
 
