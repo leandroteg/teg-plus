@@ -551,10 +551,11 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
     <div class="fields">
       <div class="field"><div class="label">Fornecedor</div><div class="value">${esc(pedido.fornecedor_nome)}</div></div>
       <div class="field"><div class="label">Valor Total</div><div class="value big">${fmtBRL(pedido.valor_total)}</div>${
-        (Number(pedido.valor_frete) > 0 || Number(pedido.valor_desconto) > 0)
+        (Number(pedido.valor_frete) > 0 || Number(pedido.valor_despesas) > 0 || Number(pedido.valor_desconto) > 0)
           ? `<div style="font-size:10px;color:#64748b;margin-top:2px">${[
-              `Produtos: ${fmtBRL((pedido.valor_total ?? 0) - (Number(pedido.valor_frete) || 0) + (Number(pedido.valor_desconto) || 0))}`,
+              `Produtos: ${fmtBRL((pedido.valor_total ?? 0) - (Number(pedido.valor_frete) || 0) - (Number(pedido.valor_despesas) || 0) + (Number(pedido.valor_desconto) || 0))}`,
               Number(pedido.valor_frete) > 0 ? `Frete: ${fmtBRL(Number(pedido.valor_frete))}` : null,
+              Number(pedido.valor_despesas) > 0 ? `Despesas: ${fmtBRL(Number(pedido.valor_despesas))}` : null,
               Number(pedido.valor_desconto) > 0 ? `Desconto: −${fmtBRL(Number(pedido.valor_desconto))}` : null,
             ].filter(Boolean).join(' · ')}</div>`
           : ''
@@ -2548,19 +2549,25 @@ function DetailModal({
             )
           })()}
 
-          {/* Quadro Produtos / Frete / Desconto — só quando houve negociação */}
-          {(Number((pedido as any).valor_frete) > 0 || Number((pedido as any).valor_desconto) > 0) && (
+          {/* Quadro Produtos / Frete / Despesas / Desconto — só quando houve negociação */}
+          {(Number((pedido as any).valor_frete) > 0 || Number((pedido as any).valor_despesas) > 0 || Number((pedido as any).valor_desconto) > 0) && (
             <div className={`rounded-xl border px-3 py-2.5 space-y-1 ${brd}`}>
               <div className="flex items-center justify-between text-xs">
                 <span className={sub}>Produtos</span>
                 <span className={txt}>
-                  {fmt((pedido.valor_total ?? 0) - (Number((pedido as any).valor_frete) || 0) + (Number((pedido as any).valor_desconto) || 0))}
+                  {fmt((pedido.valor_total ?? 0) - (Number((pedido as any).valor_frete) || 0) - (Number((pedido as any).valor_despesas) || 0) + (Number((pedido as any).valor_desconto) || 0))}
                 </span>
               </div>
               {Number((pedido as any).valor_frete) > 0 && (
                 <div className="flex items-center justify-between text-xs">
                   <span className={sub}>Frete</span>
                   <span className={txt}>{fmt(Number((pedido as any).valor_frete))}</span>
+                </div>
+              )}
+              {Number((pedido as any).valor_despesas) > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className={sub}>Despesas</span>
+                  <span className={txt}>{fmt(Number((pedido as any).valor_despesas))}</span>
                 </div>
               )}
               {Number((pedido as any).valor_desconto) > 0 && (

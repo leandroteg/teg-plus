@@ -18,7 +18,7 @@ export function usePedidos(status?: string) {
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id, empresa_id,
           condicao_pagamento, parcelas_preview, sem_cotacao, tipo_pedido, justificativa_sem_cotacao, itens_direto,
-          valor_frete, valor_desconto,
+          valor_frete, valor_despesas, valor_desconto,
           docs_conferidos, docs_conferidos_por_nome, docs_conferidos_em,
           requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, arquivo_url, base_destino_id, base_destino:est_bases!base_destino_id(nome), itens:cmp_requisicao_itens(id, descricao, descricao_complementar, quantidade, unidade, valor_unitario_estimado, natureza)),
           comprador:cmp_compradores(nome),
@@ -695,6 +695,9 @@ export interface PedidoDiretoPayload {
   empresaId?: string
   formaPagamento?: string
   cartaoId?: string
+  /** Frete/despesas somam e desconto abate no total (o front já manda valorTotal calculado) */
+  valorFrete?: number
+  valorDespesas?: number
   valorDesconto?: number
   /** Vencimento explícito. Quando informado, manda na frente da condição de pagamento. */
   dataVencimento?: string
@@ -807,6 +810,8 @@ export function useEmitirPedidoDireto() {
           empresa_id: payload.empresaId || null,
           observacoes: payload.observacoes || null,
           comprador_id: compradorIdResolvido,
+          valor_frete: payload.valorFrete || 0,
+          valor_despesas: payload.valorDespesas || 0,
           valor_desconto: payload.valorDesconto || 0,
           parcelas_preview: parcelasResolvidas,
           sem_cotacao: true,
@@ -919,6 +924,9 @@ export interface PedidoDiretoEdicaoPayload {
   empresaId?: string
   formaPagamento?: string
   cartaoId?: string
+  /** Frete/despesas somam e desconto abate no total (o front já manda valorTotal calculado) */
+  valorFrete?: number
+  valorDespesas?: number
   valorDesconto?: number
   /** Vencimento explícito. Quando informado, manda na frente da condição de pagamento. */
   dataVencimento?: string
@@ -979,6 +987,8 @@ export function useEditarPedidoDireto() {
           classe_financeira_id: payload.classeFinanceiraId || null,
           empresa_id: payload.empresaId || null,
           observacoes: payload.observacoes || null,
+          valor_frete: payload.valorFrete || 0,
+          valor_despesas: payload.valorDespesas || 0,
           valor_desconto: payload.valorDesconto || 0,
           parcelas_preview: parcelasResolvidas,
           ...(payload.justificativaSemCotacao ? { justificativa_sem_cotacao: payload.justificativaSemCotacao } : {}),

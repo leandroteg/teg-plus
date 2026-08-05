@@ -113,6 +113,8 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   // Vencimento explícito (boleto com data fechada). Preenchido, manda na frente
   // da condição de pagamento e gera uma única parcela nessa data.
   const [dataVencimento, setDataVencimento] = useState('')
+  const [valorFrete, setValorFrete] = useState(0)
+  const [valorDespesas, setValorDespesas] = useState(0)
   const [valorDesconto, setValorDesconto] = useState(0)
   const [justificativa, setJustificativa] = useState('')
   const [observacoes, setObservacoes] = useState('')
@@ -138,6 +140,8 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
     setClasseId(pedido.classe_financeira_id ?? '')
     setCondicaoPagamento(pedido.condicao_pagamento ?? '')
     setDataPrevistaEntrega(pedido.data_prevista_entrega ?? '')
+    setValorFrete(Number(pedido.valor_frete ?? 0))
+    setValorDespesas(Number((pedido as any).valor_despesas ?? 0))
     setValorDesconto(Number(pedido.valor_desconto ?? 0))
     setJustificativa(pedido.justificativa_sem_cotacao ?? '')
     setObservacoes(pedido.observacoes ?? '')
@@ -182,7 +186,12 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   const obraSel = obras.find(o => o.id === obraId)
 
   const subtotal = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario, 0)
-  const total = Math.max(0, Math.round((subtotal - (valorDesconto || 0)) * 100) / 100)
+  // Total entregue = itens + frete + despesas − desconto (mesma conta da cotação)
+  const acrescimos = (valorFrete || 0) + (valorDespesas || 0)
+  const total = Math.max(
+    0,
+    Math.round((subtotal + acrescimos - (valorDesconto || 0)) * 100) / 100,
+  )
 
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -323,6 +332,8 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
           empresaId: empresaId || undefined,
           formaPagamento: formaPagamento || undefined,
           cartaoId: formaPagamento === 'cartao' ? cartaoId || undefined : undefined,
+          valorFrete: valorFrete || undefined,
+          valorDespesas: valorDespesas || undefined,
           valorDesconto: valorDesconto || undefined,
         })
         onSuccess?.(pedido.numero_pedido)
@@ -369,6 +380,8 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
         empresaId: empresaId || undefined,
         formaPagamento: formaPagamento || undefined,
         cartaoId: formaPagamento === 'cartao' ? cartaoId || undefined : undefined,
+        valorFrete: valorFrete || undefined,
+        valorDespesas: valorDespesas || undefined,
         valorDesconto: valorDesconto || undefined,
       })
       onSuccess?.(result.numero_pedido)
@@ -839,30 +852,44 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                 </div>
               ))}
             </div>
-            {/* Desconto sempre visível — antes só aparecia com item valorado, e ninguém achava o campo */}
+            {/* Frete/Despesas/Desconto sempre visíveis — antes o desconto só
+                aparecia com item valorado, e ninguém achava o campo */}
             <div className="mt-2 space-y-1">
-              <div className="flex items-center justify-between gap-3">
-                <label className="text-[10px] text-slate-400 font-semibold">Desconto (R$)</label>
+              {([
+                { label: 'Frete (R$)', value: valorFrete, onChange: setValorFrete },
+                { label: 'Despesas (R$)', value: valorDespesas, onChange: setValorDespesas },
+                { label: 'Desconto (R$)', value: valorDesconto, onChange: setValorDesconto },
+              ] as const).map(campo => (
+                <div key={campo.label} className="flex items-center justify-between gap-3">
+                  <label className="text-[10px] text-slate-400 font-semibold">{campo.label}</label>
                   <div className="relative w-36">
                     <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">R$</span>
                     <NumericInput
                       min={0} step={0.01}
                       className="w-full border border-slate-200 rounded-lg pl-8 pr-2 py-1.5 text-sm text-right bg-white focus:ring-2 focus:ring-orange-300 outline-none"
-                      value={valorDesconto}
-                      onChange={setValorDesconto}
+                      value={campo.value}
+                      onChange={campo.onChange}
                     />
                   </div>
                 </div>
-                {valorDesconto >= subtotal && valorDesconto > 0 && (
-                  <p className="text-[10px] text-red-600 text-right">Desconto maior ou igual ao total dos itens — confira.</p>
-                )}
-                <div className="flex justify-end items-baseline gap-2">
-                  {valorDesconto > 0 && (
-                    <span className="text-[11px] text-slate-400 line-through">{fmt(subtotal)}</span>
-                  )}
-                  <span className="text-sm font-extrabold text-orange-600">{fmt(total)}</span>
+              ))}
+              {valorDesconto >= subtotal + acrescimos && valorDesconto > 0 && (
+                <p className="text-[10px] text-red-600 text-right">Desconto maior ou igual ao total do pedido — confira.</p>
+              )}
+              {/* Composição do total — só aparece quando há frete/despesas/desconto */}
+              {(valorFrete > 0 || valorDespesas > 0 || valorDesconto > 0) && (
+                <div className="flex flex-wrap justify-end gap-x-2 text-[10px] text-slate-400">
+                  <span>Itens {fmt(subtotal)}</span>
+                  {valorFrete > 0 && <span>+ frete {fmt(valorFrete)}</span>}
+                  {valorDespesas > 0 && <span>+ despesas {fmt(valorDespesas)}</span>}
+                  {valorDesconto > 0 && <span>− desconto {fmt(valorDesconto)}</span>}
                 </div>
+              )}
+              <div className="flex justify-end items-baseline gap-2">
+                <span className="text-[10px] text-slate-400 font-semibold">Total</span>
+                <span className="text-sm font-extrabold text-orange-600">{fmt(total)}</span>
               </div>
+            </div>
           </div>
 
           {/* Justificativa (obrigatória) */}
