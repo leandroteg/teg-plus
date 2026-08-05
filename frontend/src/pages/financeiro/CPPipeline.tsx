@@ -3794,18 +3794,34 @@ function CpColResizeHandle({ colIndex, onStart }: {
 // ══ Observação do título ════════════════════════════════════════
 
 /**
+ * Toda previsão manual nasce com a observação montada em useCriarPrevisao
+ * ("Previsão de pagamento registrada manualmente. | Solicitante: X"). Isso é
+ * carimbo do sistema, não recado de ninguém: ocupa a coluna inteira sem dizer
+ * nada a quem vai pagar. Nesses títulos a descrição — que foi o que a pessoa
+ * realmente escreveu — vale mais.
+ */
+const OBS_AUTOMATICA_PREVISAO = 'Previsão de pagamento registrada manualmente'
+
+/**
  * O que mostrar na coluna Observações. A observação do pedido é a que costuma
  * carregar a instrução de pagamento ("multa placa X", "não aceita faturamento")
- * e por isso vem primeiro; a do próprio título entra quando não há pedido.
- * Divergência já tem selo próprio no detalhe, mas aqui vale aparecer — é
- * justamente o tipo de coisa que o financeiro precisa ver antes de pagar.
+ * e por isso vem primeiro; a do próprio título entra quando não há pedido, e a
+ * descrição cobre o caso do carimbo automático acima.
  */
 function obsDoTitulo(cp: ContaPagar): { texto: string; doPedido: boolean } | null {
   const doPedido = cp.pedido?.observacoes?.trim()
   if (doPedido) return { texto: doPedido, doPedido: true }
+
   const doTitulo = cp.observacoes?.trim()
-  if (doTitulo) return { texto: doTitulo, doPedido: false }
-  return null
+  if (doTitulo && !doTitulo.startsWith(OBS_AUTOMATICA_PREVISAO)) {
+    return { texto: doTitulo, doPedido: false }
+  }
+
+  const descricao = cp.descricao?.trim()
+  if (descricao) return { texto: descricao, doPedido: false }
+
+  // Sem descrição, o carimbo automático ainda é melhor que célula vazia.
+  return doTitulo ? { texto: doTitulo, doPedido: false } : null
 }
 
 // ══ CPRow (compact table row) ═══════════════════════════════════
@@ -3899,9 +3915,22 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empres
       </div>
 
       <div className="min-w-0">
-        <span className={`block truncate text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          {cp.descricao || '\u2014'}
-        </span>
+        {showObs ? (
+          <span
+            className={`block truncate text-[11px] ${
+              obs?.doPedido
+                ? isDark ? 'text-amber-300' : 'text-amber-700'
+                : isDark ? 'text-slate-500' : 'text-slate-400'
+            }`}
+            title={obs ? (obs.doPedido ? `Observa\u00e7\u00f5es do pedido ${pedidoNum ?? ''}: ${obs.texto}` : obs.texto) : undefined}
+          >
+            {obs?.texto || '\u2014'}
+          </span>
+        ) : (
+          <span className={`block truncate text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {cp.descricao || '\u2014'}
+          </span>
+        )}
         {approvalHint && (
           <span className={`block truncate text-[10px] font-medium ${
             approvalHint.tone === 'rose'
@@ -3914,25 +3943,6 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empres
           </span>
         )}
       </div>
-
-      {showObs && (
-        <span className="min-w-0">
-          {obs ? (
-            <span
-              className={`block truncate text-[11px] ${
-                obs.doPedido
-                  ? isDark ? 'text-amber-300' : 'text-amber-700'
-                  : isDark ? 'text-slate-500' : 'text-slate-400'
-              }`}
-              title={obs.doPedido ? `Observa\u00e7\u00f5es do pedido ${pedidoNum ?? ''}: ${obs.texto}` : obs.texto}
-            >
-              {obs.texto}
-            </span>
-          ) : (
-            <span className="block truncate text-[11px] text-slate-300">{'\u2014'}</span>
-          )}
-        </span>
-      )}
 
       <span className={`text-[11px] truncate min-w-0 flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {obraNome ? <><Building2 size={9} className="shrink-0" /> {obraNome}</> : '\u2014'}
@@ -4537,25 +4547,17 @@ export default function CPPipeline() {
   const empresasLookup = useLookupEmpresas()
   const empresasCurtas = useMemo(() => mapaEmpresaCurta(empresasLookup), [empresasLookup])
 
-  // Observações só nas etapas em que o financeiro ainda está decidindo o
-  // pagamento (Previstos/Confirmados) — depois de virar lote a instrução do
-  // pedido já não muda nada e a coluna só roubaria espaço.
+  // Nas etapas em que o financeiro ainda está decidindo o pagamento
+  // (Previstos/Confirmados), a terceira coluna mostra a observação no lugar da
+  // descrição: é ali que mora a instrução que muda a decisão de pagar. A
+  // descrição continua no detalhe do título. Nas demais abas a coluna segue
+  // sendo a descrição.
   const showObsCol = activeTab === 'previsto' || activeTab === 'confirmado'
 
   // Resizable columns
   const cpTableRef = useRef<HTMLDivElement>(null)
   const cpColWidthsRef = useRef<number[]>([])
-  // A largura salva no ref tem uma entrada por coluna; ao entrar/sair das abas
-  // com Observações a contagem muda e o cache precisa ser descartado, senão o
-  // grid fica com uma coluna a mais ou a menos que os cabeçalhos.
-  const showObsColRef = useRef(showObsCol)
-  if (showObsColRef.current !== showObsCol) {
-    showObsColRef.current = showObsCol
-    cpColWidthsRef.current = []
-  }
-  const CP_COLS_DEFAULT = showObsCol
-    ? '20px 2px 86px minmax(0,1.5fr) minmax(0,1.2fr) minmax(0,1.3fr) minmax(0,0.9fr) 84px 70px 110px 72px 96px'
-    : '20px 2px 86px minmax(0,1.8fr) minmax(0,1.45fr) minmax(0,1fr) 84px 70px 110px 72px 96px'
+  const CP_COLS_DEFAULT = '20px 2px 86px minmax(0,1.8fr) minmax(0,1.45fr) minmax(0,1fr) 84px 70px 110px 72px 96px'
   const startCpColResize = useCallback((colIndex: number, startX: number) => {
     const container = cpTableRef.current
     if (!container) return
@@ -5865,15 +5867,12 @@ export default function CPPipeline() {
                 <span />
                 <span className="relative" data-cph>Empresa<CpColResizeHandle colIndex={0} onStart={startCpColResize} /></span>
                 <span className="relative" data-cph>Fornecedor<CpColResizeHandle colIndex={1} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>{`Descri\u00e7\u00e3o`}<CpColResizeHandle colIndex={2} onStart={startCpColResize} /></span>
-                {showObsCol && (
-                  <span className="relative" data-cph>{`Observa\u00e7\u00f5es`}<CpColResizeHandle colIndex={3} onStart={startCpColResize} /></span>
-                )}
-                <span className="relative" data-cph>Obra<CpColResizeHandle colIndex={showObsCol ? 4 : 3} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Origem<CpColResizeHandle colIndex={showObsCol ? 5 : 4} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>CC<CpColResizeHandle colIndex={showObsCol ? 6 : 5} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Pedido<CpColResizeHandle colIndex={showObsCol ? 7 : 6} onStart={startCpColResize} /></span>
-                <span className="relative text-right" data-cph>Venc.<CpColResizeHandle colIndex={showObsCol ? 8 : 7} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>{showObsCol ? `Observa\u00e7\u00f5es` : `Descri\u00e7\u00e3o`}<CpColResizeHandle colIndex={2} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Obra<CpColResizeHandle colIndex={3} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Origem<CpColResizeHandle colIndex={4} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>CC<CpColResizeHandle colIndex={5} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Pedido<CpColResizeHandle colIndex={6} onStart={startCpColResize} /></span>
+                <span className="relative text-right" data-cph>Venc.<CpColResizeHandle colIndex={7} onStart={startCpColResize} /></span>
                 <span className="text-right" data-cph>Valor</span>
               </div>
               {activeCPs.map(cp => (
