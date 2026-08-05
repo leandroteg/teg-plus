@@ -4099,6 +4099,10 @@ function LoteItemsPanel({
   const { data: comentariosPorCp = {} } = useComentariosItens(
     (data?.itens ?? []).map(i => i.cp_id).filter(Boolean)
   )
+  // Mesmo apelido curto da coluna Empresa da lista de CPs — o lote mistura
+  // empresas pagadoras, entao a coluna evita ter que abrir titulo por titulo.
+  const empresasLookup = useLookupEmpresas()
+  const empresasCurtas = useMemo(() => mapaEmpresaCurta(empresasLookup), [empresasLookup])
 
   if (isLoading) {
     return (
@@ -4114,8 +4118,9 @@ function LoteItemsPanel({
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/80'}`}>
-      <div className={`grid grid-cols-[34px_minmax(0,1.8fr)_110px_90px_110px_120px] gap-x-3 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500 border-b border-white/[0.08]' : 'text-slate-400 border-b border-slate-200'}`}>
+      <div className={`grid grid-cols-[34px_96px_minmax(0,1.8fr)_110px_90px_110px_120px] gap-x-3 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500 border-b border-white/[0.08]' : 'text-slate-400 border-b border-slate-200'}`}>
         <span title="Número do título dentro do lote, do menor para o maior valor">Nº</span>
+        <span>Empresa</span>
         <span>Item</span>
         <span>Documento</span>
         <span>Venc.</span>
@@ -4128,10 +4133,27 @@ function LoteItemsPanel({
             key={item.id}
             type="button"
             onClick={() => item.cp && onOpenCP(item.cp)}
-            className={`grid w-full grid-cols-[34px_minmax(0,1.8fr)_110px_90px_110px_120px] gap-x-3 px-4 py-2.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-white'}`}
+            className={`grid w-full grid-cols-[34px_96px_minmax(0,1.8fr)_110px_90px_110px_120px] gap-x-3 px-4 py-2.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-white'}`}
           >
             <span className={`text-[11px] font-bold tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               {item.ordem ?? '\u2014'}
+            </span>
+            <span className="min-w-0 self-center">
+              {(() => {
+                const empresaLabel = item.cp?.empresa_id ? empresasCurtas.get(item.cp.empresa_id) : undefined
+                return (
+                  <span
+                    className={`inline-block max-w-full truncate rounded-md px-1.5 py-0.5 text-[9px] font-bold ${
+                      empresaLabel
+                        ? isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                        : isDark ? 'text-slate-600' : 'text-slate-300'
+                    }`}
+                    title={empresaLabel ?? 'Sem empresa'}
+                  >
+                    {empresaLabel ?? '\u2014'}
+                  </span>
+                )
+              })()}
             </span>
             <div className="min-w-0">
               <p className={`truncate text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{item.cp?.fornecedor_nome || 'Item sem fornecedor'}</p>

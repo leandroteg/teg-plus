@@ -10,6 +10,8 @@ import type { ContaPagar } from '../../types/financeiro'
 import { downloadPagamentosPrevistosPdf, type EscopoRelatorio } from '../../utils/pagamentos-previstos-pdf'
 import { useFaturaConciliacaoStatus } from '../../hooks/useCartoes'
 import { useLocFaturaResumo } from '../../hooks/useLocacao'
+import { useLookupEmpresas } from '../../hooks/useLookups'
+import { mapaEmpresaCurta } from '../../utils/empresaCurta'
 import { supabase } from '../../services/supabase'
 import VencimentoFilterBar, {
   filterByVencimento, VENC_RANGE_VAZIO,
@@ -108,6 +110,11 @@ export default function PainelPagamentos() {
   const [escopoPdf, setEscopoPdfRaw] = useState<EscopoRelatorio>('todos')
   const { data: cps = [], isLoading } = useCPsParaPagamento(STATUS_POR_ESCOPO[escopoPdf])
   const registrarBatch = useRegistrarPagamentoBatch()
+
+  // Empresa pagadora abreviada na linha — mesmo apelido curto usado na lista de
+  // Contas a Pagar, resolvido por mapa para nao virar um lookup por linha.
+  const empresasLookup = useLookupEmpresas()
+  const empresasCurtas = useMemo(() => mapaEmpresaCurta(empresasLookup), [empresasLookup])
 
   const [busca, setBusca] = useState('')
   const [groupBy, setGroupBy] = useState<GroupBy>('vencimento')
@@ -518,6 +525,7 @@ export default function PainelPagamentos() {
                 {section.cps.map(cp => {
                   const pagavel = podePagar(cp)
                   const statusInfo = STATUS_LABEL[cp.status] ?? { label: cp.status, color: 'bg-slate-200 text-slate-700' }
+                  const empresaLabel = cp.empresa_id ? empresasCurtas.get(cp.empresa_id) : undefined
                   return (
                     <div
                       key={cp.id}
@@ -537,6 +545,17 @@ export default function PainelPagamentos() {
                         {selected.has(cp.id)
                           ? <CheckSquare size={15} className="text-emerald-500" />
                           : <Square size={15} />}
+                      </span>
+
+                      <span
+                        className={`shrink-0 w-24 truncate text-center text-[9px] font-bold rounded-md px-1.5 py-0.5 ${
+                          empresaLabel
+                            ? isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+                            : isDark ? 'text-slate-600' : 'text-slate-300'
+                        }`}
+                        title={empresaLabel ?? 'Sem empresa'}
+                      >
+                        {empresaLabel ?? '—'}
                       </span>
 
                       <div className="flex-1 min-w-0">
