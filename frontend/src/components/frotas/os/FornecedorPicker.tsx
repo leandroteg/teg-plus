@@ -9,6 +9,7 @@ import { useFornecedoresOS } from '../../../hooks/useFrotas'
 
 export default function FornecedorPicker({
   valorId, valorNome, onChange, isDark, placeholder = 'Buscar fornecedor por nome ou CNPJ...',
+  usarLista = useFornecedoresOS,
 }: {
   valorId?: string
   /** Nome já conhecido (evita buscar só para exibir o selecionado). */
@@ -16,13 +17,17 @@ export default function FornecedorPicker({
   onChange: (f: { id: string; nome: string } | undefined) => void
   isDark: boolean
   placeholder?: string
+  /** De onde vem a lista. O padrão é a do Frotas (prioriza quem já foi usado em
+   *  OS); a Locação passa a sua, que prioriza quem já foi usado em locação —
+   *  mesmo cadastro corporativo, ordem de relevância diferente. */
+  usarLista?: typeof useFornecedoresOS
 }) {
   const [aberto, setAberto] = useState(false)
   const [busca, setBusca] = useState('')
   const [selecionadoNome, setSelecionadoNome] = useState(valorNome ?? '')
   const ref = useRef<HTMLDivElement>(null)
 
-  const { data: fornecedores = [], isLoading } = useFornecedoresOS(aberto ? busca : undefined)
+  const { data: fornecedores = [], isLoading } = usarLista(aberto ? busca : undefined)
 
   useEffect(() => { setSelecionadoNome(valorNome ?? '') }, [valorNome])
 

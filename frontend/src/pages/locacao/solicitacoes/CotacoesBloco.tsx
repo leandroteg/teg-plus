@@ -14,14 +14,47 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Building2, Paperclip, Loader2, Trash2, Plus, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../../../services/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
+import FornecedorPicker from '../../../components/frotas/os/FornecedorPicker'
+import type { FornecedorOS } from '../../../hooks/useFrotas'
 
 const BUCKET = 'locacao-faturas'
 const BRL = (v?: number | null) =>
   v == null ? '—' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+/** Mesmo cadastro corporativo do Frotas (cmp_fornecedores), mas a lista inicial
+ *  prioriza quem já foi usado EM LOCAÇÃO — o prestador predial não é o mesmo
+ *  universo da oficina de frota, e misturar as duas ordens atrapalha os dois. */
+export function useFornecedoresLocacao(busca?: string) {
+  return useQuery({
+    queryKey: ['loc_fornecedores', busca ?? ''],
+    queryFn: async () => {
+      const termo = (busca ?? '').trim()
+      const { data: usados } = await supabase
+        .from('loc_cotacoes').select('fornecedor_id').not('fornecedor_id', 'is', null)
+      const idsUsados = new Set((usados ?? []).map(u => u.fornecedor_id as string))
+
+      let q = supabase.from('cmp_fornecedores')
+        .select('id, razao_social, nome_fantasia, cnpj, cidade, uf')
+        .eq('ativo', true).order('razao_social').limit(termo ? 50 : 30)
+      if (termo) {
+        q = q.or(`razao_social.ilike.%${termo}%,nome_fantasia.ilike.%${termo}%,cnpj.ilike.%${termo}%`)
+      } else if (idsUsados.size) {
+        q = q.in('id', [...idsUsados])
+      }
+      const { data, error } = await q
+      if (error) throw error
+      return ((data ?? []) as FornecedorOS[])
+        .map(f => ({ ...f, jaUsado: idsUsados.has(f.id) }))
+        .sort((a, b) => Number(b.jaUsado) - Number(a.jaUsado))
+    },
+    staleTime: 60_000,
+  })
+}
+
 export interface LocCotacao {
   id: string
   solicitacao_id: string
+  fornecedor_id?: string | null
   fornecedor_nome?: string | null
   valor_total: number
   prazo_execucao_dias?: number | null
@@ -50,7 +83,7 @@ function useSalvarCotacaoLocacao() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (p: {
-      solicitacao_id: string; fornecedor_nome: string; valor_total: number
+      solicitacao_id: string; fornecedor_id?: string | null; fornecedor_nome: string; valor_total: number
       prazo_execucao_dias?: number | null; observacoes?: string | null
       arquivo?: File | null; criado_por_nome?: string | null
     }) => {
@@ -97,7 +130,7 @@ export default function CotacoesBloco({ solicitacaoId, isDark, somenteLeitura }:
   const remover = useRemoverCotacaoLocacao()
 
   const [aberto, setAberto] = useState(false)
-  const [forn, setForn] = useState('')
+  const [forn, setForn] = useState<{ id: string; nome: string } | null>(null)
   const [valor, setValor] = useState('')
   const [prazo, setPrazo] = useState('')
   const [arquivo, setArquivo] = useState<File | null>(null)
@@ -151,8 +184,14 @@ export default function CotacoesBloco({ solicitacaoId, isDark, somenteLeitura }:
 
           {!somenteLeitura && (aberto ? (
             <div className={`rounded-lg border p-2.5 space-y-2 ${isDark ? 'border-white/[0.1]' : 'border-slate-200'}`}>
-              <input value={forn} onChange={e => setForn(e.target.value)} className={`${inp} w-full`}
-                placeholder="Fornecedor (oficina, prestador…)" />
+              <FornecedorPicker
+                valorId={forn?.id}
+                valorNome={forn?.nome}
+                onChange={f => setForn(f ?? null)}
+                usarLista={useFornecedoresLocacao}
+                isDark={isDark}
+                placeholder="Buscar fornecedor por nome ou CNPJ..."
+              />
               <div className="flex gap-2">
                 <input type="number" step="0.01" placeholder="Valor R$" value={valor}
                   onChange={e => setValor(e.target.value)} className={`${inp} flex-1`} />
@@ -168,16 +207,18 @@ export default function CotacoesBloco({ solicitacaoId, isDark, somenteLeitura }:
                   onChange={e => setArquivo(e.target.files?.[0] ?? null)} />
               </label>
               <div className="flex gap-2">
-                <button type="button" onClick={() => { setAberto(false); setArquivo(null) }}
+                <button type="button" onClick={() => { setAberto(false); setArquivo(null); setForn(null) }}
                   className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold ${txtMuted}`}>Cancelar</button>
-                <button type="button" disabled={!forn.trim() || !valor || salvar.isPending}
+                <button type="button" disabled={!forn || !valor || salvar.isPending}
                   onClick={async () => {
+                    if (!forn) return
                     await salvar.mutateAsync({
-                      solicitacao_id: solicitacaoId, fornecedor_nome: forn.trim(),
+                      solicitacao_id: solicitacaoId,
+                      fornecedor_id: forn.id, fornecedor_nome: forn.nome,
                       valor_total: +valor, prazo_execucao_dias: prazo ? +prazo : null,
                       arquivo, criado_por_nome: perfil?.nome ?? null,
                     })
-                    setForn(''); setValor(''); setPrazo(''); setArquivo(null); setAberto(false)
+                    setForn(null); setValor(''); setPrazo(''); setArquivo(null); setAberto(false)
                   }}
                   className="flex-1 py-1.5 rounded-lg bg-sky-600 text-white text-[11px] font-bold disabled:opacity-50 inline-flex items-center justify-center gap-1">
                   {salvar.isPending && <Loader2 size={11} className="animate-spin" />} Salvar orçamento
