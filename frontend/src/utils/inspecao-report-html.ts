@@ -132,3 +132,116 @@ ${insp.observacoes ? `<h2>OBSERVAÇÕES GERAIS</h2><p>${esc(insp.observacoes)}</
 <footer class="rod">Documento gerado pelo TEG+ QSMA em ${new Date().toLocaleString('pt-BR')}</footer>
 </body></html>`
 }
+
+// ── Registro de limpeza (vem do Portal TEG) ──────────────────────────────────
+// Mesmo caminho de envio da inspeção: HTML aqui, PDF no SuperTEG pelo n8n.
+// A limpeza não tem checklist de modelo — tem a lista de áreas conferidas
+// (jsonb `checklist`) e as fotos, que já chegam como URL pública do Portal.
+
+export interface LimpezaReportRow {
+  id: string
+  titulo: string
+  descricao?: string | null
+  criado_por_nome?: string | null
+  data_conclusao?: string | null
+  created_at: string
+  imovel?: { titulo?: string | null; nome?: string | null; cidade?: string | null; uf?: string | null } | null
+  checklist?: { area: string; estado: string }[] | null
+  fotos?: string[] | null
+}
+
+export function nomeArquivoLimpeza(l: LimpezaReportRow): string {
+  const aloj = (l.imovel?.titulo || l.imovel?.nome || 'alojamento').split(/[\s-]/)[0]
+  const d = (l.data_conclusao ?? l.created_at).slice(0, 10).replace(/-/g, '')
+  return `Limpeza_${aloj}_${d}`.replace(/[^\w.\- ]+/g, '_')
+}
+
+const ESTADO: Record<string, { txt: string; cor: string; bg: string }> = {
+  ok:       { txt: 'OK',       cor: '#047857', bg: '#ecfdf5' },
+  pendente: { txt: 'PENDENTE', cor: '#b45309', bg: '#fffbeb' },
+  na:       { txt: 'N/A',      cor: '#475569', bg: '#f1f5f9' },
+}
+
+export async function buildLimpezaReportHtml(l: LimpezaReportRow): Promise<string> {
+  const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
+  const areas = l.checklist ?? []
+  const pendentes = areas.filter(a => a.estado === 'pendente').length
+  const aloj = l.imovel?.titulo || l.imovel?.nome || '—'
+  const cidade = [l.imovel?.cidade, l.imovel?.uf].filter(Boolean).join('/')
+  const quando = l.data_conclusao ?? l.created_at
+
+  const linhas = areas.map((a, i) => {
+    const cfg = ESTADO[a.estado] ?? ESTADO.na
+    return `<tr class="${a.estado === 'pendente' ? 'nc' : ''}">
+      <td class="ord">${i + 1}</td>
+      <td><div class="item">${esc(a.area)}</div></td>
+      <td class="resp"><span class="tag" style="color:${cfg.cor};background:${cfg.bg}">${cfg.txt}</span></td>
+    </tr>`
+  }).join('')
+
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
+<title>Registro de Limpeza — ${esc(aloj)}</title>
+<style>
+  @page{size:A4 portrait;margin:12mm}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',system-ui,Arial,sans-serif;color:#0f172a;font-size:11pt}
+  header.cab{background:#1e293b;color:#fff;padding:8mm 10mm;display:flex;align-items:center;justify-content:space-between;gap:8mm}
+  header.cab .emp{font-size:12pt;font-weight:800}
+  header.cab .sub{font-size:8pt;color:#b4becb;margin-top:1mm}
+  header.cab .tit{text-align:right}
+  header.cab .tit b{font-size:13pt;display:block}
+  header.cab .tit span{font-size:8.5pt;color:#b4becb}
+  h2{font-size:10.5pt;color:#0891b2;border-bottom:.6mm solid #0891b2;padding-bottom:1.2mm;margin:7mm 0 3mm}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:2mm 8mm}
+  .grid .lbl{font-size:8pt;color:#64748b}
+  .grid .val{font-size:10pt;font-weight:600}
+  table{width:100%;border-collapse:collapse;margin-top:2mm}
+  th{background:#f1f5f9;color:#475569;font-size:8pt;text-transform:uppercase;letter-spacing:.5px;text-align:left;padding:2mm}
+  td{border-bottom:.3mm solid #e2e8f0;padding:2.5mm 2mm;vertical-align:top}
+  tr{page-break-inside:avoid}
+  tr.nc td{background:#fffbeb}
+  td.ord{width:10mm;color:#94a3b8;font-family:Consolas,monospace}
+  td.resp{width:28mm;text-align:right}
+  .tag{font-size:7.5pt;font-weight:800;padding:1mm 2.5mm;border-radius:10mm;white-space:nowrap}
+  .resumo{display:flex;gap:4mm;margin-top:3mm}
+  .kpi{flex:1;border:.3mm solid #e2e8f0;border-radius:2mm;padding:3mm;text-align:center}
+  .kpi b{display:block;font-size:16pt}
+  .kpi span{font-size:8pt;color:#64748b}
+  .kpi.alerta b{color:#b45309}
+  .fotos{display:flex;flex-wrap:wrap;gap:2mm;margin-top:2mm}
+  .fotos img{width:42mm;height:42mm;object-fit:cover;border:.3mm solid #cbd5e1;border-radius:2mm}
+  footer.rod{margin-top:8mm;font-size:7.5pt;color:#94a3b8;text-align:center}
+</style></head><body>
+<header class="cab">
+  <div>
+    <div class="emp">${esc(empresa.fantasia)}</div>
+    <div class="sub">CNPJ: ${esc(empresa.cnpj)}</div>
+  </div>
+  <div class="tit"><b>REGISTRO DE LIMPEZA</b><span>Alojamentos · Portal TEG</span></div>
+</header>
+
+<h2>DADOS DO REGISTRO</h2>
+<div class="grid">
+  <div><div class="lbl">Alojamento</div><div class="val">${esc(aloj)}</div></div>
+  <div><div class="lbl">Cidade</div><div class="val">${esc(cidade || '—')}</div></div>
+  <div><div class="lbl">Registro</div><div class="val">${esc(l.titulo)}</div></div>
+  <div><div class="lbl">Data / Hora</div><div class="val">${esc(fmtDT(quando))}</div></div>
+  <div><div class="lbl">Registrado por</div><div class="val">${esc(l.criado_por_nome ?? '—')}</div></div>
+</div>
+
+<div class="resumo">
+  <div class="kpi"><b>${areas.length}</b><span>áreas conferidas</span></div>
+  <div class="kpi ${pendentes ? 'alerta' : ''}"><b>${pendentes}</b><span>pendências</span></div>
+</div>
+
+${areas.length ? `<h2>ÁREAS CONFERIDAS</h2>
+<table><thead><tr><th>#</th><th>Área</th><th style="text-align:right">Estado</th></tr></thead>
+<tbody>${linhas}</tbody></table>` : ''}
+
+${l.descricao ? `<h2>OBSERVAÇÕES</h2><p>${esc(l.descricao)}</p>` : ''}
+
+${(l.fotos ?? []).length ? `<h2>FOTOS</h2><div class="fotos">${(l.fotos ?? []).slice(0, 12).map(u => `<img src="${esc(u)}" alt=""/>`).join('')}</div>` : ''}
+
+<footer class="rod">Documento gerado pelo TEG+ · Gestão de Imóveis em ${new Date().toLocaleString('pt-BR')}</footer>
+</body></html>`
+}

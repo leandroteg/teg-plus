@@ -5,19 +5,20 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Wrench, X, Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown, ShieldAlert,
+  Wrench, X, Search, LayoutList, LayoutGrid, Columns3, ArrowUp, ArrowDown, ShieldAlert, ClipboardCheck,
 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useSolicitacoesLocacao } from '../../../hooks/useLocacao'
 import SolicitacaoModal from './SolicitacaoModal'
 import RelatorioNCs from './RelatorioNCs'
+import InspecoesLimpezas from './InspecoesLimpezas'
 import { SolicitacaoCard, SolicitacaoRow, URGENCIA_ORDER, imovelLabel } from './SolicitacaoCards'
 import {
   STAGES, STAGE_ACCENT, STAGE_ACCENT_DARK, stageDe, ENCERRADOS, type StageKey,
 } from './solicitacaoStages'
 import type { LocSolicitacao } from '../../../types/locacao'
 
-type ViewMode = 'cards' | 'list' | 'quadro' | 'ncs'
+type ViewMode = 'cards' | 'list' | 'quadro' | 'ncs' | 'confer'
 type SortField = 'data' | 'imovel' | 'urgencia'
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
@@ -131,7 +132,7 @@ export default function SolicitacoesPipeline() {
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
       {/* Etapas — escondidas no quadro, onde as colunas já são as etapas. */}
-      {viewMode !== 'quadro' && viewMode !== 'ncs' && (
+      {viewMode !== 'quadro' && viewMode !== 'ncs' && viewMode !== 'confer' && (
       <div className={`flex gap-1 p-1 pb-2 rounded-t-2xl border-b overflow-x-auto hide-scrollbar ${
         isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'
       }`}>
@@ -195,8 +196,10 @@ export default function SolicitacoesPipeline() {
             className={`p-1.5 ${viewMode === 'quadro' ? (isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700') : (isDark ? 'text-slate-500' : 'text-slate-400')}`}><Columns3 size={14} /></button>
           <button onClick={() => setViewMode('ncs')} title="NCs de Segurança"
             className={`p-1.5 ${viewMode === 'ncs' ? (isDark ? 'bg-rose-500/20 text-rose-300' : 'bg-rose-50 text-rose-600') : (isDark ? 'text-slate-500' : 'text-slate-400')}`}><ShieldAlert size={14} /></button>
+          <button onClick={() => setViewMode('confer')} title="Inspeções e Limpezas"
+            className={`p-1.5 ${viewMode === 'confer' ? (isDark ? 'bg-teal-500/20 text-teal-300' : 'bg-teal-50 text-teal-600') : (isDark ? 'text-slate-500' : 'text-slate-400')}`}><ClipboardCheck size={14} /></button>
         </div>
-        <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'} ${viewMode === 'confer' ? 'invisible' : ''}`}>
           {viewMode === 'quadro'
             ? [...quadroGrouped.values()].reduce((s, l) => s + l.length, 0)
             : activeItems.length} item(s)
@@ -205,7 +208,9 @@ export default function SolicitacoesPipeline() {
 
       {/* Conteúdo */}
       <div className="min-h-[200px]">
-        {viewMode === 'ncs' ? (
+        {viewMode === 'confer' ? (
+          <InspecoesLimpezas isDark={isDark} />
+        ) : viewMode === 'ncs' ? (
           <RelatorioNCs solicitacoes={solicitacoes} isDark={isDark} onAbrir={setDetail} />
         ) : viewMode === 'quadro' ? (
           <div ref={boardRef} style={boardH ? { height: boardH } : undefined}
