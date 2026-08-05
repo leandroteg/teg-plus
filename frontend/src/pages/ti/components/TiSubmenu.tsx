@@ -10,17 +10,21 @@ import { ChevronDown } from 'lucide-react'
 
 const ITENS = [
   { to: '/ti/chamados', label: 'Chamados' },
-  { to: '/ti/atencao', label: 'Precisam de Atenção' },
-  { to: '/ti/recentes', label: 'Chamados Recentes' },
-  { to: '/ti/respostas', label: 'Respostas Prontas' },
-  { to: '/ti/base', label: 'Base de Conhecimento' },
+  { to: '/ti/mais', label: 'Mais opções' },
 ]
+
+// Telas que vivem dentro de "Mais opções": estando em qualquer uma delas, o
+// submenu já aparece marcando "Mais opções".
+const DENTRO_DE_MAIS = ['/ti/atencao', '/ti/recentes', '/ti/respostas', '/ti/base']
 
 export function TiSubmenu() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  // Rota atual entre as do submenu; fora delas, cai em Chamados (o item-âncora).
-  const atual = ITENS.find((i) => pathname === i.to || pathname.startsWith(`${i.to}/`))?.to ?? ITENS[0].to
+  // Rota atual entre as do submenu; as telas de apoio contam como "Mais opções";
+  // fora disso, cai em Chamados (o item-âncora).
+  const atual = DENTRO_DE_MAIS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+    ? '/ti/mais'
+    : ITENS.find((i) => pathname === i.to || pathname.startsWith(`${i.to}/`))?.to ?? ITENS[0].to
 
   return (
     <div className="relative print:hidden">

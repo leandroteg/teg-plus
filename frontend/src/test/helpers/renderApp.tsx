@@ -141,6 +141,7 @@ export function createMockPerfil(overrides: Partial<Perfil> = {}): Perfil {
     email: 'admin@teguniao.com.br',
     cargo: 'Administrador',
     departamento: 'TI',
+    telefone: null,
     avatar_url: null,
     role: 'admin',
     alcada_nivel: 4,

@@ -42,13 +42,12 @@ export function TiTabs() {
 
   const emAberto = stats ? stats.abertos + stats.emAndamento + stats.aguardando : undefined
 
+  // Só o essencial do dia a dia. As telas de apoio (Precisam de Atenção,
+  // Chamados Recentes, Respostas Prontas, Base de Conhecimento) ficam em
+  // /ti/mais, alcançáveis pelo submenu do cabeçalho (TiSubmenu).
   const TABS: Tab[] = [
     { to: '/ti/chamados', end: true, label: 'Chamados', icon: Inbox, accent: 'sky', count: stats?.total },
     { to: '/ti/quadro', label: 'Quadro de Chamados', icon: Columns3, accent: 'violet', count: emAberto },
-    { to: '/ti/atencao', label: 'Precisam de Atenção', icon: AlertTriangle, accent: 'amber' },
-    { to: '/ti/recentes', label: 'Chamados Recentes', icon: History, accent: 'rose' },
-    { to: '/ti/respostas', label: 'Respostas Prontas', icon: MessageSquareText, accent: 'teal' },
-    { to: '/ti/base', label: 'Base de Conhecimento', icon: BookOpen, accent: 'emerald' },
   ]
 
   return (
