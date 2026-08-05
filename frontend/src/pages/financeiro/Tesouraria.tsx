@@ -424,7 +424,8 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
   const aplicar = useAplicarConciliacaoAuto()
 
   const [selMov, setSelMov] = useState<string | null>(null)
-  const [selTitulo, setSelTitulo] = useState<{ id: string; tipo: 'CP' | 'CR' } | null>(null)
+  // N titulos por linha do extrato: o SISPAG paga o lote inteiro numa linha so.
+  const [selTitulos, setSelTitulos] = useState<Array<{ id: string; tipo: 'CP' | 'CR' }>>([])
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
 
   useEffect(() => {
@@ -433,8 +434,18 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
     return () => clearTimeout(t)
   }, [toast])
 
+  // Mais recentes primeiro (desempate por valor desc). Ordena ANTES do slice: cortando
+  // antes, os 30 exibidos eram os 30 primeiros da RPC, nao os 30 mais recentes.
   const movimentacoesBanco = useMemo(
-    () => movimentacoes.filter((mov) => !mov.conciliado && mov.tipo !== 'transferencia').slice(0, 30),
+    () => movimentacoes
+      .filter((mov) => !mov.conciliado && mov.tipo !== 'transferencia')
+      .slice()
+      .sort((a, b) => {
+        const porData = (b.data_movimentacao ?? '').localeCompare(a.data_movimentacao ?? '')
+        if (porData !== 0) return porData
+        return Math.abs(b.valor) - Math.abs(a.valor)
+      })
+      .slice(0, 30),
     [movimentacoes],
   )
 
@@ -476,6 +487,40 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
     [movimentacoesBanco, selMov],
   )
 
+  const titulosSelecionados = useMemo(
+    () => selTitulos
+      .map((sel) => sistemaPendente.find((t) => t.id === sel.id && t.tipo === sel.tipo))
+      .filter((t): t is (typeof sistemaPendente)[number] => !!t),
+    [sistemaPendente, selTitulos],
+  )
+
+  const somaSelecionada = useMemo(
+    () => titulosSelecionados.reduce((acc, t) => acc + t.valorOriginal, 0),
+    [titulosSelecionados],
+  )
+
+  // Quanto da linha do extrato ainda falta cobrir com titulos.
+  const restante = movSelecionado ? Math.abs(movSelecionado.valor) - somaSelecionada : 0
+
+  // Trocar a linha do extrato (saida -> entrada) invalida o que ja estava marcado.
+  useEffect(() => {
+    if (!movSelecionado) return
+    const esperado: 'CP' | 'CR' = movSelecionado.tipo === 'saida' ? 'CP' : 'CR'
+    setSelTitulos((prev) => prev.some((t) => t.tipo !== esperado)
+      ? prev.filter((t) => t.tipo === esperado)
+      : prev)
+  }, [movSelecionado])
+
+  function toggleTitulo(id: string, tipo: 'CP' | 'CR') {
+    setSelTitulos((prev) => {
+      const jaEsta = prev.some((t) => t.id === id && t.tipo === tipo)
+      if (jaEsta) return prev.filter((t) => !(t.id === id && t.tipo === tipo))
+      // Somar CP com CR na mesma linha nao existe — trocar de tipo zera a selecao.
+      const base = prev.filter((t) => t.tipo === tipo)
+      return [...base, { id, tipo }]
+    })
+  }
+
   // Ordenacao da coluna de titulos. 'padrao' preserva o comportamento util:
   // vencimento quando nada esta selecionado, e proximidade de valor quando ha
   // movimento selecionado (o candidato mais provavel primeiro).
@@ -490,12 +535,16 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
     const tipoEsperado: 'CP' | 'CR' | null = movSelecionado
       ? (movSelecionado.tipo === 'saida' ? 'CP' : 'CR')
       : (filtroTipo === 'todos' ? null : filtroTipo)
-    const valorMov = movSelecionado ? Math.abs(movSelecionado.valor) : 0
+    // Compatibilidade medida contra o que FALTA, nao contra o total da linha: a
+    // cada titulo marcado do lote, o proximo que fecha a conta sobe pro topo.
+    const alvo = movSelecionado
+      ? (restante > 0.01 ? restante : Math.abs(movSelecionado.valor))
+      : 0
 
     let base = tipoEsperado
       ? sistemaPendente
           .filter((t) => t.tipo === tipoEsperado)
-          .map((t) => ({ ...t, _delta: movSelecionado ? Math.abs(t.valorOriginal - valorMov) : 0 }))
+          .map((t) => ({ ...t, _delta: movSelecionado ? Math.abs(t.valorOriginal - alvo) : 0 }))
       : sistemaPendente.map((t) => ({ ...t, _delta: 0 }))
 
     const q = buscaTitulo.trim().toLowerCase()
@@ -512,40 +561,49 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
       if (movSelecionado) return a._delta - b._delta
       return a.data.localeCompare(b.data)
     })
-    return ordenado.slice(0, 40)
-  }, [movSelecionado, sistemaPendente, ordemTitulos, ordemAsc, filtroTipo, buscaTitulo])
+    const topo = ordenado.slice(0, 40)
+    // Titulo selecionado que ficou fora do corte (ou da busca) continuaria somando
+    // sem aparecer, e o usuario nao teria como desmarcar.
+    const forasSelecionados = titulosSelecionados
+      .filter((t) => !topo.some((x) => x.id === t.id && x.tipo === t.tipo))
+      .map((t) => ({ ...t, _delta: 0 }))
+    return [...forasSelecionados, ...topo]
+  }, [movSelecionado, sistemaPendente, ordemTitulos, ordemAsc, filtroTipo, buscaTitulo, restante, titulosSelecionados])
 
-  const tituloSelecionado = useMemo(
-    () => sistemaPendente.find((t) => t.id === selTitulo?.id && t.tipo === selTitulo?.tipo) ?? null,
-    [sistemaPendente, selTitulo],
-  )
-
-  const valoresBatem = movSelecionado && tituloSelecionado
-    ? Math.abs(Math.abs(movSelecionado.valor) - tituloSelecionado.valorOriginal) < 0.01
+  const valoresBatem = movSelecionado && titulosSelecionados.length > 0
+    ? Math.abs(Math.abs(movSelecionado.valor) - somaSelecionada) < 0.01
     : false
 
-  const tipoCompativel = movSelecionado && tituloSelecionado
-    ? (movSelecionado.tipo === 'saida' && tituloSelecionado.tipo === 'CP')
-      || (movSelecionado.tipo === 'entrada' && tituloSelecionado.tipo === 'CR')
+  const tipoCompativel = movSelecionado && titulosSelecionados.length > 0
+    ? titulosSelecionados.every((t) => movSelecionado.tipo === 'saida' ? t.tipo === 'CP' : t.tipo === 'CR')
     : false
 
-  const podeCasar = !!(movSelecionado && tituloSelecionado && valoresBatem && tipoCompativel && !aplicar.isPending)
+  const podeCasar = !!(movSelecionado && titulosSelecionados.length > 0 && valoresBatem && tipoCompativel && !aplicar.isPending)
 
   async function handleCasar() {
-    if (!movSelecionado || !tituloSelecionado) return
+    if (!movSelecionado || titulosSelecionados.length === 0) return
+    const tipo = titulosSelecionados[0].tipo
     try {
+      // cand_ids cobre 1:1 e 1:N — a RPC grava cp_id/cr_id quando e um so e
+      // cp_ids/cr_ids quando e lote.
       const r = await aplicar.mutateAsync([{
         mov_id: movSelecionado.id,
-        tipo_match: tituloSelecionado.tipo === 'CP' ? 'cp' : 'cr',
-        cand_id: tituloSelecionado.id,
+        tipo_match: tipo === 'CP' ? 'cp' : 'cr',
+        cand_id: titulosSelecionados[0].id,
+        cand_ids: titulosSelecionados.map((t) => t.id),
       }])
       if (r.aplicadas > 0) {
-        setToast({ kind: 'ok', msg: `Conciliacao realizada — ${tituloSelecionado.titulo}` })
+        setToast({
+          kind: 'ok',
+          msg: titulosSelecionados.length === 1
+            ? `Conciliacao realizada — ${titulosSelecionados[0].titulo}`
+            : `Conciliacao realizada — ${titulosSelecionados.length} titulos casados com 1 linha do extrato`,
+        })
       } else {
         setToast({ kind: 'err', msg: 'Nenhuma conciliacao aplicada (titulo pode ja estar conciliado).' })
       }
       setSelMov(null)
-      setSelTitulo(null)
+      setSelTitulos([])
     } catch (err: any) {
       setToast({ kind: 'err', msg: `Erro: ${err?.message ?? 'falha ao conciliar'}` })
     }
@@ -577,7 +635,7 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
         <div className={`rounded-2xl p-4 ${cardCls}`}>
           <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Como usar</p>
           <p className={`mt-2 text-[11px] leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-            Clique 1 linha do extrato e 1 titulo do sistema com mesmo valor, depois confirme.
+            Clique 1 linha do extrato e 1 ou mais titulos ate a soma bater com o valor, depois confirme.
           </p>
         </div>
       </div>
@@ -663,8 +721,13 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
                   {op.label}{ordemTitulos === op.k && op.k !== 'padrao' ? (ordemAsc ? ' ↑' : ' ↓') : ''}
                 </button>
               ))}
-              {selTitulo && (
-                <button onClick={() => setSelTitulo(null)} className="ml-1 text-[10px] text-slate-400 hover:text-slate-600 font-semibold">Limpar</button>
+              {titulosSelecionados.length > 1 && (
+                <span className="ml-1 rounded-full bg-emerald-100 text-emerald-700 px-2 py-0.5 text-[10px] font-bold">
+                  {titulosSelecionados.length} selec.
+                </span>
+              )}
+              {selTitulos.length > 0 && (
+                <button onClick={() => setSelTitulos([])} className="ml-1 text-[10px] text-slate-400 hover:text-slate-600 font-semibold">Limpar</button>
               )}
             </div>
           </div>
@@ -707,15 +770,16 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
                 {movSelecionado ? 'Nenhum titulo compativel encontrado' : 'Nenhum titulo realizado'}
               </p>
             ) : sistemaOrdenado.map((item) => {
-              const ativo = item.id === selTitulo?.id && item.tipo === selTitulo?.tipo
-              const valorBate = movSelecionado
-                ? Math.abs(item.valorOriginal - Math.abs(movSelecionado.valor)) < 0.01
+              const ativo = selTitulos.some((t) => t.id === item.id && t.tipo === item.tipo)
+              // Destaca quem fecha o que ainda FALTA, nao o total da linha.
+              const valorBate = movSelecionado && !ativo
+                ? Math.abs(item.valorOriginal - restante) < 0.01
                 : false
               return (
                 <button
                   key={`${item.tipo}-${item.id}`}
                   type="button"
-                  onClick={() => setSelTitulo(ativo ? null : { id: item.id, tipo: item.tipo })}
+                  onClick={() => toggleTitulo(item.id, item.tipo)}
                   className={`w-full text-left rounded-xl px-3 py-3 transition-all ${
                     ativo
                       ? 'bg-emerald-50 ring-2 ring-emerald-400/40'
@@ -746,7 +810,7 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
       </div>
 
       {/* Barra de acao sticky */}
-      {(selMov || selTitulo) && (
+      {(selMov || selTitulos.length > 0) && (
         <div className={`sticky bottom-3 z-30 rounded-2xl backdrop-blur-lg border shadow-lg px-4 py-3 flex items-center gap-3 flex-wrap ${
           isDark ? 'bg-[#1e293b]/95 border-white/[0.08]' : 'bg-white/95 border-slate-200'
         }`}>
@@ -757,25 +821,33 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
                 Extrato: {fmtFull(Math.abs(movSelecionado.valor))}
               </span>
             )}
-            {movSelecionado && tituloSelecionado && <span className="mx-2 text-slate-400">×</span>}
-            {tituloSelecionado && (
+            {movSelecionado && titulosSelecionados.length > 0 && <span className="mx-2 text-slate-400">×</span>}
+            {titulosSelecionados.length === 1 && (
               <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                {tituloSelecionado.tipo} {tituloSelecionado.titulo} — {fmtFull(tituloSelecionado.valorOriginal)}
+                {titulosSelecionados[0].tipo} {titulosSelecionados[0].titulo} — {fmtFull(titulosSelecionados[0].valorOriginal)}
               </span>
             )}
-            {movSelecionado && tituloSelecionado && !valoresBatem && (
+            {titulosSelecionados.length > 1 && (
+              <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                {titulosSelecionados.length} titulos — soma {fmtFull(somaSelecionada)}
+              </span>
+            )}
+            {movSelecionado && titulosSelecionados.length > 0 && !valoresBatem && (
               <span className="ml-2 inline-flex items-center gap-1 text-amber-600 font-bold">
-                <AlertTriangle size={11} /> valores nao batem
+                <AlertTriangle size={11} />
+                {restante > 0
+                  ? `faltam ${fmtFull(restante)}`
+                  : `excede em ${fmtFull(Math.abs(restante))}`}
               </span>
             )}
-            {movSelecionado && tituloSelecionado && !tipoCompativel && (
+            {movSelecionado && titulosSelecionados.length > 0 && !tipoCompativel && (
               <span className="ml-2 inline-flex items-center gap-1 text-red-600 font-bold">
                 <AlertTriangle size={11} /> tipo incompativel
               </span>
             )}
           </div>
           <button
-            onClick={() => { setSelMov(null); setSelTitulo(null) }}
+            onClick={() => { setSelMov(null); setSelTitulos([]) }}
             className={`px-3 py-2 rounded-xl border text-[11px] font-semibold ${
               isDark ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
@@ -792,7 +864,7 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
             ) : (
               <Check size={13} />
             )}
-            Casar selecionados
+            {titulosSelecionados.length > 1 ? `Casar ${titulosSelecionados.length} titulos` : 'Casar selecionados'}
           </button>
         </div>
       )}
