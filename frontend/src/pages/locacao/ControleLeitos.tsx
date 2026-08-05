@@ -130,12 +130,40 @@ async function imprimirFolhaQrs(tituloAloj: string, leitos: Leito[]) {
 
 // FOLHA DO ALOJAMENTO — 1 página com o QR do alojamento (o colaborador escaneia e
 // informa o número do leito). Pra colar na entrada.
-async function imprimirFolhaAlojamento(alojamento: LocImovel, leitos: Leito[]) {
-  const logo = LOGO()
+async function paginaAlojamento(alojamento: LocImovel, leitos: Leito[], logo: string) {
   const codigo = alojamento.titulo || alojamento.nome || alojamento.descricao || 'Alojamento'
   const faixa = faixaLeitosInfo(leitos)
   const dataUrl = await QRCode.toDataURL(alojamentoUrl(alojamento.id), { width: 720, margin: 1 })
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Alojamento — ${esc(codigo)}</title>
+  return `<section class="page">
+      <img class="logo" src="${logo}" alt="TEG"/>
+      <div class="lbl">ALOJAMENTO</div>
+      <div class="cod">${esc(codigo)}</div>
+      <div class="end">${esc(fmtEndereco(alojamento))}${alojamento.cidade ? ' · ' + esc(alojamento.cidade) : ''}${alojamento.uf ? '/' + esc(alojamento.uf) : ''}</div>
+      <img class="qr" src="${dataUrl}" alt="QR"/>
+      <div class="call">Escaneie e informe o número do seu leito<br/>para fazer check-in / check-out no Portal TEG</div>
+      ${faixa ? `<div class="faixa">
+        <div class="fx-lbl">LEITOS DESTE ALOJAMENTO</div>
+        <div class="fx-num">${faixa.total === 1
+          ? esc(faixa.ini)
+          : `${esc(faixa.ini)}<span>a</span>${esc(faixa.fim)}`}</div>
+        <div class="fx-sub">${faixa.total} leito${faixa.total > 1 ? 's' : ''} · informe um número desta faixa</div>
+      </div>` : ''}
+      <footer>Cada leito também tem o seu próprio QR</footer>
+    </section>`
+}
+
+/** Folha com 1 página por alojamento. Serve para 1 ou para todos de uma vez. */
+async function imprimirFolhaAlojamento(alojamentos: LocImovel[], leitosPorImovel: Map<string, Leito[]>) {
+  if (!alojamentos.length) return
+  const logo = LOGO()
+  const um = alojamentos.length === 1
+  const titulo = um
+    ? `Alojamento — ${esc(alojamentos[0].titulo || alojamentos[0].nome || alojamentos[0].descricao || '')}`
+    : `QR dos Alojamentos (${alojamentos.length})`
+  const paginas = await Promise.all(
+    alojamentos.map(a => paginaAlojamento(a, leitosPorImovel.get(a.id) ?? [], logo)),
+  )
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${titulo}</title>
     <style>${PRINT_CSS}
       .page{height:262mm;border:3px solid #0891b2;border-radius:18px;padding:14mm;margin:0 auto;max-width:186mm;
             display:flex;flex-direction:column;align-items:center;text-align:center;page-break-inside:avoid}
@@ -151,24 +179,10 @@ async function imprimirFolhaAlojamento(alojamento: LocImovel, leitos: Leito[]) {
       .faixa .fx-num span{font-family:inherit;font-size:18pt;color:#64748b;font-weight:700;margin:0 3mm}
       .faixa .fx-sub{font-size:11pt;color:#475569;margin-top:1mm}
       footer{margin-top:auto;font-size:10pt;color:#94a3b8}
+      .page + .page{margin-top:8mm}
     </style></head><body>
-    <div class="bar"><button onclick="window.print()">🖨 Imprimir folha do alojamento</button></div>
-    <section class="page">
-      <img class="logo" src="${logo}" alt="TEG"/>
-      <div class="lbl">ALOJAMENTO</div>
-      <div class="cod">${esc(codigo)}</div>
-      <div class="end">${esc(fmtEndereco(alojamento))}${alojamento.cidade ? ' · ' + esc(alojamento.cidade) : ''}${alojamento.uf ? '/' + esc(alojamento.uf) : ''}</div>
-      <img class="qr" src="${dataUrl}" alt="QR"/>
-      <div class="call">Escaneie e informe o número do seu leito<br/>para fazer check-in / check-out no Portal TEG</div>
-      ${faixa ? `<div class="faixa">
-        <div class="fx-lbl">LEITOS DESTE ALOJAMENTO</div>
-        <div class="fx-num">${faixa.total === 1
-          ? esc(faixa.ini)
-          : `${esc(faixa.ini)}<span>a</span>${esc(faixa.fim)}`}</div>
-        <div class="fx-sub">${faixa.total} leito${faixa.total > 1 ? 's' : ''} · informe um número desta faixa</div>
-      </div>` : ''}
-      <footer>Cada leito também tem o seu próprio QR</footer>
-    </section>
+    <div class="bar"><button onclick="window.print()">🖨 Imprimir ${um ? 'folha do alojamento' : `${alojamentos.length} folhas`}</button></div>
+    ${paginas.join('')}
     </body></html>`
   const w = window.open('', '_blank')
   if (w) { w.document.write(html); w.document.close(); w.focus() }
@@ -328,6 +342,17 @@ export default function ControleLeitos() {
               <input type="text" placeholder="Buscar alojamento…" value={search} onChange={e => setSearch(e.target.value)}
                 className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
             </div>
+            {/* QR de todos os alojamentos filtrados de uma vez (padrão do botão QR da Frota) */}
+            <button
+              onClick={() => imprimirFolhaAlojamento(alojFiltrados, leitosPorImovel)}
+              disabled={!alojFiltrados.length}
+              title="Abrir o QR de todos os alojamentos filtrados, um por página"
+              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-bold transition-colors disabled:opacity-40 ${
+                isDark ? 'border-white/[0.1] text-slate-300 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <QrCode size={13} /> QR Codes ({alojFiltrados.length})
+            </button>
           </>
         ) : <div className="flex-1" />}
         {/* Toggle lista/card — só na sub-visão Alojamento (padrão da aba Ativos) */}
@@ -742,7 +767,7 @@ function AlojamentoDrawer({ alojamento, leitos, ocupPorLeito, isDark, onClose }:
               <div className="min-w-0">
                 <p className={`text-xs ${txtMuted}`}>QR do alojamento — cole na entrada. Ao escanear, o colaborador informa o número do leito no Portal. Cada leito também tem o seu QR.</p>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <button onClick={() => imprimirFolhaAlojamento(alojamento, leitosOrd)}
+                  <button onClick={() => imprimirFolhaAlojamento([alojamento], new Map([[alojamento.id, leitosOrd]]))}
                     className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700">
                     <Printer size={13} /> Folha do alojamento
                   </button>
