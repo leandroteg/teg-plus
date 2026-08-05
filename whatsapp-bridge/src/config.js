@@ -39,4 +39,6 @@ export const config = {
   followupEsperaMin: Number(process.env.WHATSAPP_FOLLOWUP_ESPERA_MIN ?? 15),
   followupMax: Number(process.env.WHATSAPP_FOLLOWUP_MAX ?? 2), // avisos por chamado
   assistenteEmail: process.env.WHATSAPP_PERFIL_ASSISTENTE_EMAIL ?? 'assistente-ia@sistema.teguniao.com.br',
+  // Assina, no chamado, as respostas que a equipe digita direto no WhatsApp.
+  suporteEmail: process.env.WHATSAPP_PERFIL_SUPORTE_EMAIL ?? 'suporte-whatsapp@sistema.teguniao.com.br',
 }

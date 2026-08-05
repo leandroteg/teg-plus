@@ -35,6 +35,17 @@ export async function getAssistentePerfilId() {
   return data.id
 }
 
+// Conta de sistema que assina as respostas digitadas no celular pela equipe.
+let suporteIdCache = null
+export async function getSuportePerfilId() {
+  if (suporteIdCache) return suporteIdCache
+  const { data, error } = await supabase.from('sys_perfis').select('id').eq('email', config.suporteEmail).maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error(`Conta de suporte não encontrada (${config.suporteEmail}). Aplique a migração ti_perfil_suporte_whatsapp.`)
+  suporteIdCache = data.id
+  return data.id
+}
+
 // Casa o telefone com um funcionário cadastrado (últimos 8 dígitos). null se não achar.
 //
 // Só perfis ATIVOS: quando alguém sai da empresa, o número costuma ser
@@ -81,6 +92,15 @@ export async function claimMensagem(msgId) {
   if (!error) return true
   if (error.code === '23505') return false // duplicada — já processada (ou em processamento)
   throw error
+}
+
+// Anota uma mensagem que o PRÓPRIO bridge enviou. Serve para o webhook saber
+// que ela não foi digitada por um atendente no celular (o claim já existe, então
+// o handleFromMe a ignora). Reusa a tabela de dedup — mesma semântica: "esta
+// mensagem já está contabilizada".
+export async function marcarEnviada(msgId) {
+  const { error } = await supabase.from('ti_whatsapp_mensagens').insert({ id: String(msgId) })
+  if (error && error.code !== '23505') err('marcarEnviada', error.message)
 }
 
 export async function desfazerClaim(msgId) {
@@ -223,11 +243,15 @@ export async function getOutboundReplies(sinceISO) {
   // Avisos automáticos do assistente vão SEM o cabeçalho "*Resposta no CH-x*"
   // (ele anunciaria uma resposta humana que não houve).
   const assistenteId = await getAssistentePerfilId().catch(() => null)
+  // Resposta que a equipe digitou no celular já chegou ao usuário pelo próprio
+  // WhatsApp — ela existe no chamado só como registro. Reenviar duplicaria.
+  const suporteId = await getSuportePerfilId().catch(() => null)
   const out = []
   for (const c of rows) {
     const ch = one(c.chamado)
     if (!ch) continue
     if (c.autor_id === ch.solicitante_id) continue // o próprio solicitante comentou → não ecoar
+    if (suporteId && c.autor_id === suporteId) continue // já entregue pelo celular
     const sol = one(ch.solicitante)
     const tel = (ch.contato_externo && ch.contato_externo.telefone) || (sol && sol.telefone)
     if (!tel) continue

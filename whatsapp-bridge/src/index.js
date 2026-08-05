@@ -11,7 +11,7 @@ import { aiEnabled, aiRouter } from './ai.js'
 
 // Versão do código: vai para o log de boot E para ti_whatsapp.worker_versao,
 // então dá para conferir por SQL se um deploy aplicou mesmo o código novo.
-const BUILD = '1.4.0-ciclo-conversa'
+const BUILD = '1.5.0-resposta-celular'
 
 // Estado local espelhado em ti_whatsapp (o painel do TEG+ lê de lá).
 let local = { status: 'disconnected', numero: null }
@@ -286,6 +286,7 @@ async function main() {
   log(`aviso de mudança de status: LIGADO (agrupa após ${config.statusSettleMs / 1000}s de silêncio)`)
   log(`acompanhamento automático: ${config.followupEsperaMin > 0 ? `LIGADO (${config.followupEsperaMin} min, máx ${config.followupMax} avisos)` : 'desligado'}`)
   try { log('conta externa:', await db.getExternoPerfilId()) } catch (e) { err(e.message) }
+  try { await db.getSuportePerfilId(); log('resposta pelo celular: registrada no chamado') } catch (e) { err(e.message) }
 
   await db.syncStatus({ worker_versao: BUILD }) // carimba a versão p/ conferência por SQL
 

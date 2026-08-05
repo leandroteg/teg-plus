@@ -155,9 +155,46 @@ export async function handleMessagesUpsert(data) {
   if (firstErr) throw firstErr
 }
 
+// Resposta que a equipe digitou no celular (ou WhatsApp Web) em vez de usar o
+// painel: registra no chamado para a conversa não ficar só no aparelho.
+// O que o próprio bridge envia já está anotado em ti_whatsapp_mensagens
+// (marcarEnviada), então o claim abaixo falha e a mensagem é ignorada — é isso
+// que separa "digitado à mão" de "enviado pelo sistema".
+async function handleFromMe(raw) {
+  const key = raw.key
+  const msgId = String(key.id || '')
+  if (!msgId) return
+  let jid = String(key.remoteJid || '')
+  if (jid.endsWith('@lid')) jid = String(key.remoteJidAlt || '')
+  if (!jid.endsWith('@s.whatsapp.net')) return // grupo/status/etc
+  const digits = db.onlyDigits(jid.split('@')[0])
+  if (!digits) return
+
+  const m = unwrap(raw.message)
+  const texto = extractText(m) || detectMedia(m)?.caption || ''
+  if (!texto) return // mídia enviada pelo atendente: fica só no WhatsApp
+
+  if (!(await db.claimMensagem(msgId))) return // enviada pelo próprio bridge
+
+  const telKey = db.phoneKey(digits)
+  const known = await db.findRequesterByPhone(digits)
+  const ticket = await db.findConversaAtiva({
+    solicitanteId: known ? known.id : null,
+    telKey: known ? null : telKey,
+    janelaMin: config.janelaMin,
+  })
+  if (!ticket) { log(`resposta manual sem chamado aberto (${digits}) — não registrada`); return }
+
+  const suporteId = await db.getSuportePerfilId()
+  await db.addComment({ chamadoId: ticket.id, autorId: suporteId, mensagem: texto })
+  await db.vincularMensagemAoChamado(msgId, ticket.id)
+  log(`+resposta do celular em CH-${ticket.numero} (${digits})`)
+}
+
 async function handleOne(raw) {
   const key = raw?.key
-  if (!key || key.fromMe) return
+  if (!key) return
+  if (key.fromMe) { await handleFromMe(raw); return }
   const sender = resolveSender(raw)
   if (!sender) return
   const { digits, name } = sender

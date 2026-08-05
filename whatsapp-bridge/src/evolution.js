@@ -3,7 +3,7 @@
 // configurada (config.evolutionInstance).
 import { config } from './config.js'
 import { log, err } from './log.js'
-import { onlyDigits } from './db.js'
+import { onlyDigits, marcarEnviada } from './db.js'
 
 async function api(method, path, body) {
   const res = await fetch(`${config.evolutionUrl}${path}`, {
@@ -24,12 +24,18 @@ async function api(method, path, body) {
 // ─── Envio ───────────────────────────────────────────────────────────────────
 // Retorna true/false — o /ai/responder usa o retorno p/ acionar o retry do n8n;
 // os demais chamadores ignoram (mesmo comportamento de antes).
+// Toda mensagem enviada pelo bridge tem o id anotado (marcarEnviada). É assim
+// que o webhook distingue o que saiu DAQUI do que um atendente digitou no
+// celular: o que volta como "enviado por nós" sem estar anotado foi digitado
+// à mão — e vira comentário no chamado.
 export async function sendWhatsApp({ to, text }) {
   let digits = onlyDigits(to)
   if (!digits) return false
   if (!digits.startsWith('55') && (digits.length === 10 || digits.length === 11)) digits = '55' + digits
   try {
-    await api('POST', `/message/sendText/${config.evolutionInstance}`, { number: digits, text })
+    const r = await api('POST', `/message/sendText/${config.evolutionInstance}`, { number: digits, text })
+    const id = r?.key?.id
+    if (id) await marcarEnviada(id)
     return true
   } catch (e) { err('sendWhatsApp', e.message); return false }
 }
