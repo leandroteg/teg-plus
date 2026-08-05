@@ -211,10 +211,19 @@ export default function Conciliacao() {
 
   const isLoading = tab === 'cp' ? loadingCP : loadingCR
 
+  // Cancelado fica de fora da tela inteira: ela existe para classificar e
+  // conciliar, e título cancelado não entra em nenhuma das duas coisas
+  // (handleConciliar só aceita pago/recebido). Deixá-lo na lista só inflava os
+  // contadores de "sem CC" e "sem classe" com trabalho que ninguém precisa
+  // fazer. Filtrado aqui, na origem, para lista, KPIs e badges das abas
+  // contarem a mesma coisa.
+  const cpAtivas = useMemo(() => contasCP.filter(cp => cp.status !== 'cancelado'), [contasCP])
+  const crAtivas = useMemo(() => contasCR.filter(cr => cr.status !== 'cancelado'), [contasCR])
+
   // Unify rows
   const rows: UnifiedRow[] = useMemo(() => {
     if (tab === 'cp') {
-      return contasCP.map(cp => ({
+      return cpAtivas.map(cp => ({
         id: cp.id,
         tipo: 'cp' as const,
         nome: cp.fornecedor_nome,
@@ -231,7 +240,7 @@ export default function Conciliacao() {
         raw: cp,
       }))
     }
-    return contasCR.map(cr => ({
+    return crAtivas.map(cr => ({
       id: cr.id,
       tipo: 'cr' as const,
       nome: cr.cliente_nome,
@@ -247,7 +256,7 @@ export default function Conciliacao() {
       natureza: cr.natureza,
       raw: cr,
     }))
-  }, [tab, contasCP, contasCR])
+  }, [tab, cpAtivas, crAtivas])
 
   // Apply filters
   const filtered = useMemo(() => {
@@ -594,7 +603,7 @@ export default function Conciliacao() {
           <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
             tab === 'cp' ? 'bg-emerald-500' : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'
           }`}>
-            {contasCP.length}
+            {cpAtivas.length}
           </span>
         </button>
         <button
@@ -609,7 +618,7 @@ export default function Conciliacao() {
           <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
             tab === 'cr' ? 'bg-emerald-500' : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'
           }`}>
-            {contasCR.length}
+            {crAtivas.length}
           </span>
         </button>
       </div>
