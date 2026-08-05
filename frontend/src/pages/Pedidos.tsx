@@ -47,6 +47,10 @@ import { api } from '../services/api'
 import { supabase } from '../services/supabase'
 import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, useConferirAnexo, TIPO_LABEL } from '../hooks/useAnexos'
 import type { PedidoAnexo } from '../hooks/useAnexos'
+import VencimentoFilterBar, {
+  filterByVencimento, VENC_RANGE_VAZIO,
+  type VencFilterId, type VencRange,
+} from '../components/financeiro/VencimentoFilterBar'
 import FluxoTimeline from '../components/FluxoTimeline'
 import RecebimentoModal from '../components/RecebimentoModal'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
@@ -3109,6 +3113,8 @@ export default function Pedidos() {
   const [sortField, setSortField]                   = useState<SortField>('data')
   const [sortDir, setSortDir]                       = useState<SortDir>('desc')
   const [viewMode, setViewMode]                     = useState<ViewMode>('cards')
+  const [vencFilter, setVencFilter]                 = useState<VencFilterId>('all')
+  const [vencRange, setVencRange]                   = useState<VencRange>(VENC_RANGE_VAZIO)
   const [selectedPedido, setSelectedPedido]         = useState<PedidoListItem | null>(null)
   const [compartilharPedido, setCompartilhar]       = useState<PedidoListItem | null>(null)
   const [showLiberarModal, setShowLiberarModal]     = useState<string | null>(null)
@@ -3216,18 +3222,34 @@ export default function Pedidos() {
   const stage = PIPELINE_STAGES.find(s => s.key === activeTab)!
   const tabFiltered = useMemo(() => allPedidoItems.filter(stage.matchFn), [allPedidoItems, stage])
 
+  // Vencimento: atalhos + período De/Até (between). Mesmo componente e mesma
+  // função de filtro do Financeiro, para os dois lados responderem igual.
+  // Pedido sem vencimento sai de qualquer filtro que não seja "Todos" — string
+  // vazia compara como menor que hoje e ele apareceria em "Vencidos".
+  const vencFiltered = useMemo(() => {
+    if (vencFilter === 'all') return tabFiltered
+    const comVenc = tabFiltered.filter(p => !!(p as any).data_vencimento)
+    return filterByVencimento(
+      comVenc,
+      vencFilter,
+      vencRange,
+      p => (p as any).data_vencimento as string,
+      p => (p as any).status_pagamento === 'pago' || p.status === 'cancelado',
+    )
+  }, [tabFiltered, vencFilter, vencRange])
+
   // Search
   const searched = useMemo(() => {
-    if (!search.trim()) return tabFiltered
+    if (!search.trim()) return vencFiltered
     const q = search.toLowerCase()
-    return tabFiltered.filter(p =>
+    return vencFiltered.filter(p =>
       (p.numero_pedido ?? '').toLowerCase().includes(q) ||
       p.fornecedor_nome.toLowerCase().includes(q) ||
       (p.requisicao?.descricao ?? '').toLowerCase().includes(q) ||
       (p.requisicao?.obra_nome ?? '').toLowerCase().includes(q) ||
       (p.nf_numero ?? '').toLowerCase().includes(q)
     )
-  }, [tabFiltered, search])
+  }, [vencFiltered, search])
 
   // Sort
   const sorted = useMemo(() => {
@@ -3367,6 +3389,24 @@ export default function Pedidos() {
           <Download size={14} />
         </button>
       </div>
+
+      {/* Filtro por vencimento — atalhos + De/Até. Conta dentro da aba atual. */}
+      <VencimentoFilterBar
+        items={tabFiltered.filter(p => !!(p as any).data_vencimento)}
+        value={vencFilter}
+        onChange={setVencFilter}
+        range={vencRange}
+        onRangeChange={setVencRange}
+        getVencimento={p => (p as any).data_vencimento as string}
+        isSettled={p => (p as any).status_pagamento === 'pago' || p.status === 'cancelado'}
+        isDark={dark}
+      />
+      {vencFilter !== 'all' && (
+        <p className={`text-[11px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+          {sorted.length} de {tabFiltered.length} pedidos desta etapa
+          {tabFiltered.some(p => !(p as any).data_vencimento) && ' · pedidos sem vencimento ficam fora do filtro'}
+        </p>
+      )}
 
       {/* Content */}
       {isLoading ? (
