@@ -5,16 +5,18 @@ import {
   Landmark, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Plus, Upload, Wallet, Building2, CircleDollarSign, Search,
   Filter, X, Calendar, ChevronDown, Eye, FileText, Check,
-  AlertTriangle, Zap, RefreshCw, ArrowDownUp, Link2, CreditCard, Download,
+  AlertTriangle, Zap, RefreshCw, ArrowDownUp, Link2, CreditCard, Download, Pencil,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Line, ComposedChart,
 } from 'recharts'
 import {
-  useTesourariaDashboard, useCriarContaBancaria, useCriarMovimentacao, useImportExtrato,
+  useTesourariaDashboard, useCriarContaBancaria, useEditarContaBancaria,
+  useCriarMovimentacao, useImportExtrato,
 } from '../../hooks/useTesouraria'
 import { useContasPagar, useContasReceber, useAplicarConciliacaoAuto } from '../../hooks/useFinanceiro'
+import { useAuth } from '../../contexts/AuthContext'
 import type { TesourariaDashboardData, CategoriaMovimentacao, MovimentacaoTesouraria } from '../../types/financeiro'
 import DetalheDrawer from '../../components/DetalheDrawer'
 import AuditoriaCard from '../../components/AuditoriaCard'
@@ -437,8 +439,11 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
   )
 
   const sistemaPendente = useMemo(() => {
+    // So titulos ja realizados: a conciliacao casa o extrato com o que JA saiu
+    // (ou entrou) no banco. Com previsto/confirmado na lista, ela enchia de
+    // conta em aberto (as varias da Cemig) que nunca teria par no extrato.
     const cp = contasPagar
-      .filter((item) => !['conciliado', 'cancelado'].includes(item.status))
+      .filter((item) => item.status === 'pago')
       .map((item) => ({
         id: item.id,
         tipo: 'CP' as const,
@@ -451,7 +456,7 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
       }))
 
     const cr = contasReceber
-      .filter((item) => !['conciliado', 'cancelado'].includes(item.status))
+      .filter((item) => item.status === 'recebido')
       .map((item) => ({
         id: item.id,
         tipo: 'CR' as const,
@@ -471,17 +476,44 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
     [movimentacoesBanco, selMov],
   )
 
-  // Quando ha movimento selecionado, ranqueia candidatos por (tipo certo, valor batendo)
+  // Ordenacao da coluna de titulos. 'padrao' preserva o comportamento util:
+  // vencimento quando nada esta selecionado, e proximidade de valor quando ha
+  // movimento selecionado (o candidato mais provavel primeiro).
+  const [ordemTitulos, setOrdemTitulos] = useState<'padrao' | 'valor' | 'titulo'>('padrao')
+  const [ordemAsc, setOrdemAsc] = useState(true)
+  // A pagar x A receber. Com movimento selecionado o tipo ja e imposto pelo lado
+  // do extrato (saida so casa com CP), entao o filtro fica inativo.
+  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'CP' | 'CR'>('todos')
+  const [buscaTitulo, setBuscaTitulo] = useState('')
+
   const sistemaOrdenado = useMemo(() => {
-    if (!movSelecionado) return sistemaPendente.slice(0, 40)
-    const tipoEsperado: 'CP' | 'CR' = movSelecionado.tipo === 'saida' ? 'CP' : 'CR'
-    const valorMov = Math.abs(movSelecionado.valor)
-    const compativeis = sistemaPendente
-      .filter((t) => t.tipo === tipoEsperado)
-      .map((t) => ({ ...t, _delta: Math.abs(t.valorOriginal - valorMov) }))
-      .sort((a, b) => a._delta - b._delta)
-    return compativeis.slice(0, 40)
-  }, [movSelecionado, sistemaPendente])
+    const tipoEsperado: 'CP' | 'CR' | null = movSelecionado
+      ? (movSelecionado.tipo === 'saida' ? 'CP' : 'CR')
+      : (filtroTipo === 'todos' ? null : filtroTipo)
+    const valorMov = movSelecionado ? Math.abs(movSelecionado.valor) : 0
+
+    let base = tipoEsperado
+      ? sistemaPendente
+          .filter((t) => t.tipo === tipoEsperado)
+          .map((t) => ({ ...t, _delta: movSelecionado ? Math.abs(t.valorOriginal - valorMov) : 0 }))
+      : sistemaPendente.map((t) => ({ ...t, _delta: 0 }))
+
+    const q = buscaTitulo.trim().toLowerCase()
+    if (q) {
+      base = base.filter((t) =>
+        t.titulo.toLowerCase().includes(q) || (t.descricao ?? '').toLowerCase().includes(q))
+    }
+
+    const dir = ordemAsc ? 1 : -1
+    const ordenado = [...base].sort((a, b) => {
+      if (ordemTitulos === 'valor') return (a.valorOriginal - b.valorOriginal) * dir
+      if (ordemTitulos === 'titulo') return a.titulo.localeCompare(b.titulo, 'pt-BR') * dir
+      // padrao
+      if (movSelecionado) return a._delta - b._delta
+      return a.data.localeCompare(b.data)
+    })
+    return ordenado.slice(0, 40)
+  }, [movSelecionado, sistemaPendente, ordemTitulos, ordemAsc, filtroTipo, buscaTitulo])
 
   const tituloSelecionado = useMemo(
     () => sistemaPendente.find((t) => t.id === selTitulo?.id && t.tipo === selTitulo?.tipo) ?? null,
@@ -600,21 +632,79 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
           <div className={`flex items-center justify-between gap-2 px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
             <div className="flex items-center gap-2">
               <FileText size={14} className="text-violet-500" />
-              <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Titulos do sistema</h3>
+              <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Titulos realizados</h3>
               {movSelecionado && (
                 <span className="ml-1 rounded-full bg-violet-100 text-violet-700 px-2 py-0.5 text-[10px] font-bold">
                   filtrando {movSelecionado.tipo === 'saida' ? 'CP' : 'CR'} compativel
                 </span>
               )}
             </div>
-            {selTitulo && (
-              <button onClick={() => setSelTitulo(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-semibold">Limpar</button>
-            )}
+            <div className="flex items-center gap-1">
+              {([
+                { k: 'padrao' as const, label: movSelecionado ? 'Compat.' : 'Venc.' },
+                { k: 'valor' as const, label: 'Valor' },
+                { k: 'titulo' as const, label: 'Titulo' },
+              ]).map(op => (
+                <button
+                  key={op.k}
+                  onClick={() => {
+                    if (ordemTitulos === op.k && op.k !== 'padrao') setOrdemAsc(v => !v)
+                    else { setOrdemTitulos(op.k); setOrdemAsc(true) }
+                  }}
+                  title={op.k === 'padrao'
+                    ? (movSelecionado ? 'Mais compativel com o movimento primeiro' : 'Por vencimento')
+                    : `Ordenar por ${op.label.toLowerCase()}`}
+                  className={`rounded-lg px-1.5 py-0.5 text-[10px] font-bold transition-colors ${
+                    ordemTitulos === op.k
+                      ? 'bg-violet-100 text-violet-700'
+                      : isDark ? 'text-slate-500 hover:bg-white/[0.06]' : 'text-slate-400 hover:bg-slate-100'
+                  }`}
+                >
+                  {op.label}{ordemTitulos === op.k && op.k !== 'padrao' ? (ordemAsc ? ' ↑' : ' ↓') : ''}
+                </button>
+              ))}
+              {selTitulo && (
+                <button onClick={() => setSelTitulo(null)} className="ml-1 text-[10px] text-slate-400 hover:text-slate-600 font-semibold">Limpar</button>
+              )}
+            </div>
+          </div>
+          <div className={`flex items-center gap-2 px-3 py-2 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <div className="flex items-center gap-1">
+              {([
+                { k: 'todos' as const, label: 'Todos' },
+                { k: 'CP' as const, label: 'Pagos' },
+                { k: 'CR' as const, label: 'Recebidos' },
+              ]).map(op => (
+                <button
+                  key={op.k}
+                  disabled={Boolean(movSelecionado)}
+                  onClick={() => setFiltroTipo(op.k)}
+                  title={movSelecionado ? 'Com movimento selecionado o tipo vem do extrato' : undefined}
+                  className={`rounded-lg px-2 py-0.5 text-[10px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                    filtroTipo === op.k && !movSelecionado
+                      ? 'bg-violet-100 text-violet-700'
+                      : isDark ? 'text-slate-500 hover:bg-white/[0.06]' : 'text-slate-400 hover:bg-slate-100'
+                  }`}
+                >
+                  {op.label}
+                </button>
+              ))}
+            </div>
+            <input
+              value={buscaTitulo}
+              onChange={(e) => setBuscaTitulo(e.target.value)}
+              placeholder="Buscar titulo..."
+              className={`ml-auto w-32 rounded-lg px-2 py-1 text-[11px] outline-none transition-colors ${
+                isDark
+                  ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200 placeholder:text-slate-500'
+                  : 'bg-slate-50 border border-slate-200 text-slate-700 placeholder:text-slate-400'
+              }`}
+            />
           </div>
           <div className="divide-y divide-slate-100 p-2 max-h-[60vh] overflow-y-auto">
             {sistemaOrdenado.length === 0 ? (
               <p className={`px-2 py-6 text-center text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                {movSelecionado ? 'Nenhum titulo compativel encontrado' : 'Nenhum titulo pendente'}
+                {movSelecionado ? 'Nenhum titulo compativel encontrado' : 'Nenhum titulo realizado'}
               </p>
             ) : sistemaOrdenado.map((item) => {
               const ativo = item.id === selTitulo?.id && item.tipo === selTitulo?.tipo
@@ -817,11 +907,13 @@ function FluxoCaixaChart({ data, isDark }: {
 
 // ── ContasBancariasPanel ────────────────────────────────────────────────────
 
-function ContasBancariasPanel({ contas, isDark, onNovaConta, onImportOFX }: {
+function ContasBancariasPanel({ contas, isDark, onNovaConta, onImportOFX, onEditarConta }: {
   contas: TesourariaDashboardData['contas']
   isDark: boolean
   onNovaConta: () => void
   onImportOFX: () => void
+  /** Só passa quando o usuário é Admin — sem isso o lápis nem aparece. */
+  onEditarConta?: (conta: TesourariaDashboardData['contas'][number]) => void
 }) {
   return (
     <div className={`rounded-2xl overflow-hidden ${
@@ -869,6 +961,17 @@ function ContasBancariasPanel({ contas, isDark, onNovaConta, onImportOFX }: {
               }`}>
                 {fmtFull(c.saldo_atual)}
               </p>
+              {onEditarConta && (
+                <button
+                  onClick={() => onEditarConta(c)}
+                  title="Editar conta"
+                  className={`shrink-0 rounded-lg p-1 transition-colors ${
+                    isDark ? 'text-slate-500 hover:bg-white/[0.08] hover:text-slate-300' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                  }`}
+                >
+                  <Pencil size={11} />
+                </button>
+              )}
             </div>
           ))
         )}
@@ -1257,33 +1360,52 @@ function MovimentacoesTable({ movimentacoes, isDark, onNovaMovimentacao }: {
 
 // ── NovaContaModal ──────────────────────────────────────────────────────────
 
-function NovaContaModal({ isDark, onClose }: { isDark: boolean; onClose: () => void }) {
+// Mesmo formulário para criar e editar: `conta` preenchida = edição.
+// A edição é restrita a Admin no ponto que abre este modal.
+function NovaContaModal({ isDark, onClose, conta }: {
+  isDark: boolean
+  onClose: () => void
+  conta?: { id: string; nome: string; banco_nome?: string | null; agencia?: string | null; conta?: string | null; tipo?: string | null; cor?: string | null }
+}) {
   const criar = useCriarContaBancaria()
+  const editar = useEditarContaBancaria()
+  const editando = Boolean(conta?.id)
   const [form, setForm] = useState({
-    nome: '',
-    banco_nome: '',
-    agencia: '',
-    conta: '',
-    tipo: 'corrente' as 'corrente' | 'poupanca' | 'investimento',
-    cor: CORES_PRESET[0],
+    nome: conta?.nome ?? '',
+    banco_nome: conta?.banco_nome ?? '',
+    agencia: conta?.agencia ?? '',
+    conta: conta?.conta ?? '',
+    tipo: (conta?.tipo as 'corrente' | 'poupanca' | 'investimento') ?? 'corrente',
+    cor: conta?.cor ?? CORES_PRESET[0],
   })
   const [erroSalvar, setErroSalvar] = useState<string | null>(null)
 
   const canSubmit = form.nome.trim().length > 0
+  const salvando = criar.isPending || editar.isPending
 
   const handleSubmit = () => {
     if (!canSubmit) return
     setErroSalvar(null)
-    criar.mutate(
-      { nome: form.nome, banco_nome: form.banco_nome || undefined, agencia: form.agencia || undefined, conta: form.conta || undefined, tipo: form.tipo, cor: form.cor },
-      {
-        onSuccess: () => onClose(),
-        onError: (err) => {
-          const msg = err instanceof Error ? err.message : 'Erro ao salvar conta bancária'
-          setErroSalvar(msg)
-        },
+    const payload = {
+      nome: form.nome,
+      banco_nome: form.banco_nome || undefined,
+      agencia: form.agencia || undefined,
+      conta: form.conta || undefined,
+      tipo: form.tipo,
+      cor: form.cor,
+    }
+    const handlers = {
+      onSuccess: () => onClose(),
+      onError: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Erro ao salvar conta bancária'
+        setErroSalvar(msg)
       },
-    )
+    }
+    if (editando && conta) {
+      editar.mutate({ id: conta.id, ...payload }, handlers)
+    } else {
+      criar.mutate(payload, handlers)
+    }
   }
 
   const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
@@ -1309,7 +1431,7 @@ function NovaContaModal({ isDark, onClose }: { isDark: boolean; onClose: () => v
           isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'
         }`}>
           <h2 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            Nova Conta Bancaria
+            {editando ? 'Editar Conta Bancaria' : 'Nova Conta Bancaria'}
           </h2>
           <button onClick={onClose} className={`p-1 rounded-lg transition-colors ${
             isDark ? 'hover:bg-white/[0.06] text-slate-400' : 'hover:bg-slate-100 text-slate-500'
@@ -1419,11 +1541,11 @@ function NovaContaModal({ isDark, onClose }: { isDark: boolean; onClose: () => v
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!canSubmit || criar.isPending}
+            disabled={!canSubmit || salvando}
             className="px-4 py-2 rounded-xl text-xs font-bold bg-teal-600 text-white hover:bg-teal-700 transition-colors
               disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
-            {criar.isPending ? 'Salvando...' : 'Criar Conta'}
+            {salvando ? 'Salvando...' : editando ? 'Salvar' : 'Criar Conta'}
           </button>
         </div>
       </div>
@@ -2186,6 +2308,9 @@ export default function Tesouraria() {
   const { isDark } = useTheme()
   const [searchParams, setSearchParams] = useSearchParams()
   const [periodo, setPeriodo] = useState('30d')
+  // Edicao de conta bancaria e restrita a Admin (pedido do user 05/ago).
+  const { isAdmin } = useAuth()
+  const [contaEmEdicao, setContaEmEdicao] = useState<TesourariaDashboardData['contas'][number] | null>(null)
   const [showNovaConta, setShowNovaConta] = useState(false)
   const [showNovaMovimentacao, setShowNovaMovimentacao] = useState(false)
   const [showImportExtrato, setShowImportExtrato] = useState(false)
@@ -2374,6 +2499,7 @@ export default function Tesouraria() {
                 isDark={isDark}
                 onNovaConta={() => setShowNovaConta(true)}
                 onImportOFX={() => setShowImportExtrato(true)}
+                onEditarConta={isAdmin ? (c) => setContaEmEdicao(c) : undefined}
               />
               <AgingPanel agingCp={agingCp} agingCr={agingCr} isDark={isDark} />
             </div>
@@ -2415,6 +2541,7 @@ export default function Tesouraria() {
                 isDark={isDark}
                 onNovaConta={() => setShowNovaConta(true)}
                 onImportOFX={() => setShowImportExtrato(true)}
+                onEditarConta={isAdmin ? (c) => setContaEmEdicao(c) : undefined}
               />
             </div>
           </div>
@@ -2434,6 +2561,13 @@ export default function Tesouraria() {
         <OmiePanel isDark={isDark} />
       )}
 
+      {contaEmEdicao && (
+        <NovaContaModal
+          isDark={isDark}
+          conta={contaEmEdicao}
+          onClose={() => setContaEmEdicao(null)}
+        />
+      )}
       {showNovaConta && (
         <NovaContaModal isDark={isDark} onClose={() => setShowNovaConta(false)} />
       )}
