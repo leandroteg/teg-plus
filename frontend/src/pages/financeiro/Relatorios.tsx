@@ -56,6 +56,14 @@ export function RelatoriosToolbar({ de, ate, setDe, setAte, isDark }: {
 
 export const relPeriodoDefault = () => ({ de: `${new Date().getFullYear()}-01`, ate: ymHoje() })
 
+// O Painel abre no mês anterior + mês corrente. O ano inteiro (padrão dos
+// Relatórios) enchia os cards com meses já liquidados e escondia o que está
+// vencendo agora, que é a pergunta do painel.
+export const painelPeriodoDefault = () => {
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1)
+  return { de: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, ate: ymHoje() }
+}
+
 // Fluxo de Caixa abre olhando pra FRENTE: próximo mês → dezembro do ano desse mês.
 export const fluxoPeriodoDefault = () => {
   const d = new Date(); d.setMonth(d.getMonth() + 1)

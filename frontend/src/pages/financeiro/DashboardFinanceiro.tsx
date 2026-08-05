@@ -9,7 +9,7 @@ import {
 
 const PainelPagamentos = lazy(() => import('./PainelPagamentos'))
 // Import estático: a toolbar do período renderiza no header (mesma linha do título)
-import Relatorios, { RelatoriosToolbar, PeriodoSelect, relPeriodoDefault, fluxoPeriodoDefault } from './Relatorios'
+import Relatorios, { RelatoriosToolbar, PeriodoSelect, relPeriodoDefault, painelPeriodoDefault, fluxoPeriodoDefault } from './Relatorios'
 
 // Sub-painéis do seletor: painel padrão, pgtos previstos e as telas de Relatórios
 type PainelKey = 'painel' | 'contas_receber' | 'pgtos_previstos' | 'rel_fluxo' | 'rel_aging'
@@ -139,7 +139,7 @@ export default function DashboardFinanceiro({ initialPainel }: { initialPainel?:
   const nav = useNavigate()
   const location = useLocation()
   // intervalo de meses ('YYYY-MM'), mesmo padrão dos relatórios
-  const [periodo, setPeriodo] = useState(relPeriodoDefault)
+  const [periodo, setPeriodo] = useState(painelPeriodoDefault)
   const [painelAtivo, setPainelAtivo] = useState<PainelKey>(initialPainel ?? 'painel')
   const [relPeriodo, setRelPeriodo] = useState(relPeriodoDefault)  // De → Até dos relatórios (vive no header)
 
@@ -149,7 +149,9 @@ export default function DashboardFinanceiro({ initialPainel }: { initialPainel?:
     else if (painelAtivo in REL_TIPO) setRelPeriodo(relPeriodoDefault())
   }, [painelAtivo])
 
-  useEffect(() => { setPeriodo(relPeriodoDefault()) }, [location.key])
+  // ao voltar para o painel, volta ao padrão DELE (mês anterior + corrente) —
+  // usar o dos relatórios aqui reabria no ano inteiro
+  useEffect(() => { setPeriodo(painelPeriodoDefault()) }, [location.key])
   const { data, isLoading, refetch } = useFinanceiroDashboard(periodo.de, periodo.ate)
 
   const kpis = data?.kpis ?? EMPTY_KPIS
