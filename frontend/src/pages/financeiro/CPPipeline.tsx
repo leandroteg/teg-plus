@@ -3682,7 +3682,12 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               </button>
             )}
             {cp.status === 'confirmado' && (
-              <button onClick={() => onAction('addLote', cp)} className="flex-1 py-3 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-all flex items-center justify-center gap-2">
+              <button
+                onClick={() => onAction('addLote', cp)}
+                disabled={devolvida}
+                title={devolvida ? 'Resolva a inconsistência antes de incluir no lote' : undefined}
+                className="flex-1 py-3 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 <Layers size={15} /> Adicionar ao Lote
               </button>
             )}
@@ -3824,6 +3829,18 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empres
           <span className={`text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
             {cp.fornecedor_nome}
           </span>
+          {/* Sem isto a devolução era invisível na lista: o título continuava
+              com cara de normal e só o detalhe mostrava a pendência. */}
+          {cp.devolucao_motivo && (
+            <span
+              title={`Devolvido para correção${cp.devolvido_para_nome ? ` — ${cp.devolvido_para_nome}` : ''}: ${cp.devolucao_motivo}`}
+              className={`inline-flex items-center gap-0.5 text-[9px] font-bold rounded-full px-1.5 py-0.5 shrink-0 ${
+                isDark ? 'bg-rose-500/15 text-rose-300' : 'bg-rose-50 text-rose-700 border border-rose-200'
+              }`}
+            >
+              <Undo2 size={8} /> Devolvido
+            </span>
+          )}
           {cp.origem === 'logistica' && (
             <span className="inline-flex items-center gap-0.5 bg-purple-50 text-purple-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
               <Truck size={8} /> Log
@@ -4840,11 +4857,21 @@ export default function CPPipeline() {
   // ou juntar ao que já está montado. Antes só criava lote novo, e quem quisesse
   // incluir um título tinha que ir até o detalhe do lote.
   const handleCriarLote = (ids: string[]) => {
+    // Título devolvido para correção não avança. A trava existia só no botão
+    // Confirmar (previsto → confirmado); daqui, que é o avanço a partir de
+    // Confirmados, um título com pendência entrava em lote e seguia pro pagamento.
+    const devolvidos = ids.filter(id => contasById.get(id)?.devolucao_motivo)
+    const liberados = ids.filter(id => !contasById.get(id)?.devolucao_motivo)
+    if (devolvidos.length > 0) {
+      showToast('error', `${devolvidos.length} título(s) devolvido(s) para correção ficaram de fora — resolva a pendência antes.`)
+    }
+    if (liberados.length === 0) return
+
     if (lotesEmMontagem.length > 0) {
-      setDestinoLoteIds(ids)
+      setDestinoLoteIds(liberados)
       return
     }
-    void criarLoteNovo(ids)
+    void criarLoteNovo(liberados)
   }
 
   const criarLoteNovo = async (ids: string[]) => {
