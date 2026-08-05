@@ -189,13 +189,35 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
   const border = isDark ? 'divide-white/[0.05]' : 'divide-slate-100'
   const txt = isDark ? 'text-slate-300' : 'text-slate-600'
 
-  const Linha = ({ label, val, cls, sub }: { label: string; val: (ym: string) => number; cls?: string; sub?: boolean }) => (
-    <tr className={cls}>
-      <td className={`${tdLbl} ${sub ? 'pl-7' : ''} ${cls ? '' : txt}`}>{label}</td>
-      {meses.map(ym => <td key={ym} className={td}>{fmtK(val(ym))}</td>)}
-      <td className={`${td} font-bold`}>{fmtK(meses.reduce((s, ym) => s + val(ym), 0))}</td>
-    </tr>
-  )
+  // estimado = mês sem nada em contas a receber, então o valor veio do cronograma
+  const receitaEstimada = (ym: string) => !receitaReal.has(ym)
+  const corEst = isDark ? 'text-amber-300' : 'text-amber-600'
+
+  const Linha = ({ label, val, cls, sub, estimado }: {
+    label: string; val: (ym: string) => number; cls?: string; sub?: boolean
+    /** marca a célula como projeção (amarelo + asterisco) */
+    estimado?: (ym: string) => boolean
+  }) => {
+    const algumEst = !!estimado && meses.some(estimado)
+    return (
+      <tr className={cls}>
+        <td className={`${tdLbl} ${sub ? 'pl-7' : ''} ${cls ? '' : txt}`}>{label}</td>
+        {meses.map(ym => {
+          const est = !!estimado?.(ym)
+          return (
+            <td key={ym} className={`${td} ${est ? corEst : ''}`}
+              title={est ? 'projeção do cronograma do EGP — ainda não há nota em contas a receber' : undefined}>
+              {fmtK(val(ym))}{est && '*'}
+            </td>
+          )
+        })}
+        <td className={`${td} font-bold ${algumEst ? corEst : ''}`}
+          title={algumEst ? 'inclui meses projetados' : undefined}>
+          {fmtK(meses.reduce((s, ym) => s + val(ym), 0))}{algumEst && '*'}
+        </td>
+      </tr>
+    )
+  }
 
   return (
     <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
@@ -209,7 +231,7 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
             </tr>
           </thead>
           <tbody className={`divide-y ${border}`}>
-            <Linha label="RECEITAS" val={receitaDe}
+            <Linha label="RECEITAS" val={receitaDe} estimado={receitaEstimada}
               cls={`font-bold ${isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`} />
 
             {SECTIONS.map(sec => (
@@ -231,8 +253,9 @@ export default function FluxoCaixaPrevisto({ de, ate, isDark }: { de: string; at
         </table>
       </div>
       <p className={`px-4 py-2 text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        Receitas: cronograma PUBLICADO no EGP (painel Cronograma → Publicar cronograma); real de contas a receber substitui no mês. Saídas: contas a pagar (classe financeira),
-        contratos recorrentes provisionados e folha CLT projetada — todas mapeadas nas categorias do Plano Orçamentário.
+        <span className={isDark ? 'text-amber-300' : 'text-amber-600'}>*</span> receita <b>estimada</b>: projeção do cronograma PUBLICADO no EGP (painel Cronograma → Publicar cronograma),
+        usada enquanto o mês não tem nota em contas a receber — assim que houver, o real substitui e o asterisco sai.
+        Saídas: contas a pagar (classe financeira), contratos recorrentes provisionados e folha CLT projetada — todas mapeadas nas categorias do Plano Orçamentário.
       </p>
     </div>
   )
