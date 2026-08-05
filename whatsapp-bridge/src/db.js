@@ -324,6 +324,19 @@ export async function syncStatus(patch) {
   if (error) err('syncStatus', error.message)
 }
 
+// ─── Cursores de saída (sobrevivem a deploy/restart) ─────────────────────────
+export async function getCursors() {
+  const { data, error } = await supabase.from('ti_whatsapp')
+    .select('cursor_saida, cursor_status').eq('id', 1).maybeSingle()
+  if (error) { err('getCursors', error.message); return null } // falha → boot igual ao de antes
+  return { saida: data?.cursor_saida ?? null, status: data?.cursor_status ?? null }
+}
+
+export async function setCursor(coluna, iso) {
+  const { error } = await supabase.from('ti_whatsapp').update({ [coluna]: iso }).eq('id', 1)
+  if (error) err('setCursor', coluna, error.message)
+}
+
 // Lê e LIMPA o comando pendente enviado pelo painel admin.
 export async function pollCommand() {
   const { data, error } = await supabase.from('ti_whatsapp').select('comando, comando_payload').eq('id', 1).maybeSingle()

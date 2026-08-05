@@ -57,7 +57,11 @@ export default function ChamadoDetalhe() {
   const { user, isStaff: staff } = useTiAuth()
   const queryClient = useQueryClient()
 
-  const ticketQ = useQuery({ queryKey: ['ti', 'ticket', id], queryFn: () => getTicket(id!), enabled: !!id })
+  // refetchInterval: no canal WhatsApp a resposta do usuario chega pelo bridge,
+  // nao por acao na tela — sem poll o atendente fica olhando um chamado parado
+  // e conclui que o usuario sumiu. (Aba oculta nao consulta: main.tsx define
+  // refetchIntervalInBackground false.)
+  const ticketQ = useQuery({ queryKey: ['ti', 'ticket', id], queryFn: () => getTicket(id!), enabled: !!id, refetchInterval: 15_000 })
   const assigneesQ = useQuery({ queryKey: ['ti', 'assignees'], queryFn: listAssignees, enabled: staff })
   const catQ = useQuery({ queryKey: ['ti', 'categories'], queryFn: listCategories, enabled: staff })
   const secQ = useQuery({ queryKey: ['ti', 'sectors'], queryFn: listSectors, enabled: staff })
@@ -215,6 +219,13 @@ export default function ChamadoDetalhe() {
                 </select>
               )}
               <textarea className="input min-h-[90px] resize-y" placeholder="Escreva uma resposta…" value={body} onChange={(e) => setBody(e.target.value)} />
+              {staff && t.externalContact && (
+                <p className={`mt-1.5 text-xs ${internal ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {internal
+                    ? `Nota interna — NÃO será enviada ao WhatsApp de ${t.externalContact.phone}.`
+                    : `Será enviada agora no WhatsApp ${t.externalContact.phone}, como “Resposta no ${t.code}”.`}
+                </p>
+              )}
               <div className="mt-2 flex items-center justify-between">
                 {staff ? (
                   <label className="flex items-center gap-2 text-sm text-slate-600">

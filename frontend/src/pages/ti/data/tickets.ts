@@ -190,10 +190,17 @@ export async function getTicket(id: string): Promise<TicketDetail | null> {
   // supabase-js infere os embeds autor/ator como array (mesmo sendo to-one); em
   // runtime vêm como objeto. Tipamos o callback como any e o mapper lida com isso.
   /* eslint-disable @typescript-eslint/no-explicit-any */
+  // Chamado do WhatsApp: o solicitante é a conta de sistema "WhatsApp (externo)".
+  // Sem este override, TODA fala do usuário no histórico aparece com esse nome e
+  // a equipe não distingue quem falou o quê. Mesmo tratamento que toTicket já dá
+  // ao cabeçalho do chamado (mappers.ts).
+  const ext = t.contato_externo && typeof t.contato_externo === 'object' ? (t.contato_externo as { nome?: string }) : null
+  const solId = (t.solicitante as { id?: string } | null)?.id
+  const asAuthor = (p: any) => (ext?.nome && p?.id && p.id === solId ? { ...p, nome: ext.nome } : p)
   const comments = (comRes.data ?? []).map((c: any) =>
-    toComment(c, toTicketUser(c.autor, roleFor(c.autor?.id))))
+    toComment(c, toTicketUser(asAuthor(c.autor), roleFor(c.autor?.id))))
   const activities = (actRes.data ?? []).map((a: any) =>
-    toActivity(a, a.ator ? toTicketUser(a.ator, roleFor(a.ator.id)) : null))
+    toActivity(a, a.ator ? toTicketUser(asAuthor(a.ator), roleFor(a.ator.id)) : null))
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   return { ...toTicket(t), comments, activities, attachments, customFields }

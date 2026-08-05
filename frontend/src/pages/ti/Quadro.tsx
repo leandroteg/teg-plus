@@ -75,11 +75,16 @@ function Column({ status, tickets, onMove }: { status: Status; tickets: Ticket[]
 
 export default function Quadro() {
   const queryClient = useQueryClient()
-  const { data, isLoading } = useQuery({ queryKey: ['ti', 'board'], queryFn: () => listTickets({}) })
+  // Poll: chamados nascem pelo WhatsApp o dia todo; sem isso o quadro aberto na
+  // TV/mesa da equipe fica congelado no estado do primeiro carregamento.
+  const { data, isLoading } = useQuery({ queryKey: ['ti', 'board'], queryFn: () => listTickets({}), refetchInterval: 20_000 })
 
   const mutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: Status }) => patchTicket(id, { status }),
     onSuccess: () => {
+      // 'board' precisa entrar aqui: com o poll ligado, o update otimista de
+      // onMove seria desfeito pelo próximo refetch se o cache não sincronizasse.
+      queryClient.invalidateQueries({ queryKey: ['ti', 'board'] })
       queryClient.invalidateQueries({ queryKey: ['ti', 'tickets'] })
       queryClient.invalidateQueries({ queryKey: ['ti', 'stats'] })
     },

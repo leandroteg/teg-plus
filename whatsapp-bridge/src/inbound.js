@@ -157,7 +157,14 @@ async function handleOne(raw) {
   try {
     await processMessage({ raw, digits, name, body, mediaInfo, msgId, efeitos })
   } catch (e) {
-    if (msgId && !efeitos.commit) await db.desfazerClaim(msgId).catch(() => {}) // permite retry da Evolution
+    if (msgId && !efeitos.commit) {
+      await db.desfazerClaim(msgId).catch(() => {}) // permite retry da Evolution
+    } else {
+      // Claim já definitivo (houve escrita): a reentrega será ignorada e esta
+      // mensagem morre aqui. Não deixar o usuário no vácuo nem a equipe sem rastro.
+      err('MENSAGEM PERDIDA (falha após a 1ª escrita) — msgId:', msgId, '| de:', digits, '|', e.message)
+      await sendWhatsApp({ to: digits, text: '⚠️ Tive um problema ao registrar sua última mensagem. Se você não receber a confirmação em instantes, por favor reenvie.' })
+    }
     throw e
   }
 }
@@ -188,7 +195,9 @@ async function processMessage({ raw, digits, name, body, mediaInfo, msgId, efeit
 
   // chamado-alvo: (a) cita CH-xxxx → (b) conversa recente aberta
   let ticket = null
-  const cit = body.match(/CH[-\s]?(\d+)/i)
+  // \b é essencial: sem ele "o switch 8 caiu" viraria comentário no CH-0008
+  // de outra pessoa (o mesmo vale para patch/touch/match + número).
+  const cit = body.match(/\bCH[-\s]?(\d+)/i)
   if (cit) ticket = await db.findTicketByNumero(parseInt(cit[1], 10))
   if (!ticket) {
     ticket = known
@@ -243,12 +252,17 @@ async function processMessage({ raw, digits, name, body, mediaInfo, msgId, efeit
     // junto com a resposta de setor é anexada (o worker a descartava).
     await abrirChamado({ solicitanteId: pend.solicitanteId, contatoExterno: pend.contatoExterno, body: pend.firstText, media: pend.media || media, setorId: chosen.id, to: digits, msgId, efeitos })
   } else {
+    // Texto que não casa com setor quase sempre É a descrição do problema: o
+    // usuário cumprimentou primeiro ("Bom dia") e só agora contou o caso.
+    // ACUMULA em vez de descartar — sem isso o chamado nascia intitulado "Oi".
+    if (body) pend.firstText = pend.firstText ? `${pend.firstText}\n${body}` : body
+    if (!pend.media && media) pend.media = media
     pend.tries += 1; pend.ts = Date.now()
     if (pend.tries >= 2) {
       pendingSector.delete(digits)
-      await abrirChamado({ solicitanteId: pend.solicitanteId, contatoExterno: pend.contatoExterno, body: pend.firstText, media: pend.media || media, setorId: null, to: digits, msgId, efeitos })
+      await abrirChamado({ solicitanteId: pend.solicitanteId, contatoExterno: pend.contatoExterno, body: pend.firstText, media: pend.media, setorId: null, to: digits, msgId, efeitos })
     } else {
-      await sendWhatsApp({ to: digits, text: `Não entendi 🤔.\n\n${sectorQuestion(sectors)}` })
+      await sendWhatsApp({ to: digits, text: `Anotei sua mensagem 👍 Só falta o setor para eu direcionar:\n\n${sectorQuestion(sectors)}` })
     }
   }
 }
@@ -261,10 +275,14 @@ async function abrirChamado({ solicitanteId, contatoExterno, body, media, setorI
     return
   }
   const raw = (body || '').trim()
-  const titulo = raw.length >= 4 ? raw.slice(0, 80) : 'Atendimento via WhatsApp'
+  // Conta CARACTERES (code points), não unidades UTF-16: os CHECKs do banco
+  // usam length() do Postgres. "👍🏽" tem raw.length 4 mas 2 caracteres — pelo
+  // critério antigo virava título e o insert estourava o CHECK (>= 3).
+  const rawLen = [...raw].length
+  const titulo = rawLen >= 4 ? [...raw].slice(0, 80).join('') : 'Atendimento via WhatsApp'
   // descricao precisa satisfazer o CHECK ti_chamados_descricao_check (mín. ~5 chars):
   // textos curtos ("oi") ganham prefixo; só-mídia usa o texto padrão.
-  const descricao = raw.length >= 5
+  const descricao = rawLen >= 5
     ? raw
     : media
       ? '(mensagem com mídia — ver anexos)'

@@ -11,7 +11,7 @@ import { aiEnabled, aiRouter } from './ai.js'
 
 // Versão do código: vai para o log de boot E para ti_whatsapp.worker_versao,
 // então dá para conferir por SQL se um deploy aplicou mesmo o código novo.
-const BUILD = '1.2.0-followup'
+const BUILD = '1.3.0-preprod'
 
 // Estado local espelhado em ti_whatsapp (o painel do TEG+ lê de lá).
 let local = { status: 'disconnected', numero: null }
@@ -21,7 +21,13 @@ function setLocal(patch) { local = { ...local, ...patch } }
 let outboundCursor = new Date().toISOString()
 let statusCursor = outboundCursor
 let statusFalhas = 0 // ciclos consecutivos segurando o cursor por falha de envio
+let saidaFalhas = 0
 const STATUS_MAX_RETRIES = 5
+const SAIDA_MAX_RETRIES = 5
+// Intervalo entre mensagens de um mesmo lote. O número é novo e amanhã fala
+// com dezenas de contatos pela 1ª vez: disparar em rajada é o padrão clássico
+// de bloqueio do WhatsApp. ~40 msg/min continua muito acima do volume real.
+const ENVIO_INTERVALO_MS = Number(process.env.WHATSAPP_ENVIO_INTERVALO_MS ?? 1200)
 let stopped = false
 
 function sleep(ms) { return new Promise((res) => setTimeout(res, ms)) }
@@ -142,17 +148,31 @@ async function loopSaida() {
   while (!stopped) {
     try {
       const { out: replies, lastSeen } = await db.getOutboundReplies(outboundCursor)
+      let falhou = false
       for (const r of replies) {
         const texto = r.doAssistente
           ? r.mensagem // aviso automático já se explica; prefixo de "resposta" enganaria
           : `*Resposta no CH-${String(r.numero).padStart(4, '0')}*\n${r.mensagem}`
-        await evo.sendWhatsApp({ to: r.to, text: texto })
+        const ok = await evo.sendWhatsApp({ to: r.to, text: texto })
+        if (!ok) { err(`saída CH-${r.numero}: envio falhou — segurando cursor p/ nova tentativa`); falhou = true; break }
+        await sleep(ENVIO_INTERVALO_MS) // espaça a rajada
       }
-      // Avança pelo último comentário VISTO (não só enviado): comentários filtrados
-      // (autor=solicitante, chamado sem telefone) deixam de ser re-buscados a cada
-      // poll — sem isso o cursor congela e, passado o cap de linhas do Supabase,
-      // o canal de saída travaria de vez.
-      if (lastSeen && lastSeen > outboundCursor) outboundCursor = lastSeen
+      // Falha de envio NÃO avança o cursor: a resposta da equipe é retentada no
+      // próximo ciclo (sem isso ela sumia em silêncio — a equipe jura que
+      // respondeu e o usuário jura que não recebeu).
+      if (falhou && saidaFalhas < SAIDA_MAX_RETRIES) saidaFalhas += 1
+      else {
+        if (falhou) err('saída: desistindo do envio após', SAIDA_MAX_RETRIES, 'tentativas')
+        saidaFalhas = 0
+        // Avança pelo último comentário VISTO (não só enviado): comentários filtrados
+        // (autor=solicitante, chamado sem telefone) deixam de ser re-buscados a cada
+        // poll — sem isso o cursor congela e, passado o cap de linhas do Supabase,
+        // o canal de saída travaria de vez.
+        if (lastSeen && lastSeen > outboundCursor) {
+          outboundCursor = lastSeen
+          await db.setCursor('cursor_saida', outboundCursor)
+        }
+      }
     } catch (e) { err('loopSaida', e.message) }
     await sleep(config.pollSaidaMs)
   }
@@ -181,6 +201,7 @@ async function loopStatus() {
         const ok = await evo.sendWhatsApp({ to: m.to, text: texto(String(m.numero).padStart(4, '0')) })
         if (!ok) { err(`status CH-${m.numero}: envio falhou — segurando cursor p/ nova tentativa`); falhou = true; break }
         log(`status CH-${m.numero}: ${m.de} → ${m.para} (avisado ${m.to})`)
+        await sleep(ENVIO_INTERVALO_MS) // espaça a rajada (equipe arrastando vários cards)
       }
       // Falha de envio NÃO avança o cursor: o aviso é retentado no próximo
       // ciclo (perder um 'aguardando_usuario' travaria o chamado). Após
@@ -190,7 +211,10 @@ async function loopStatus() {
       else {
         if (falhou) err('status: desistindo do aviso após', STATUS_MAX_RETRIES, 'tentativas')
         statusFalhas = 0
-        if (lastSeen && lastSeen > statusCursor) statusCursor = lastSeen
+        if (lastSeen && lastSeen > statusCursor) {
+          statusCursor = lastSeen
+          await db.setCursor('cursor_status', statusCursor)
+        }
       }
     } catch (e) { err('loopStatus', e.message) }
     await sleep(config.pollSaidaMs)
@@ -254,6 +278,16 @@ async function main() {
   try { log('conta externa:', await db.getExternoPerfilId()) } catch (e) { err(e.message) }
 
   await db.syncStatus({ worker_versao: BUILD }) // carimba a versão p/ conferência por SQL
+
+  // Retoma os cursores de onde pararam (um deploy no meio do expediente não
+  // pode engolir respostas em voo), mas nunca mais que 6h atrás — se o bridge
+  // ficou dias fora, reenviar tudo seria pior que perder.
+  const cur = await db.getCursors()
+  const piso = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+  if (cur?.saida && cur.saida > piso) outboundCursor = cur.saida
+  if (cur?.status && cur.status > piso) statusCursor = cur.status
+  log('cursores:', `saída=${outboundCursor}`, `status=${statusCursor}`)
+
   await reconcile()
 
   app.listen(config.port, () => log(`webhook ouvindo na porta ${config.port} (POST /webhook)`))
