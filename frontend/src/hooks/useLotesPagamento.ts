@@ -280,6 +280,54 @@ export function useComentarItemLote() {
   })
 }
 
+// ── Mutation: decisão título a título (mig 232/233) ──────────────────────────
+
+export interface DecisaoItemResultado {
+  decisao: 'aprovado' | 'rejeitado'
+  pendentes: number
+  aprovados: number
+  rejeitados: number
+  total: number
+  lote_fechado: boolean
+}
+
+/**
+ * Decide UM título do lote, da tela do APROVADOR. O lote continua o mesmo:
+ * aprovado libera a CP para o Financeiro pagar na hora, recusado sai do lote e
+ * volta para 'confirmado'. A aprovação só fecha quando não resta item pendente.
+ *
+ * Toda a regra (inclusive a checagem de alçada) fica no banco, em RPC SECURITY
+ * DEFINER: o aprovador não tem o módulo financeiro e a escrita direta do
+ * cliente morreria na RLS sem avisar ninguém. É o que separa este hook do
+ * useDecidirItemLote acima, que é do Financeiro e escreve na tabela.
+ */
+export function useDecidirTituloLote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ loteId, cpId, decisao, motivo }: {
+      loteId: string
+      cpId: string
+      decisao: 'aprovado' | 'rejeitado'
+      motivo?: string
+    }) => {
+      const { data, error } = await supabase.rpc('fin_lote_decidir_cp', {
+        p_lote_id: loteId,
+        p_cp_id: cpId,
+        p_decisao: decisao,
+        p_motivo: motivo ?? null,
+      })
+      if (error) throw new Error(error.message)
+      return data as DecisaoItemResultado
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
 // ── Mutation: Criar lote ─────────────────────────────────────────────────────
 
 export function useCriarLote() {

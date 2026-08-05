@@ -21,7 +21,7 @@ import {
 } from '../hooks/useAprovacoes'
 import type { HistoricoFiltros } from '../hooks/useAprovacoes'
 import { useHistoricoAlteracoesItens, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
-import { useComentariosItens } from '../hooks/useLotesPagamento'
+import { useComentariosItens, useDecidirTituloLote } from '../hooks/useLotesPagamento'
 import ComentarioItemLote from '../components/financeiro/ComentarioItemLote'
 import FluxoTimeline from '../components/FluxoTimeline'
 import { useLinhaTempoCompra } from '../hooks/useLinhaTempoCompra'
@@ -750,7 +750,9 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           {mutation.isPending && action === 'aprovada'
             ? <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
             : <CheckCircle size={20} />}
-          <span>Aprovar</span>
+          {/* Em lote o botão decide todos os marcados de uma vez — dizer só
+              "Aprovar" foi o que levou a aprovar 7 títulos querendo aprovar 1. */}
+          <span>{aprovacao.pagamento_detalhes?.is_lote ? 'Aprovar todos' : 'Aprovar'}</span>
         </button>
       </div>
 
@@ -1167,6 +1169,24 @@ function PagamentoDetalhesCard({ detalhes, loteId, selectedItemIds, setSelectedI
   const { data: comentariosPorCp = {} } = useComentariosItens(
     (detalhes.itens ?? []).map(i => i.id).filter(Boolean)
   )
+  // Decisão título a título (mig 232): aprovar um libera só ele para o
+  // Financeiro; os outros continuam aqui esperando decisão.
+  const decidirItem = useDecidirTituloLote()
+  const [recusando, setRecusando] = useState<string | null>(null)
+  const [motivoRecusa, setMotivoRecusa] = useState('')
+  const [erroItem, setErroItem] = useState<string | null>(null)
+
+  const decidir = async (cpId: string, decisao: 'aprovado' | 'rejeitado', motivo?: string) => {
+    if (!loteId) return
+    setErroItem(null)
+    try {
+      await decidirItem.mutateAsync({ loteId, cpId, decisao, motivo })
+      setRecusando(null)
+      setMotivoRecusa('')
+    } catch (e) {
+      setErroItem(e instanceof Error ? e.message : 'Erro ao registrar a decisão do título.')
+    }
+  }
   const fmtDate = (d: string) => {
     if (!d) return '—'
     const dt = new Date(d.length === 10 ? d + 'T00:00:00' : d)
@@ -1211,6 +1231,9 @@ function PagamentoDetalhesCard({ detalhes, loteId, selectedItemIds, setSelectedI
     const excluidos = detalhes.excluidos ?? 0
     const pendentes = totalItens - aprovados - excluidos
     const selectedCount = selectedItemIds?.size ?? totalItens
+    // Conta pela decisão de cada item (mig 232), não pelos contadores do lote:
+    // com decisão título a título os dois podem divergir por alguns segundos.
+    const pendentesAgora = itens.filter(i => !i.decisao || i.decisao === 'pendente').length
 
     // Fornecedores summary: group by fornecedor_nome with summed values
     const fornecedorMap = new Map<string, number>()
@@ -1291,6 +1314,20 @@ function PagamentoDetalhesCard({ detalhes, loteId, selectedItemIds, setSelectedI
 
         {showItens && (
           <div className="space-y-2">
+            {/* Falta decidir: sem isso o aprovador decide um, sai da tela, e o
+                lote fica pendurado esperando decisão sem ninguém saber. */}
+            {loteId && pendentesAgora > 0 && (
+              <div className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-700">
+                <Clock size={12} className="shrink-0" />
+                Faltam {pendentesAgora} de {totalItens} títulos para decidir
+              </div>
+            )}
+            {erroItem && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
+                {erroItem}
+              </div>
+            )}
+
             {/* Selection counter */}
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-slate-500 font-medium">
@@ -1419,6 +1456,69 @@ function PagamentoDetalhesCard({ detalhes, loteId, selectedItemIds, setSelectedI
                             comentarios={comentariosPorCp[item.id]}
                           />
                         </div>
+
+                        {/* Decisão só deste título (mig 232). O que já foi
+                            decidido mostra o selo e sai do caminho. */}
+                        {loteId && (
+                          <div className="mt-1.5" onClick={e => e.stopPropagation()}>
+                            {item.decisao === 'aprovado' ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                <CheckCircle size={10} /> Aprovado — liberado para pagamento
+                              </span>
+                            ) : item.decisao === 'rejeitado' ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                                <XCircle size={10} /> Recusado — voltou para o Financeiro
+                              </span>
+                            ) : recusando === item.id ? (
+                              <div className="space-y-1.5 rounded-xl border border-rose-200 bg-rose-50/60 p-2">
+                                <textarea
+                                  autoFocus
+                                  rows={2}
+                                  value={motivoRecusa}
+                                  onChange={e => setMotivoRecusa(e.target.value.toUpperCase())}
+                                  placeholder="MOTIVO DA RECUSA (OBRIGATORIO) — VAI PARA O FINANCEIRO"
+                                  className="w-full resize-none rounded-lg border border-rose-200 bg-white px-2 py-1.5 text-[11px] uppercase outline-none focus:ring-2 focus:ring-rose-300"
+                                />
+                                <div className="flex gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => { setRecusando(null); setMotivoRecusa('') }}
+                                    className="flex-1 rounded-lg border border-slate-200 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-white"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={decidirItem.isPending || !motivoRecusa.trim()}
+                                    onClick={() => decidir(item.id, 'rejeitado', motivoRecusa.trim())}
+                                    className="flex-[2] rounded-lg bg-rose-600 py-1.5 text-[11px] font-bold text-white hover:bg-rose-700 disabled:opacity-50"
+                                  >
+                                    Confirmar recusa
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={decidirItem.isPending}
+                                  onClick={() => decidir(item.id, 'aprovado')}
+                                  className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  <CheckCircle size={11} /> Aprovar este
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={decidirItem.isPending}
+                                  onClick={() => { setRecusando(item.id); setMotivoRecusa(''); setErroItem(null) }}
+                                  className="flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                                >
+                                  <XCircle size={11} /> Recusar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1442,11 +1542,16 @@ function PagamentoDetalhesCard({ detalhes, loteId, selectedItemIds, setSelectedI
             <p>
               Este e um <strong>Lote de Pagamento</strong> com <strong>{totalItens} itens</strong> no
               valor total de <strong>{fmt(detalhes.valor_original)}</strong>.
-              Voce pode aprovar todos os itens ou desmarcar itens individuais para aprova-los parcialmente.
-              Itens desmarcados serao rejeitados automaticamente.
             </p>
             <p className="mt-1.5">
-              Ao aprovar, somente os itens selecionados seguirao para pagamento. Ao rejeitar, todo o lote voltara para revisao.
+              Você pode decidir <strong>título por título</strong>: em cada item, "Aprovar este" libera
+              só aquele para o Financeiro pagar, e "Recusar" devolve só aquele, com o motivo.
+              Os demais continuam aqui esperando a sua decisão — o lote segue o mesmo, sem remontagem.
+            </p>
+            <p className="mt-1.5">
+              O botão <strong>Aprovar</strong> no fim do card decide de uma vez todos os títulos que ainda
+              estão marcados — é o caminho normal quando está tudo certo. Ao rejeitar por ali, o lote inteiro
+              volta para revisão.
             </p>
           </div>
         )}
