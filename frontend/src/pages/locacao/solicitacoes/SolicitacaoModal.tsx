@@ -13,11 +13,15 @@ import { supabase } from '../../../services/supabase'
 import { useAtualizarSolicitacaoLocacao } from '../../../hooks/useLocacao'
 import { STAGES, stageDe, proximaEtapa, STAGE_RETOMA_LABEL, type StageKey } from './solicitacaoStages'
 import CotacoesBloco, { useCotacoesLocacao } from './CotacoesBloco'
+import { SolicitacaoAnexos, SolicitacaoComentarios, type EtapaAnexo } from './SolicitacaoAnexos'
 import { TIPO_CFG, URGENCIA, BRL, diasEmAberto } from './SolicitacaoCards'
 import type { LocSolicitacao } from '../../../types/locacao'
 
 const dataHora = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
+
+/** Estados em que a solicitação já morreu — usados no corpo e no mapa de anexo. */
+const ENCERRADA = new Set(['concluida', 'cancelada', 'rejeitada'])
 
 export default function SolicitacaoModal({ sol, onClose, isDark }: {
   sol: LocSolicitacao; onClose: () => void; isDark: boolean
@@ -31,6 +35,13 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
 
   const etapa = stageDe(sol.status)
   const { data: cotacoes = [] } = useCotacoesLocacao(sol.id)
+  const etapaAnexo: EtapaAnexo =
+    etapa === 'em_cotacao' ? 'cotacao'
+    : etapa === 'aguardando_aprovacao' ? 'aprovacao'
+    : etapa === 'aprovada' ? 'programacao'
+    : etapa === 'em_execucao' ? 'execucao'
+    : ENCERRADA.has(sol.status) ? 'liberacao'
+    : 'abertura'
   const prox = proximaEtapa(etapa)
 
   // Campos que a etapa atual pede antes de deixar avançar.
@@ -95,7 +106,7 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
   const inputCls = `w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 ${
     isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
   }`
-  const encerrada = sol.status === 'concluida' || sol.status === 'cancelada' || sol.status === 'rejeitada'
+  const encerrada = ENCERRADA.has(sol.status)
   const pausada = etapa === 'aguardando'
   // Para onde o Retomar devolve: de onde ela saiu; sem registro, volta pra Cotação.
   const destinoRetomada = (sol.status_anterior && STAGE_RETOMA_LABEL[sol.status_anterior])
@@ -236,6 +247,11 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
               <CotacoesBloco solicitacaoId={sol.id} isDark={isDark} />
 
               <div className="mt-3">
+                <SolicitacaoAnexos solicitacaoId={sol.id} etapa="cotacao" isDark={isDark}
+                  titulo="Laudos e fotos da avaliação" />
+              </div>
+
+              <div className="mt-3">
                 <label className={`block text-[11px] font-semibold mb-1 ${txtMuted}`}>Valor cotado (R$)</label>
                 <div className="flex gap-2">
                   <input type="number" step="0.01" value={valorEstimado} onChange={e => setValorEstimado(e.target.value)}
@@ -272,6 +288,10 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
                   <CotacoesBloco solicitacaoId={sol.id} isDark={isDark} somenteLeitura />
                 </div>
               )}
+              <div className="mt-3">
+                <SolicitacaoAnexos solicitacaoId={sol.id} etapa="aprovacao" isDark={isDark}
+                  titulo="Documentos da decisão" />
+              </div>
             </div>
           )}
 
@@ -283,6 +303,10 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
               {sol.valor_estimado != null && (
                 <p className={`text-[11px] mt-2 ${txtMuted}`}>Aprovado por {BRL(sol.valor_estimado)}.</p>
               )}
+              <div className="mt-3">
+                <SolicitacaoAnexos solicitacaoId={sol.id} etapa="programacao" isDark={isDark}
+                  titulo="Agenda, autorização de entrada e ordem de compra" />
+              </div>
             </div>
           )}
 
@@ -298,6 +322,10 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
               <input type="number" step="0.01" value={valorFinal} onChange={e => setValorFinal(e.target.value)}
                 placeholder={sol.valor_estimado != null ? String(sol.valor_estimado) : '0,00'} className={inputCls} />
               <p className={`text-[10px] mt-1.5 ${txtMuted}`}>Em branco, usa o valor cotado.</p>
+              <div className="mt-3">
+                <SolicitacaoAnexos solicitacaoId={sol.id} etapa="execucao" isDark={isDark}
+                  titulo="Fotos do serviço executado e NF" />
+              </div>
             </div>
           )}
 
@@ -315,6 +343,19 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
               </div>
             </div>
           )}
+
+          {/* Anexo e comentário vivem FORA dos blocos de etapa: a NF chega depois
+              da execução, o laudo chega na liberação, e o "liguei pro locador"
+              acontece a qualquer momento. Antes, encerrada a solicitação, não
+              havia mais onde registrar nada. */}
+          <SolicitacaoAnexos
+            solicitacaoId={sol.id}
+            etapa={etapaAnexo}
+            isDark={isDark}
+            titulo={encerrada ? 'Anexos após o encerramento (NF, termo, comprovante)' : 'Outros anexos desta etapa'}
+          />
+
+          <SolicitacaoComentarios solicitacaoId={sol.id} isDark={isDark} />
 
           {sol.cmp_requisicao_id && (
             <button className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
