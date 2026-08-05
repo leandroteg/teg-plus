@@ -31,12 +31,18 @@ export default function FornecedorDocsSection({ dark = false, fornecedorId, cnpj
   const upload = useUploadFornecedorAnexo()
   const remover = useRemoverFornecedorAnexo()
 
+  const hoje = new Date().toISOString().split('T')[0]
   const [tipo, setTipo] = useState<FornecedorDocTipo>('cartao_cnpj')
-  const [dataEmissao, setDataEmissao] = useState('')
+  // Cartão CNPJ já nasce com a data de hoje: quem anexa acabou de emitir na
+  // Receita. Sem isso o campo ficava vazio, o arquivo era descartado na hora
+  // de anexar e o único aviso era uma linha de 11px fácil de não ver.
+  const [dataEmissao, setDataEmissao] = useState(hoje)
   const [erro, setErro] = useState<string | null>(null)
+  const [okMsg, setOkMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const exigeEmissao = DOC_TIPOS.find(d => d.value === tipo)?.exigeEmissao
+  const faltaEmissao = Boolean(exigeEmissao && !dataEmissao)
   const cnpjFornecedor = isCnpj(cnpj)
 
   const text = dark ? 'text-slate-200' : 'text-slate-700'
@@ -48,14 +54,15 @@ export default function FornecedorDocsSection({ dark = false, fornecedorId, cnpj
 
   async function handlePick(file: File | undefined) {
     setErro(null)
+    setOkMsg(null)
     if (!file) return
     if (exigeEmissao && !dataEmissao) {
-      setErro('Informe a data de emissão do Cartão CNPJ antes de anexar.')
+      setErro('Informe a data de emissão do Cartão CNPJ antes de anexar. O arquivo não foi enviado.')
       if (fileRef.current) fileRef.current.value = ''
       return
     }
     if (file.size > 15 * 1024 * 1024) {
-      setErro('Arquivo maior que 15 MB.')
+      setErro('Arquivo maior que 15 MB. O arquivo não foi enviado.')
       if (fileRef.current) fileRef.current.value = ''
       return
     }
@@ -63,8 +70,11 @@ export default function FornecedorDocsSection({ dark = false, fornecedorId, cnpj
     if (isExisting) {
       try {
         await upload.mutateAsync({ fornecedorId: fornecedorId as string, tipo, file, data_emissao: dataEmissao || undefined })
-        setDataEmissao('')
+        setOkMsg(`${file.name} anexado.`)
+        setDataEmissao(exigeEmissao ? hoje : '')
       } catch (e) {
+        // Falha aqui costuma ser storage/RLS — sem o console fica invisível.
+        console.error('Falha ao anexar documento do fornecedor:', e)
         setErro(e instanceof Error ? e.message : 'Falha ao anexar.')
       }
     } else {
@@ -72,7 +82,8 @@ export default function FornecedorDocsSection({ dark = false, fornecedorId, cnpj
         ...staged,
         { tempId: crypto.randomUUID(), tipo, file, data_emissao: dataEmissao || undefined },
       ])
-      setDataEmissao('')
+      setOkMsg(`${file.name} sera enviado ao salvar.`)
+      setDataEmissao(exigeEmissao ? hoje : '')
     }
     if (fileRef.current) fileRef.current.value = ''
   }
@@ -116,7 +127,13 @@ export default function FornecedorDocsSection({ dark = false, fornecedorId, cnpj
       {cnpjFornecedor && !temCartaoValido && (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700 flex items-start gap-1.5">
           <AlertTriangle size={13} className="shrink-0 mt-px" />
-          <span>Fornecedor com CNPJ exige o <strong>Cartão CNPJ</strong> emitido nos últimos 90 dias para poder salvar.</span>
+          {/* Em cadastro novo a regra trava o salvar; na edição de legado, não —
+              dizer "para poder salvar" ali só confundia. */}
+          <span>
+            {isExisting
+              ? <>Este fornecedor está sem <strong>Cartão CNPJ</strong> válido (emitido nos últimos 90 dias). Anexe abaixo.</>
+              : <>Fornecedor com CNPJ exige o <strong>Cartão CNPJ</strong> emitido nos últimos 90 dias para poder salvar.</>}
+          </span>
         </div>
       )}
 
@@ -138,18 +155,31 @@ export default function FornecedorDocsSection({ dark = false, fornecedorId, cnpj
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          disabled={upload.isPending}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-60"
+          disabled={upload.isPending || faltaEmissao}
+          title={faltaEmissao ? 'Preencha a data de emissão antes de anexar' : undefined}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {upload.isPending ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-          Anexar
+          {upload.isPending ? 'Enviando…' : 'Anexar'}
         </button>
+        {faltaEmissao && (
+          <span className="text-[11px] text-amber-600 font-semibold self-center">Preencha a emissão para liberar</span>
+        )}
         <input ref={fileRef} type="file" className="hidden"
           accept="application/pdf,image/*"
           onChange={e => handlePick(e.target.files?.[0])} />
       </div>
 
-      {erro && <p className="mt-2 text-[11px] text-red-500 flex items-center gap-1"><AlertTriangle size={11} /> {erro}</p>}
+      {erro && (
+        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 flex items-start gap-1.5">
+          <AlertTriangle size={13} className="shrink-0 mt-px" /> {erro}
+        </div>
+      )}
+      {okMsg && (
+        <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 flex items-start gap-1.5">
+          <CheckCircle2 size={13} className="shrink-0 mt-px" /> {okMsg}
+        </div>
+      )}
 
       {/* Lista */}
       <div className="mt-4 space-y-1.5">
