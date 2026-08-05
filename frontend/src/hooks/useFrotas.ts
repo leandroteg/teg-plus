@@ -735,8 +735,24 @@ export function useCotacoesOS(osId: string) {
 export function useSalvarCotacao() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (c: Omit<FroCotacaoOS, 'id' | 'selecionado' | 'created_at' | 'fornecedor'>) => {
-      const { error } = await supabase.from('fro_cotacoes_os').insert({ ...c, selecionado: false })
+    mutationFn: async (
+      c: Omit<FroCotacaoOS, 'id' | 'selecionado' | 'created_at' | 'fornecedor'> & { arquivo?: File | null },
+    ) => {
+      const { arquivo, ...cot } = c
+      // O PDF do orçamento fica AMARRADO à cotação. Falha no upload não pode
+      // engolir o orçamento: grava-se a cotação mesmo assim, sem o anexo.
+      let anexo: { anexo_url?: string; anexo_nome?: string; anexo_path?: string } = {}
+      if (arquivo) {
+        const safe = arquivo.name.replace(/[^\w.\-]+/g, '_')
+        const path = `os/${c.os_id}/cotacao/${Date.now()}_${safe}`
+        const { error: upErr } = await supabase.storage.from('fro-checklist-fotos')
+          .upload(path, arquivo, { upsert: true, contentType: arquivo.type || undefined })
+        if (!upErr) {
+          const { data: { publicUrl } } = supabase.storage.from('fro-checklist-fotos').getPublicUrl(path)
+          anexo = { anexo_url: publicUrl, anexo_nome: arquivo.name, anexo_path: path }
+        }
+      }
+      const { error } = await supabase.from('fro_cotacoes_os').insert({ ...cot, ...anexo, selecionado: false })
       if (error) throw error
     },
     onSuccess: (_, v) => qc.invalidateQueries({ queryKey: ['fro_cotacoes', v.os_id] }),

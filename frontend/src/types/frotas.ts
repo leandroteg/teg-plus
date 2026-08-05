@@ -172,6 +172,11 @@ export interface FroCotacaoOS {
   fornecedor_id: string
   valor_total: number
   prazo_execucao_dias?: number
+  /** PDF daquele orçamento. Antes o arquivo ia para a pilha da etapa
+   *  (fro_os_anexos etapa='cotacao') e não dava para saber de qual fornecedor era. */
+  anexo_url?: string | null
+  anexo_nome?: string | null
+  anexo_path?: string | null
   validade_orcamento?: string
   observacoes?: string
   selecionado: boolean

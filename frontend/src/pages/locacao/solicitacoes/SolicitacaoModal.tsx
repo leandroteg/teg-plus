@@ -12,6 +12,7 @@ import {
 import { supabase } from '../../../services/supabase'
 import { useAtualizarSolicitacaoLocacao } from '../../../hooks/useLocacao'
 import { STAGES, stageDe, proximaEtapa, STAGE_RETOMA_LABEL, type StageKey } from './solicitacaoStages'
+import CotacoesBloco, { useCotacoesLocacao } from './CotacoesBloco'
 import { TIPO_CFG, URGENCIA, BRL, diasEmAberto } from './SolicitacaoCards'
 import type { LocSolicitacao } from '../../../types/locacao'
 
@@ -29,6 +30,7 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
   const [pausando, setPausando] = useState(false)
 
   const etapa = stageDe(sol.status)
+  const { data: cotacoes = [] } = useCotacoesLocacao(sol.id)
   const prox = proximaEtapa(etapa)
 
   // Campos que a etapa atual pede antes de deixar avançar.
@@ -231,12 +233,30 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
           {etapa === 'em_cotacao' && !encerrada && (
             <div className={`rounded-xl border p-3 ${isDark ? 'border-sky-500/20 bg-sky-500/5' : 'border-sky-200 bg-sky-50/60'}`}>
               <p className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${txtMuted}`}>Cotação</p>
-              <label className={`block text-[11px] font-semibold mb-1 ${txtMuted}`}>Valor cotado (R$)</label>
-              <input type="number" step="0.01" value={valorEstimado} onChange={e => setValorEstimado(e.target.value)}
-                placeholder="0,00" className={inputCls} />
-              <p className={`text-[10px] mt-1.5 ${txtMuted}`}>
-                Política de Compras: manutenção predial pede 2 orçamentos antes da aprovação.
-              </p>
+              <CotacoesBloco solicitacaoId={sol.id} isDark={isDark} />
+
+              <div className="mt-3">
+                <label className={`block text-[11px] font-semibold mb-1 ${txtMuted}`}>Valor cotado (R$)</label>
+                <div className="flex gap-2">
+                  <input type="number" step="0.01" value={valorEstimado} onChange={e => setValorEstimado(e.target.value)}
+                    placeholder="0,00" className={inputCls} />
+                  {cotacoes.length > 0 && (
+                    <button type="button"
+                      onClick={() => setValorEstimado(String(Math.min(...cotacoes.map(c => c.valor_total))))}
+                      title="Usar o menor orçamento"
+                      className={`shrink-0 px-2.5 rounded-lg border text-[11px] font-semibold whitespace-nowrap ${
+                        isDark ? 'border-white/[0.1] text-slate-300 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}>
+                      Menor orçamento
+                    </button>
+                  )}
+                </div>
+                <p className={`text-[10px] mt-1.5 ${cotacoes.length < 2 ? 'text-amber-500 font-semibold' : txtMuted}`}>
+                  {cotacoes.length < 2
+                    ? `Política de Compras: manutenção predial pede 2 orçamentos antes da aprovação (${cotacoes.length}/2).`
+                    : 'Política de Compras atendida: 2 ou mais orçamentos lançados.'}
+                </p>
+              </div>
             </div>
           )}
 
@@ -247,6 +267,11 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
               <p className={`text-[11px] mt-1 ${txtMuted}`}>
                 Alçada: até R$ 3.000 aprova o Welton; acima disso, o Laucídio.
               </p>
+              {cotacoes.length > 0 && (
+                <div className="mt-3">
+                  <CotacoesBloco solicitacaoId={sol.id} isDark={isDark} somenteLeitura />
+                </div>
+              )}
             </div>
           )}
 

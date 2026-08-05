@@ -13,7 +13,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   X, Wrench, Car, Camera, ShieldAlert, Loader2, Check, TriangleAlert,
-  FileSearch, Send, Building2, Clock, CalendarClock, PauseCircle, PlayCircle,  MessageSquare, Trash2, FileText, XCircle, CheckCircle, Pencil } from 'lucide-react'
+  FileSearch, Send, Building2, Clock, CalendarClock, PauseCircle, PlayCircle,  MessageSquare, Trash2, FileText, XCircle, CheckCircle, Pencil, Paperclip } from 'lucide-react'
 import {
   useItensOS, useSalvarItensOS, useHistoricoPrecoItens, useGarantiasVigentes,
   useAtualizarOS, useAtualizarStatusOS, useAprovarOS, useUploadFotoOS,
@@ -800,6 +800,13 @@ function CorpoCotacao({ os, isDark, onClose }: {
               {c.prazo_execucao_dias != null && (
                 <span className={txtMuted}>{c.prazo_execucao_dias}d</span>
               )}
+              {c.anexo_url && (
+                <a href={c.anexo_url} target="_blank" rel="noopener noreferrer"
+                  title={c.anexo_nome ?? 'Orçamento'}
+                  className="shrink-0 text-rose-500 hover:text-rose-600">
+                  <Paperclip size={12} />
+                </a>
+              )}
             </div>
           ))}
           <NovaCotacao osId={os.id} isDark={isDark} onSalvar={salvarCotacao} />
@@ -868,6 +875,7 @@ function NovaCotacao({ osId, isDark, onSalvar }: {
   const [forn, setForn] = useState('')
   const [valor, setValor] = useState('')
   const [prazo, setPrazo] = useState('')
+  const [arquivo, setArquivo] = useState<File | null>(null)
 
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
   const inp = `rounded-lg border px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-rose-500/30 ${
@@ -895,6 +903,14 @@ function NovaCotacao({ osId, isDark, onSalvar }: {
         <input type="number" placeholder="Valor R$" value={valor} onChange={e => setValor(e.target.value)} className={`${inp} flex-1`} />
         <input type="number" placeholder="Prazo (d)" value={prazo} onChange={e => setPrazo(e.target.value)} className={`${inp} w-[100px]`} />
       </div>
+      <label className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border cursor-pointer text-[11px] ${inp}`}>
+        <Paperclip size={12} className="shrink-0 opacity-60" />
+        <span className={arquivo ? 'truncate' : 'opacity-50'}>
+          {arquivo ? arquivo.name : 'Anexar o PDF deste orçamento (opcional)'}
+        </span>
+        <input type="file" className="hidden" accept=".pdf,image/*"
+          onChange={e => setArquivo(e.target.files?.[0] ?? null)} />
+      </label>
       <div className="flex gap-2">
         <button type="button" onClick={() => setAberto(false)} className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold ${txtMuted}`}>
           Cancelar
@@ -906,8 +922,9 @@ function NovaCotacao({ osId, isDark, onSalvar }: {
             await onSalvar.mutateAsync({
               os_id: osId, fornecedor_id: forn, valor_total: +valor,
               prazo_execucao_dias: prazo ? +prazo : undefined,
+              arquivo,
             })
-            setForn(''); setValor(''); setPrazo(''); setAberto(false)
+            setForn(''); setValor(''); setPrazo(''); setArquivo(null); setAberto(false)
           }}
           className="flex-1 py-1.5 rounded-lg bg-rose-500 text-white text-[11px] font-bold disabled:opacity-50"
         >
@@ -927,6 +944,9 @@ function CorpoAprovacao({ os, isDark, onClose }: {
   const { data: precoHist } = useHistoricoPrecoItens()
   const { data: cotacoes = [] } = useCotacoesOS(os.id)
   const aprovar = useAprovarOS()
+  // Faltava: pedirEsclarecimento() usa mudarStatus e o hook nunca foi declarado
+  // aqui — o botao "Pedir esclarecimento" estourava ReferenceError ao clicar.
+  const mudarStatus = useAtualizarStatusOS()
 
   const salvarItens = useSalvarItensOS()
   const [motivo, setMotivo] = useState('')
