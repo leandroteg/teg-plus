@@ -21,6 +21,8 @@ export interface PedidoAnexo {
   conferido: boolean | null
   conferido_por_nome: string | null
   conferido_em: string | null
+  /** Justificativa da recusa (mig 226) — obrigatória ao reprovar, limpa ao desfazer. */
+  conferido_motivo: string | null
 }
 
 export interface CotacaoDoc {
@@ -67,13 +69,20 @@ export function useConferirAnexo() {
   const qc = useQueryClient()
   const { perfil } = useAuth()
   return useMutation({
-    mutationFn: async ({ anexoId, pedidoId, aprovado }: { anexoId: string; pedidoId: string; aprovado: boolean | null }) => {
+    mutationFn: async ({ anexoId, pedidoId, aprovado, motivo }: { anexoId: string; pedidoId: string; aprovado: boolean | null; motivo?: string }) => {
+      // Reprovar sem dizer o porquê deixava o comprador no escuro ao receber o
+      // pedido de volta em Emitido — o motivo é obrigatório na recusa.
+      const motivoLimpo = (motivo ?? '').trim()
+      if (aprovado === false && !motivoLimpo) {
+        throw new Error('Informe o motivo da recusa do documento.')
+      }
       const { data, error } = await supabase
         .from('cmp_pedidos_anexos')
         .update({
           conferido: aprovado,
           conferido_por_nome: aprovado === null ? null : perfil?.nome ?? null,
           conferido_em: aprovado === null ? null : new Date().toISOString(),
+          conferido_motivo: aprovado === false ? motivoLimpo : null,
         })
         .eq('id', anexoId)
         .select('id')

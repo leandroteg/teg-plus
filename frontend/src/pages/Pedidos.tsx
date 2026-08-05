@@ -26,6 +26,15 @@ import {
   type ImpostoPayload,
 } from '../hooks/usePedidos'
 import { useCadFornecedores } from '../hooks/useCadastros'
+import { useFornecedorById } from '../hooks/useFinanceiro'
+import {
+  DadosPagamentoFields,
+  DADOS_PAGAMENTO_VAZIO,
+  dadosPagamentoDoFornecedor,
+  temDadosPagamento,
+  toDadosPagamento,
+  type DadosPagamentoForm,
+} from '../components/financeiro/DadosPagamentoFields'
 import { useCotacoes } from '../hooks/useCotacoes'
 import {
   buildFornecedorPrefillFromCotacao,
@@ -1081,6 +1090,25 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
   const [showImposto, setShowImposto] = useState(false)
   const anexoIdRef = useRef(0)
 
+  // Dados para pagamento — o Financeiro recebia a CP sem saber para onde pagar
+  // quando não havia boleto. Puxa do cadastro do fornecedor e deixa ajustar
+  // (conta de terceiro, PIX diferente) sem alterar o cadastro mestre.
+  const { data: fornecedorPedido } = useFornecedorById(pedido.fornecedor_id)
+  const [dadosPgto, setDadosPgto] = useState<DadosPagamentoForm>(DADOS_PAGAMENTO_VAZIO)
+  const [dadosPgtoTocado, setDadosPgtoTocado] = useState(false)
+
+  // Só semeia enquanto o usuário não mexeu — senão o fetch do fornecedor
+  // chegando depois apagaria o que ele acabou de digitar.
+  useEffect(() => {
+    if (dadosPgtoTocado || !fornecedorPedido) return
+    setDadosPgto(dadosPagamentoDoFornecedor(fornecedorPedido))
+  }, [fornecedorPedido, dadosPgtoTocado])
+
+  const patchDadosPgto = (patch: Partial<DadosPagamentoForm>) => {
+    setDadosPgtoTocado(true)
+    setDadosPgto(prev => ({ ...prev, ...patch }))
+  }
+
   const patchFile = (id: number, patch: Partial<AnexoEntry>) =>
     setFiles(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f))
 
@@ -1197,7 +1225,11 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
           ? { itens: impostoItens, valor_total: totalImposto, deduzir: anyDeduzir }
           : null
 
-      await liberarPgto.mutateAsync({ pedidoId: pedido.id, imposto })
+      await liberarPgto.mutateAsync({
+        pedidoId: pedido.id,
+        imposto,
+        dadosPagamento: temDadosPagamento(dadosPgto) ? toDadosPagamento(dadosPgto) : null,
+      })
       onClose()
     } catch (e: any) {
       setErro(e?.message ?? 'Erro ao liberar pagamento.')
@@ -1308,6 +1340,9 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">Observação <span className="text-slate-400 font-normal">(opcional)</span></label>
             <textarea value={obs} onChange={e => setObs(e.target.value)} rows={2} placeholder="Ex: NF entregue junto com o material..." className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 placeholder:text-slate-300" />
           </div>
+          {/* ── Dados para pagamento ──────────────────────────── */}
+          <DadosPagamentoFields form={dadosPgto} onChange={patchDadosPgto} />
+
           {/* ── Imposto / Retenção por item ───────────────────── */}
           <div className="rounded-xl border border-slate-200 overflow-hidden">
             <button
@@ -1527,12 +1562,27 @@ function DocSection({ title, icon, color, count, children }: { title: string; ic
 interface DocConferencia {
   status: boolean | null
   por?: string | null
+  motivo?: string | null
   pending?: boolean
-  onDecidir: (aprovado: boolean | null) => void
+  onDecidir: (aprovado: boolean | null, motivo?: string) => void
 }
 
 function DocItem({ name, url, mime, tipo, date, origem, conferencia }: { name: string; url: string; mime?: string | null; tipo?: string; date?: string; origem?: string; conferencia?: DocConferencia }) {
+  // Recusa em duas etapas: o ✗ abre o campo do motivo em vez de reprovar direto.
+  const [recusando, setRecusando] = useState(false)
+  const [motivo, setMotivo] = useState('')
+  const [erroMotivo, setErroMotivo] = useState(false)
+
+  const confirmarRecusa = () => {
+    if (!motivo.trim()) { setErroMotivo(true); return }
+    conferencia?.onDecidir(false, motivo.trim())
+    setRecusando(false)
+    setMotivo('')
+    setErroMotivo(false)
+  }
+
   return (
+    <div>
     <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-50 transition-colors group">
       <AnexoIcon mime={mime ?? null} />
       <div className="min-w-0 flex-1">
@@ -1552,6 +1602,15 @@ function DocItem({ name, url, mime, tipo, date, origem, conferencia }: { name: s
             </span>
           )}
         </div>
+        {/* O motivo continua visível depois da devolução, quando o status volta
+            a NULL: é justamente o detalhe que diz ao comprador o que corrigir. */}
+        {conferencia?.status !== true && conferencia?.motivo && (
+          <p className="text-[10px] text-red-600 mt-1 whitespace-pre-wrap break-words">
+            <span className="font-bold">
+              {conferencia.status === false ? 'Motivo:' : 'Recusado antes:'}
+            </span> {conferencia.motivo}
+          </p>
+        )}
       </div>
       {conferencia && (
         <div className="flex items-center gap-1 flex-shrink-0" onClick={e => { e.preventDefault(); e.stopPropagation() }}>
@@ -1568,7 +1627,7 @@ function DocItem({ name, url, mime, tipo, date, origem, conferencia }: { name: s
               <button
                 title="Reprovar documento"
                 disabled={conferencia.pending}
-                onClick={e => { e.preventDefault(); e.stopPropagation(); conferencia.onDecidir(false) }}
+                onClick={e => { e.preventDefault(); e.stopPropagation(); setRecusando(true); setErroMotivo(false) }}
                 className="w-7 h-7 rounded-lg flex items-center justify-center bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white transition-colors disabled:opacity-50"
               >
                 <X size={13} />
@@ -1588,6 +1647,46 @@ function DocItem({ name, url, mime, tipo, date, origem, conferencia }: { name: s
       )}
       <ExternalLink size={11} className="flex-shrink-0 text-slate-300 group-hover:text-slate-500 transition-colors" />
     </a>
+
+    {/* Motivo da recusa — fica fora do <a> para o clique não abrir o documento */}
+    {recusando && (
+      <div className="px-3 pb-3 pt-1 bg-red-50/60 border-t border-red-100 space-y-1.5">
+        <label className="text-[10px] font-bold text-red-700 uppercase tracking-wide">
+          Motivo da recusa <span className="text-red-500">*</span>
+        </label>
+        <textarea
+          autoFocus
+          rows={2}
+          value={motivo}
+          onChange={e => { setMotivo(e.target.value.toUpperCase()); setErroMotivo(false) }}
+          placeholder="EX: NF COM VALOR DIVERGENTE DO PEDIDO / CNPJ DO EMITENTE ERRADO / FALTA O BOLETO"
+          className={`w-full rounded-lg border px-2.5 py-1.5 text-[11px] uppercase resize-none outline-none focus:ring-2 focus:ring-red-300 ${
+            erroMotivo ? 'border-red-400 bg-white' : 'border-red-200 bg-white'
+          }`}
+        />
+        {erroMotivo && (
+          <p className="text-[10px] font-bold text-red-600">Escreva o motivo — ele vai para o comprador junto com o pedido.</p>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => { setRecusando(false); setMotivo(''); setErroMotivo(false) }}
+            className="flex-1 py-1.5 rounded-lg text-[11px] font-bold text-slate-600 border border-slate-200 hover:bg-white"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={conferencia?.pending}
+            onClick={confirmarRecusa}
+            className="flex-[2] py-1.5 rounded-lg text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+          >
+            Confirmar recusa
+          </button>
+        </div>
+      </div>
+    )}
+    </div>
   )
 }
 
@@ -1676,8 +1775,9 @@ function AnexosOrganizados({ pedidoId, cotacaoId, canUpload = true, conferencia 
     ? {
         status: a.conferido ?? null,
         por: a.conferido_por_nome,
+        motivo: a.conferido_motivo,
         pending: conferirAnexo.isPending,
-        onDecidir: (aprovado) => conferirAnexo.mutate({ anexoId: a.id, pedidoId, aprovado }),
+        onDecidir: (aprovado, motivo) => conferirAnexo.mutate({ anexoId: a.id, pedidoId, aprovado, motivo }),
       }
     : undefined
 
@@ -1848,6 +1948,15 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
               {nfPendente && (
                 <span title="Pedido encerrado sem nota fiscal anexada" className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${dark ? 'bg-red-500/15 text-red-400' : 'bg-red-100 text-red-700'}`}>
                   <AlertTriangle size={9} /> NF pendente
+                </span>
+              )}
+              {/* Pedido devolvido: o motivo fica no title e completo no modal */}
+              {pedido.devolucao_motivo && (
+                <span
+                  title={`Devolvido para correção por ${pedido.devolucao_por_nome ?? 'Compras'}: ${pedido.devolucao_motivo}`}
+                  className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${dark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700'}`}
+                >
+                  <AlertTriangle size={9} /> Devolvido p/ correção
                 </span>
               )}
               {atrasado && (
@@ -2058,6 +2167,12 @@ function DetailModal({
   const anexosConferiveis = (anexosConf ?? []).filter(a => a.tipo !== 'comprovante_pagamento')
   const docsAprovados  = anexosConferiveis.filter(a => a.conferido === true).length
   const docsReprovados = anexosConferiveis.filter(a => a.conferido === false).length
+  // Motivos das recusas viram o rascunho da justificativa do voltar-etapa: quem
+  // devolve o pedido não precisa redigitar o que já escreveu documento a documento.
+  const motivosRecusa = anexosConferiveis
+    .filter(a => a.conferido === false)
+    .map(a => `${TIPO_LABEL[a.tipo] ?? a.tipo}: ${a.conferido_motivo || 'SEM MOTIVO REGISTRADO'}`)
+    .join(' | ')
   const conferenciaOk = anexosConferiveis.length === 0
     ? docsConferidos
     : docsAprovados === anexosConferiveis.length
@@ -2158,6 +2273,25 @@ function DetailModal({
             {isLiberado && !isPago && <span className="flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700"><Clock size={11} /> Aguard. Pgto</span>}
             {atrasado && <span className="flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700"><AlertTriangle size={11} /> {Math.abs(dias!)}d atrasado</span>}
           </div>
+
+          {/* Devolvido para correção (mig 227) — antes o motivo do "voltar etapa"
+              só ia para o histórico da RC, e o comprador reabria o pedido em
+              Emitido sem saber o que precisava corrigir. */}
+          {pedido.devolucao_motivo && (
+            <div className={`rounded-xl border px-3 py-3 space-y-1.5 ${dark ? 'border-amber-400/30 bg-amber-500/10' : 'border-amber-300 bg-amber-50'}`}>
+              <p className={`text-[11px] font-bold uppercase tracking-wide flex items-center gap-1.5 ${dark ? 'text-amber-300' : 'text-amber-700'}`}>
+                <AlertTriangle size={12} /> Devolvido para correção
+              </p>
+              <p className={`text-xs leading-relaxed whitespace-pre-wrap break-words ${dark ? 'text-amber-100' : 'text-amber-900'}`}>
+                {pedido.devolucao_motivo}
+              </p>
+              <p className={`text-[10px] ${dark ? 'text-amber-300/70' : 'text-amber-600'}`}>
+                {pedido.devolucao_por_nome ?? 'Compras'}
+                {pedido.devolucao_em && ` · ${fmtData(pedido.devolucao_em ?? undefined)}`}
+                {' · o aviso some quando o recebimento for registrado de novo'}
+              </p>
+            </div>
+          )}
 
           {/* Info grid */}
           <div className={`grid grid-cols-2 gap-3 text-xs border rounded-xl p-4 ${brd}`}>
@@ -2707,7 +2841,11 @@ function DetailModal({
                 )}
                 {docsReprovados > 0 && podeDesfazerReceb && (
                   <button
-                    onClick={() => { setShowDesfazer(true); setDesfazerMsg(null); if (!motivoDesfazer) setMotivoDesfazer('DOCUMENTOS REPROVADOS NA CONFERENCIA: ') }}
+                    onClick={() => {
+                      setShowDesfazer(true)
+                      setDesfazerMsg(null)
+                      if (!motivoDesfazer) setMotivoDesfazer(`DOCUMENTOS REPROVADOS NA CONFERENCIA — ${motivosRecusa}`)
+                    }}
                     className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold bg-red-50 text-red-700 border border-red-300 hover:bg-red-600 hover:text-white transition-colors"
                   >
                     <X size={13} /> Reprovar — voltar etapa
@@ -2769,11 +2907,14 @@ function DetailModal({
                       As entradas de estoque serão estornadas e os itens patrimoniais gerados serão removidos.
                       Os documentos anexados permanecem. Depois é só registrar o recebimento correto.
                     </p>
+                    <label className={`block text-[10px] font-bold uppercase tracking-wide ${dark ? 'text-amber-300' : 'text-amber-700'}`}>
+                      Justificativa do pedido de retorno <span className="text-red-500">*</span>
+                    </label>
                     <textarea
                       value={motivoDesfazer}
-                      onChange={e => setMotivoDesfazer(e.target.value)}
-                      rows={2}
-                      placeholder="Motivo da correção (obrigatório)..."
+                      onChange={e => setMotivoDesfazer(e.target.value.toUpperCase())}
+                      rows={3}
+                      placeholder="O QUE O COMPRADOR PRECISA CORRIGIR (OBRIGATORIO)..."
                       className={`w-full text-xs border rounded-lg px-2.5 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 ${
                         dark ? 'bg-white/[0.05] border-white/10 text-white placeholder:text-slate-500' : 'bg-white border-amber-200 placeholder:text-amber-300'
                       }`}

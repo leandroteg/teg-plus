@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from 'react'
-import { X, PlusCircle, Trash2, Loader2, AlertTriangle, ShoppingCart, Search, UserPlus, CheckCircle2, Landmark } from 'lucide-react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { X, PlusCircle, Trash2, Loader2, AlertTriangle, ShoppingCart, Search, UserPlus, CheckCircle2, Landmark, Upload, Paperclip, FileText, ExternalLink } from 'lucide-react'
 import { useEmitirPedidoDireto, useEditarPedidoDireto, type TipoPedidoDireto } from '../hooks/usePedidos'
+import { useAnexosPedido, useUploadAnexo, TIPO_LABEL, type PedidoAnexo } from '../hooks/useAnexos'
 import { useCadFornecedores, useCadClasses, useSalvarFornecedor } from '../hooks/useCadastros'
 import { useLookupObras, useLookupEmpresas } from '../hooks/useLookups'
 import { useCartoesCredito } from '../hooks/useCartoes'
@@ -120,6 +121,52 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   const [observacoes, setObservacoes] = useState('')
   const [itens, setItens] = useState<ItemDireto[]>([emptyItem()])
   const [erro, setErro] = useState<string | null>(null)
+
+  // ── Anexos ────────────────────────────────────────────────────────────────
+  // O pedido só existe depois do insert, então na emissão os arquivos ficam
+  // numa fila e sobem logo em seguida. Na edição o pedido já tem id, mas a fila
+  // é a mesma para o comportamento não mudar de uma tela para a outra.
+  const uploadAnexo = useUploadAnexo()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const anexoIdRef = useRef(0)
+  const [anexos, setAnexos] = useState<Array<{ id: number; file: File; tipo: PedidoAnexo['tipo'] }>>([])
+  const [enviandoAnexos, setEnviandoAnexos] = useState(false)
+  // Pedido gravado mas com anexo que falhou: sem isto o modal fecharia e o
+  // documento sumiria calado — ou o usuário reemitiria e duplicaria o pedido.
+  const [emitidoComFalha, setEmitidoComFalha] = useState<{ numero: string; falhas: string[] } | null>(null)
+  const { data: anexosExistentes = [] } = useAnexosPedido(pedido?.id)
+
+  const addAnexos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const novos = Array.from(e.target.files ?? [])
+    if (novos.length) {
+      setErro(null)
+      setAnexos(prev => [
+        ...prev,
+        ...novos.map(file => ({ id: ++anexoIdRef.current, file, tipo: 'outro' as PedidoAnexo['tipo'] })),
+      ])
+    }
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  /** Sobe a fila e devolve os nomes que falharam — um anexo ruim não derruba os outros. */
+  const enviarAnexos = async (pedidoId: string): Promise<string[]> => {
+    if (anexos.length === 0) return []
+    setEnviandoAnexos(true)
+    const falhas: string[] = []
+    try {
+      for (const a of anexos) {
+        try {
+          await uploadAnexo.mutateAsync({ pedidoId, file: a.file, tipo: a.tipo, origem: 'compras' })
+        } catch {
+          falhas.push(a.file.name)
+        }
+      }
+    } finally {
+      setEnviandoAnexos(false)
+    }
+    setAnexos(prev => prev.filter(a => falhas.includes(a.file.name)))
+    return falhas
+  }
 
   // Empresa emitente. Default = Matriz (EMP-001), editável.
   const empresaMatrizId = useMemo(() => {
@@ -336,6 +383,11 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
           valorDespesas: valorDespesas || undefined,
           valorDesconto: valorDesconto || undefined,
         })
+        const falhas = await enviarAnexos(pedido.id)
+        if (falhas.length > 0) {
+          setEmitidoComFalha({ numero: pedido.numero_pedido ?? '', falhas })
+          return
+        }
         onSuccess?.(pedido.numero_pedido)
         onClose()
       } catch (e) {
@@ -384,11 +436,25 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
         valorDespesas: valorDespesas || undefined,
         valorDesconto: valorDesconto || undefined,
       })
+      // Pedido já está gravado a partir daqui: falha de anexo não pode virar
+      // erro de emissão, senão o usuário tenta de novo e duplica o pedido.
+      const falhas = await enviarAnexos(result.id)
+      if (falhas.length > 0) {
+        setEmitidoComFalha({ numero: result.numero_pedido, falhas })
+        return
+      }
       onSuccess?.(result.numero_pedido)
       onClose()
     } catch (e) {
       setErro((e as Error).message || 'Erro ao emitir pedido.')
     }
+  }
+
+  /** Fecha depois de um pedido que gravou mas ficou com anexo pendente. */
+  const fecharAposFalhaAnexo = () => {
+    onSuccess?.(emitidoComFalha?.numero ?? '')
+    setEmitidoComFalha(null)
+    onClose()
   }
 
   return (
@@ -918,6 +984,94 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
             />
           </div>
 
+          {/* Documentos — orçamento, proposta, boleto, NF... Pedido sem cotação
+              é o que menos tem rastro formal; o anexo aqui é a prova dele. */}
+          <div>
+            <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+              <Paperclip size={12} /> Documentos <span className="text-slate-400 font-normal">(opcional)</span>
+            </label>
+
+            {editMode && anexosExistentes.length > 0 && (
+              <div className="mt-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 space-y-1">
+                <p className="text-[11px] font-bold text-emerald-700">Já anexados</p>
+                {anexosExistentes.map(a => (
+                  <a
+                    key={a.id}
+                    href={a.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-[11px] text-emerald-600 hover:underline truncate"
+                  >
+                    <FileText size={11} className="shrink-0" />
+                    <span className="font-semibold shrink-0">{TIPO_LABEL[a.tipo]}</span>
+                    <span className="text-emerald-400">·</span>
+                    <span className="truncate">{a.nome_arquivo}</span>
+                    <ExternalLink size={10} className="shrink-0 text-emerald-400" />
+                  </a>
+                ))}
+              </div>
+            )}
+
+            <div
+              onClick={() => fileRef.current?.click()}
+              className="mt-1.5 flex items-center gap-3 border-2 border-dashed border-slate-200 bg-slate-50 rounded-xl px-4 py-3 cursor-pointer hover:border-orange-300 hover:bg-orange-50 transition-colors"
+            >
+              <Upload size={17} className="text-slate-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm text-slate-500">Clique para selecionar</p>
+                <p className="text-[11px] text-slate-400">PDF, JPG, PNG, XLS, XLSX — pode escolher mais de um</p>
+              </div>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept=".pdf,.xml,.jpg,.jpeg,.png,.xls,.xlsx"
+              onChange={addAnexos}
+              className="hidden"
+            />
+
+            {anexos.map(a => (
+              <div key={a.id} className="mt-1.5 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <FileText size={14} className="text-orange-500 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-slate-700 truncate">{a.file.name}</p>
+                  <p className="text-[10px] text-slate-400">{(a.file.size / 1024).toFixed(0)} KB</p>
+                </div>
+                <select
+                  value={a.tipo}
+                  onChange={e => setAnexos(prev => prev.map(x =>
+                    x.id === a.id ? { ...x, tipo: e.target.value as PedidoAnexo['tipo'] } : x
+                  ))}
+                  className="text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:ring-1 focus:ring-orange-300 outline-none"
+                >
+                  {(Object.keys(TIPO_LABEL) as PedidoAnexo['tipo'][])
+                    .filter(t => t !== 'comprovante_pagamento')
+                    .map(t => <option key={t} value={t}>{TIPO_LABEL[t]}</option>)}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setAnexos(prev => prev.filter(x => x.id !== a.id))}
+                  className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {emitidoComFalha && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-800 space-y-1">
+              <p className="flex items-center gap-2 font-bold">
+                <AlertTriangle size={13} className="shrink-0" />
+                Pedido {emitidoComFalha.numero} emitido — mas {emitidoComFalha.falhas.length} anexo(s) falharam
+              </p>
+              <p className="text-[11px]">
+                {emitidoComFalha.falhas.join(', ')}. Não emita de novo: feche e anexe pelo detalhe do pedido.
+              </p>
+            </div>
+          )}
+
           {erro && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-xs text-red-700">
               <AlertTriangle size={13} className="shrink-0" /> {erro}
@@ -927,21 +1081,35 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
 
         {/* Footer */}
         <div className="px-5 py-4 border-t border-slate-100 flex gap-3 shrink-0">
-          <button
-            onClick={onClose}
-            className="flex-1 border border-slate-200 rounded-xl py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={emitir.isPending || editar.isPending}
-            className="flex-[2] bg-orange-500 hover:bg-orange-600 text-white rounded-xl py-2.5 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg shadow-orange-500/20 transition-colors"
-          >
-            {(emitir.isPending || editar.isPending)
-              ? <><Loader2 size={15} className="animate-spin" /> {editMode ? 'Salvando...' : 'Emitindo...'}</>
-              : <><ShoppingCart size={15} /> {editMode ? 'Salvar Alterações' : 'Emitir Pedido Direto'}</>}
-          </button>
+          {emitidoComFalha ? (
+            /* Pedido já gravado: o único caminho é sair, para não duplicar. */
+            <button
+              onClick={fecharAposFalhaAnexo}
+              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white rounded-xl py-2.5 text-sm font-bold transition-colors"
+            >
+              Fechar
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={onClose}
+                className="flex-1 border border-slate-200 rounded-xl py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={emitir.isPending || editar.isPending || enviandoAnexos}
+                className="flex-[2] bg-orange-500 hover:bg-orange-600 text-white rounded-xl py-2.5 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg shadow-orange-500/20 transition-colors"
+              >
+                {enviandoAnexos
+                  ? <><Loader2 size={15} className="animate-spin" /> Anexando...</>
+                  : (emitir.isPending || editar.isPending)
+                    ? <><Loader2 size={15} className="animate-spin" /> {editMode ? 'Salvando...' : 'Emitindo...'}</>
+                    : <><ShoppingCart size={15} /> {editMode ? 'Salvar Alterações' : 'Emitir Pedido Direto'}</>}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

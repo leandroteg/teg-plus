@@ -46,6 +46,7 @@ export interface Pedido {
   requisicao_id?: string
   cotacao_id?: string
   comprador_id?: string
+  fornecedor_id?: string | null
   classe_financeira_id?: string
   centro_custo_id?: string
   empresa_id?: string
@@ -72,6 +73,11 @@ export interface Pedido {
   // Recebimento tracking
   qtd_itens_total?: number
   qtd_itens_recebidos?: number
+  // Devolucao do recebimento (mig 227) — o que o comprador precisa corrigir.
+  // Zerado pelo trigger quando o pedido e recebido de novo.
+  devolucao_motivo?: string | null
+  devolucao_por_nome?: string | null
+  devolucao_em?: string | null
   // Payment flow fields
   status_pagamento?: 'liberado' | 'pago' | null
   liberado_pagamento_em?: string
@@ -249,6 +255,8 @@ export interface AprovacaoPendente extends Aprovacao {
     anexos?: { nome: string, url: string, tipo: string, mime_type?: string }[]
     itens?: {
       id: string
+      /** Nº do título dentro do lote (1..N), do menor para o maior valor (mig 228) */
+      ordem?: number | null
       fornecedor_nome: string
       numero_documento: string
       descricao: string

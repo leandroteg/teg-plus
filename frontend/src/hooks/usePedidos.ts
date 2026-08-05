@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Pedido } from '../types'
+import type { DadosPagamento } from '../types/financeiro'
 import { supabase } from '../services/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { gerarPreviaParcelas } from '../utils/pagamentos'
@@ -20,6 +21,7 @@ export function usePedidos(status?: string) {
           condicao_pagamento, parcelas_preview, sem_cotacao, tipo_pedido, justificativa_sem_cotacao, itens_direto,
           valor_frete, valor_despesas, valor_desconto,
           docs_conferidos, docs_conferidos_por_nome, docs_conferidos_em,
+          devolucao_motivo, devolucao_por_nome, devolucao_em,
           requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, arquivo_url, base_destino_id, base_destino:est_bases!base_destino_id(nome), itens:cmp_requisicao_itens(id, descricao, descricao_complementar, quantidade, unidade, valor_unitario_estimado, natureza)),
           comprador:cmp_compradores(nome),
           cotacao:cmp_cotacoes!cotacao_id(concluido_por_nome)
@@ -83,7 +85,12 @@ export function useLiberarPagamento() {
   const qc = useQueryClient()
   const { perfil } = useAuth()
   return useMutation({
-    mutationFn: async ({ pedidoId, imposto }: { pedidoId: string; imposto?: ImpostoPayload | null }) => {
+    mutationFn: async ({ pedidoId, imposto, dadosPagamento }: {
+      pedidoId: string
+      imposto?: ImpostoPayload | null
+      /** Para onde pagar (mig 222) — o Financeiro recebia a CP sem esse dado. */
+      dadosPagamento?: DadosPagamento | null
+    }) => {
       // Trava: so libera pagamento apos recebimento confirmado E com nota fiscal
       const { data: ped, error: pedErr } = await supabase
         .from('cmp_pedidos')
@@ -106,16 +113,22 @@ export function useLiberarPagamento() {
         .eq('id', pedidoId)
       if (error) throw error
 
-      // Propaga imposto para a CP vinculada ao pedido, se houver
+      // Propaga imposto e dados bancários para a CP vinculada ao pedido.
+      // Num update só: a CP é a mesma e cada roundtrip extra é uma chance a
+      // mais de gravar metade da informação.
+      const patchCP: Record<string, unknown> = {}
       if (imposto && imposto.valor_total > 0 && imposto.itens.length > 0) {
+        patchCP.impostos_itens  = imposto.itens
+        patchCP.imposto_valor   = imposto.valor_total
+        patchCP.imposto_deduzir = imposto.deduzir
+      }
+      if (dadosPagamento && Object.keys(dadosPagamento).length > 0) {
+        patchCP.dados_pagamento = dadosPagamento
+      }
+      if (Object.keys(patchCP).length > 0) {
         await supabase
           .from('fin_contas_pagar')
-          .update({
-            impostos_itens:  imposto.itens,
-            imposto_valor:   imposto.valor_total,
-            imposto_deduzir: imposto.deduzir,
-            updated_at:      new Date().toISOString(),
-          })
+          .update({ ...patchCP, updated_at: new Date().toISOString() })
           .eq('pedido_id', pedidoId)
           .neq('status', 'pago')
       }
