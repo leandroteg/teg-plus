@@ -18,7 +18,7 @@ const TABS = [
   { key: 'aditivos', label: 'Aditivos & Renovações',    icon: FileSignature },
   { key: 'faturas',  label: 'Faturas',                  icon: Receipt },
   { key: 'servicos', label: 'Manutenções e Serviços',   icon: Wrench },
-  { key: 'inspecoes', label: 'Relatórios de Inspeção',  icon: ShieldCheck },
+  { key: 'inspecoes', label: 'Inspeções',               icon: ShieldCheck },
   { key: 'acordos',  label: 'Controle Leitos',          icon: BedDouble },
 ] as const
 
