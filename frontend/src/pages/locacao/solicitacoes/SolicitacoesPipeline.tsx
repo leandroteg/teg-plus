@@ -11,7 +11,7 @@ import { useTheme } from '../../../contexts/ThemeContext'
 import { useSolicitacoesLocacao } from '../../../hooks/useLocacao'
 import SolicitacaoModal from './SolicitacaoModal'
 import RelatorioNCs from './RelatorioNCs'
-import InspecoesLimpezas from './InspecoesLimpezas'
+import InspecoesLimpezas, { ConferBarra, useConferFiltros } from './InspecoesLimpezas'
 import { SolicitacaoCard, SolicitacaoRow, URGENCIA_ORDER, imovelLabel } from './SolicitacaoCards'
 import {
   STAGES, STAGE_ACCENT, STAGE_ACCENT_DARK, stageDe, ENCERRADOS, type StageKey,
@@ -37,6 +37,7 @@ export default function SolicitacoesPipeline() {
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [detail, setDetail] = useState<LocSolicitacao | null>(null)
+  const confer = useConferFiltros()
 
   // Deep link do Portal ("Fechar OS"): ?imovel=<id> recorta neste imóvel e, se
   // houver uma única solicitação viva, abre o modal dela já na etapa certa.
@@ -162,7 +163,8 @@ export default function SolicitacoesPipeline() {
 
       {/* Toolbar */}
       <div className={`px-4 py-2.5 border-b flex flex-wrap items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-        <div className="relative flex-1 min-w-[180px] max-w-sm">
+        {viewMode === 'confer' && <ConferBarra isDark={isDark} f={confer} />}
+        <div className={`relative flex-1 min-w-[180px] max-w-sm ${viewMode === 'confer' ? 'hidden' : ''}`}>
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar imóvel, problema, solicitante..."
@@ -175,7 +177,7 @@ export default function SolicitacoesPipeline() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className={`flex items-center gap-0.5 ${viewMode === 'confer' ? 'hidden' : ''}`}>
           {SORT_OPTIONS.map(opt => (
             <button key={opt.field} onClick={() => toggleSort(opt.field)}
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
@@ -199,7 +201,7 @@ export default function SolicitacoesPipeline() {
           <button onClick={() => setViewMode('confer')} title="Inspeções e Limpezas"
             className={`p-1.5 ${viewMode === 'confer' ? (isDark ? 'bg-teal-500/20 text-teal-300' : 'bg-teal-50 text-teal-600') : (isDark ? 'text-slate-500' : 'text-slate-400')}`}><ClipboardCheck size={14} /></button>
         </div>
-        <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'} ${viewMode === 'confer' ? 'invisible' : ''}`}>
+        <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'} ${viewMode === 'confer' ? 'hidden' : ''}`}>
           {viewMode === 'quadro'
             ? [...quadroGrouped.values()].reduce((s, l) => s + l.length, 0)
             : activeItems.length} item(s)
@@ -209,7 +211,7 @@ export default function SolicitacoesPipeline() {
       {/* Conteúdo */}
       <div className="min-h-[200px]">
         {viewMode === 'confer' ? (
-          <InspecoesLimpezas isDark={isDark} />
+          <InspecoesLimpezas isDark={isDark} f={confer} />
         ) : viewMode === 'ncs' ? (
           <RelatorioNCs solicitacoes={solicitacoes} isDark={isDark} onAbrir={setDetail} />
         ) : viewMode === 'quadro' ? (

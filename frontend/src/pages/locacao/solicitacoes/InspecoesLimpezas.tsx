@@ -41,26 +41,28 @@ type Registro = {
   limp?: LocSolicitacao
 }
 
-export default function InspecoesLimpezas({ isDark }: { isDark: boolean }) {
-  const { data: inspecoes = [], isLoading: loadIns } = useInspecoes({ apenasImoveis: true })
-  const { data: solicitacoes = [], isLoading: loadSol } = useSolicitacoesLocacao()
-
+/** Estado dos filtros — mora no pipeline para os controles poderem ser
+ *  desenhados na MESMA linha dos ícones de visão, e não numa segunda barra. */
+export function useConferFiltros() {
   const [busca, setBusca] = useState('')
   const [fOrigem, setFOrigem] = useState<'' | 'inspecao' | 'limpeza'>('')
   const [fCidade, setFCidade] = useState('')
   const [fPessoa, setFPessoa] = useState('')
   const [fDe, setFDe] = useState('')
   const [fAte, setFAte] = useState('')
-  const [baixando, setBaixando] = useState<string | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [emailOpen, setEmailOpen] = useState(false)
-  const [emailDest, setEmailDest] = useState('')
-  const [enviando, setEnviando] = useState(false)
-  const [aviso, setAviso] = useState<string | null>(null)
+  const temFiltro = !!(busca || fOrigem || fCidade || fPessoa || fDe || fAte)
+  const limpar = () => { setBusca(''); setFOrigem(''); setFCidade(''); setFPessoa(''); setFDe(''); setFAte('') }
+  return { busca, setBusca, fOrigem, setFOrigem, fCidade, setFCidade, fPessoa, setFPessoa,
+           fDe, setFDe, fAte, setFAte, sel, setSel, emailOpen, setEmailOpen, temFiltro, limpar }
+}
+export type ConferFiltros = ReturnType<typeof useConferFiltros>
 
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
-  const txtMain = isDark ? 'text-white' : 'text-slate-800'
-  const campo = `text-[11px] rounded-lg border px-2 py-1.5 ${isDark ? 'bg-white/[0.04] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-600'}`
+function useRegistrosConfer(f: ConferFiltros) {
+  const { data: inspecoes = [], isLoading: loadIns } = useInspecoes({ apenasImoveis: true })
+  const { data: solicitacoes = [], isLoading: loadSol } = useSolicitacoesLocacao()
+  const { busca, fOrigem, fCidade, fPessoa, fDe, fAte } = f
 
   const registros = useMemo<Registro[]>(() => {
     const doIns: Registro[] = inspecoes.map(i => ({
@@ -109,9 +111,64 @@ export default function InspecoesLimpezas({ isDark }: { isDark: boolean }) {
     return true
   }), [registros, busca, fOrigem, fCidade, fPessoa, fDe, fAte])
 
+  return { filtrados, cidades, pessoas, carregando: loadIns || loadSol }
+}
+
+/** Controles da visão — o pipeline desenha isto NA MESMA LINHA dos ícones. */
+export function ConferBarra({ isDark, f }: { isDark: boolean; f: ConferFiltros }) {
+  const { filtrados, cidades, pessoas } = useRegistrosConfer(f)
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const campo = `text-[11px] rounded-lg border px-2 py-1.5 ${isDark ? 'bg-white/[0.04] border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-600'}`
+  return (
+    <>
+      <div className="relative flex-1 min-w-[150px] max-w-[200px]">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input type="text" value={f.busca} onChange={e => f.setBusca(e.target.value)} placeholder="Buscar alojamento, pessoa…"
+          className={`w-full pl-9 pr-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white'}`} />
+      </div>
+      <select value={f.fOrigem} onChange={e => f.setFOrigem(e.target.value as ConferFiltros['fOrigem'])} className={campo}>
+        <option value="">Tipo</option><option value="inspecao">Inspeção</option><option value="limpeza">Limpeza</option>
+      </select>
+      <select value={f.fCidade} onChange={e => f.setFCidade(e.target.value)} className={campo}>
+        <option value="">Cidade</option>{cidades.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+      <select value={f.fPessoa} onChange={e => f.setFPessoa(e.target.value)} className={campo}>
+        <option value="">Pessoa</option>{pessoas.map(x => <option key={x} value={x}>{x}</option>)}
+      </select>
+      <input type="date" value={f.fDe} onChange={e => f.setFDe(e.target.value)} title="Data inicial" className={campo} />
+      <span className={`text-[11px] ${txtMuted}`}>a</span>
+      <input type="date" value={f.fAte} onChange={e => f.setFAte(e.target.value)} title="Data final" className={campo} />
+      {f.temFiltro && (
+        <button onClick={f.limpar} className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold ${isDark ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-slate-100'}`}>
+          <X size={12} /> Limpar
+        </button>
+      )}
+      <span className={`ml-auto text-[11px] ${txtMuted}`}>
+        {filtrados.length} registro(s){f.sel.size ? ` · ${f.sel.size} selecionado(s)` : ''}
+      </span>
+      <button onClick={() => f.setEmailOpen(true)} disabled={!f.sel.size}
+        title={f.sel.size ? `Enviar ${f.sel.size} registro(s) por e-mail` : 'Selecione o que quer enviar'}
+        className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-bold transition-colors disabled:opacity-40 ${
+          isDark ? 'border-white/[0.1] text-slate-300 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-600 hover:bg-slate-100'
+        }`}>
+        <Mail size={13} /> E-mail{f.sel.size ? ` (${f.sel.size})` : ''}
+      </button>
+    </>
+  )
+}
+
+export default function InspecoesLimpezas({ isDark, f }: { isDark: boolean; f: ConferFiltros }) {
+  const { filtrados, carregando } = useRegistrosConfer(f)
+  const { sel, setSel, emailOpen, setEmailOpen } = f
+  const [baixando, setBaixando] = useState<string | null>(null)
+  const [emailDest, setEmailDest] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+
   const selecionados = filtrados.filter(r => sel.has(r.id))
-  const temFiltro = !!(busca || fOrigem || fCidade || fPessoa || fDe || fAte)
-  const limpar = () => { setBusca(''); setFOrigem(''); setFCidade(''); setFPessoa(''); setFDe(''); setFAte('') }
+  const temFiltro = f.temFiltro
   const toggleSel = (id: string) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleTodos = () => setSel(s => s.size === filtrados.length ? new Set() : new Set(filtrados.map(r => r.id)))
 
@@ -168,54 +225,10 @@ export default function InspecoesLimpezas({ isDark }: { isDark: boolean }) {
     } finally { setEnviando(false) }
   }
 
-  if (loadIns || loadSol) return <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
+  if (carregando) return <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
-    <div className="space-y-3 p-4">
-      {/* Filtros + contagem + e-mail, tudo na mesma linha */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[150px] max-w-[210px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar alojamento, pessoa…"
-            className={`w-full pl-9 pr-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white'}`} />
-        </div>
-
-        <select value={fOrigem} onChange={e => setFOrigem(e.target.value as typeof fOrigem)} className={campo}>
-          <option value="">Tipo</option>
-          <option value="inspecao">Inspeção</option>
-          <option value="limpeza">Limpeza</option>
-        </select>
-        <select value={fCidade} onChange={e => setFCidade(e.target.value)} className={campo}>
-          <option value="">Cidade</option>
-          {cidades.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={fPessoa} onChange={e => setFPessoa(e.target.value)} className={campo}>
-          <option value="">Pessoa</option>
-          {pessoas.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <input type="date" value={fDe} onChange={e => setFDe(e.target.value)} title="Data inicial" className={campo} />
-        <span className={`text-[11px] ${txtMuted}`}>a</span>
-        <input type="date" value={fAte} onChange={e => setFAte(e.target.value)} title="Data final" className={campo} />
-
-        {temFiltro && (
-          <button onClick={limpar} className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold ${isDark ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-slate-100'}`}>
-            <X size={12} /> Limpar
-          </button>
-        )}
-
-        <span className={`ml-auto text-[11px] ${txtMuted}`}>
-          {filtrados.length} registro(s){sel.size ? ` · ${sel.size} selecionado(s)` : ''}
-        </span>
-
-        <button onClick={() => setEmailOpen(true)} disabled={!sel.size || enviando}
-          title={sel.size ? `Enviar ${sel.size} registro(s) por e-mail` : 'Selecione o que quer enviar'}
-          className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-bold transition-colors disabled:opacity-40 ${
-            isDark ? 'border-white/[0.1] text-slate-300 hover:bg-white/[0.06]' : 'border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}>
-          {enviando ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />} E-mail{sel.size ? ` (${sel.size})` : ''}
-        </button>
-      </div>
-
+    <div className="space-y-3 p-4 pt-3">
       {aviso && (
         <p className={`text-[11px] font-semibold px-3 py-2 rounded-xl ${aviso.startsWith('Falha')
           ? isDark ? 'bg-rose-500/10 text-rose-300' : 'bg-rose-50 text-rose-700'
