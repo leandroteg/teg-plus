@@ -10,6 +10,7 @@ import {
   normalizeDigits,
 } from '../hooks/useFornecedorVinculo'
 import FornecedorDocsSection from './FornecedorDocsSection'
+import { erroCpfCnpj } from '../utils/validarCpfCnpj'
 import {
   motivoBloqueioCartaoCnpj,
   persistStagedDocs,
@@ -139,9 +140,14 @@ export default function FornecedorCadastroModal({
       return
     }
 
-    if (cnpjDigits.length !== 14 && cnpjDigits.length !== 11) {
-      setErrorMessage('Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.')
-      return
+    // Fornecedor do exterior não tem CNPJ — a validação inteira é pulada.
+    // Sem essa saída, a checagem de dígito verificador barraria caso legítimo.
+    if (!form.exterior) {
+      const erroDoc = erroCpfCnpj(cnpjDigits)
+      if (erroDoc) {
+        setErrorMessage(erroDoc)
+        return
+      }
     }
 
     if (requirePaymentData && !paymentReady) {
@@ -150,7 +156,8 @@ export default function FornecedorCadastroModal({
     }
 
     // Regra Cartão CNPJ: só bloqueia o cadastro NOVO (edição de legado não trava).
-    if (!form.id) {
+    // Estrangeiro não tem Cartão CNPJ para apresentar.
+    if (!form.id && !form.exterior) {
       const bloqueio = motivoBloqueioCartaoCnpj(cnpjDigits, anexosExistentes, staged)
       if (bloqueio) {
         setErrorMessage(bloqueio)
@@ -160,7 +167,7 @@ export default function FornecedorCadastroModal({
 
     const payload = {
       ...form,
-      cnpj: cnpjDigits,
+      cnpj: form.exterior ? null : cnpjDigits,
       ativo: form.ativo ?? true,
     }
 
@@ -221,14 +228,30 @@ export default function FornecedorCadastroModal({
               <UpperInput value={form.nome_fantasia ?? ''} onChange={(event) => setField('nome_fantasia', event.target.value)} placeholder="Nome fantasia" className={`input-base ${input}`} />
             </div>
             <div>
-              <label className={`block text-xs font-bold mb-1 ${subtext}`}>CPF/CNPJ *</label>
+              <label className={`flex items-center gap-2 text-xs font-semibold mb-2 cursor-pointer ${subtext}`}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.exterior)}
+                  onChange={(event) => setForm(prev => ({
+                    ...prev,
+                    exterior: event.target.checked,
+                    cnpj: event.target.checked ? '' : prev.cnpj,
+                  }))}
+                  className="w-3.5 h-3.5 rounded"
+                />
+                Fornecedor do exterior (sem CNPJ)
+              </label>
+              <label className={`block text-xs font-bold mb-1 ${subtext}`}>
+                CPF/CNPJ {form.exterior ? '' : '*'}
+              </label>
               <div className="relative">
                 <input
                   value={form.cnpj ?? ''}
+                  disabled={Boolean(form.exterior)}
                   onChange={(event) => setField('cnpj', event.target.value)}
-                  onBlur={() => cnpjLookup.consultar(form.cnpj ?? '')}
-                  placeholder="CPF ou CNPJ"
-                  className={`input-base pr-24 ${input}`}
+                  onBlur={() => { if (!form.exterior) cnpjLookup.consultar(form.cnpj ?? '') }}
+                  placeholder={form.exterior ? 'Não se aplica — fornecedor estrangeiro' : 'CPF ou CNPJ'}
+                  className={`input-base pr-24 ${input} ${form.exterior ? 'opacity-60 cursor-not-allowed' : ''}`}
                 />
                 {cnpjLookup.loading && (
                   <div className={`absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-semibold ${dark ? 'text-teal-300' : 'text-teal-600'}`}>

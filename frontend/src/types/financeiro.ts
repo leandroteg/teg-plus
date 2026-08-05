@@ -55,7 +55,9 @@ export interface Fornecedor {
   numero_cadastro?: string
   razao_social: string
   nome_fantasia?: string
-  cnpj?: string
+  cnpj?: string | null
+  /** Fornecedor estrangeiro: dispensa CNPJ, validação de DV e Cartão CNPJ. */
+  exterior?: boolean
   telefone?: string
   email?: string
   contato_nome?: string
