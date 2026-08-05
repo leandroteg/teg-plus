@@ -36,13 +36,26 @@ export async function getAssistentePerfilId() {
 }
 
 // Casa o telefone com um funcionário cadastrado (últimos 8 dígitos). null se não achar.
+//
+// Só perfis ATIVOS: quando alguém sai da empresa, o número costuma ser
+// repassado a outra pessoa (ou reciclado pela operadora). Casar com o perfil
+// do ex-funcionário faria o chamado nascer no nome errado e — pior — poderia
+// mandar resposta de chamado antigo dele para quem tem o número hoje.
+//
+// Número em DOIS perfis ativos (erro de cadastro) = ambíguo: trata como contato
+// externo e loga, em vez de escolher um "meio certo" e vazar conversa.
 export async function findRequesterByPhone(phone) {
   const key = phoneKey(phone)
   if (!key) return null
-  const { data, error } = await supabase.from('sys_perfis').select('id, nome, telefone').not('telefone', 'is', null)
+  const { data, error } = await supabase.from('sys_perfis').select('id, nome, telefone')
+    .eq('ativo', true).not('telefone', 'is', null)
   if (error) throw error
-  const found = (data ?? []).find((u) => phoneKey(u.telefone) === key)
-  return found ? { id: found.id, nome: found.nome } : null
+  const donos = (data ?? []).filter((u) => phoneKey(u.telefone) === key)
+  if (donos.length > 1) {
+    err(`telefone ${key} cadastrado em ${donos.length} perfis ativos (${donos.map((d) => d.nome).join(', ')}) — tratando como contato externo até o cadastro ser corrigido`)
+    return null
+  }
+  return donos.length === 1 ? { id: donos[0].id, nome: donos[0].nome } : null
 }
 
 // ─── Metadados ───────────────────────────────────────────────────────────────

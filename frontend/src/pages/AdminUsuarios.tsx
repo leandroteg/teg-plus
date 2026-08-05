@@ -757,6 +757,7 @@ function UserDetailPanel({
   const [moduloPapeis, setModuloPapeis] = useState<Record<string, PapelGlobal>>(
     extractModuloPapeis(user.permissoes_especiais as Record<string, any>)
   )
+  const [telefoneErro, setTelefoneErro] = useState('')
   const [novaSenha,    setNovaSenha]    = useState('')
   const [confirmSenha, setConfirmSenha] = useState('')
   const [showSenha,    setShowSenha]    = useState(false)
@@ -825,6 +826,23 @@ function UserDetailPanel({
 
   const handleSave = async () => {
     setSenhaError('')
+    setTelefoneErro('')
+    // Mesmo número em dois perfis ativos deixa o Helpdesk sem saber de quem é o
+    // chamado — o bridge desiste e trata como contato externo. Barra aqui.
+    const telDigits = normalizarTelefone(telefone)
+    if (telDigits) {
+      const { data: outros } = await supabase
+        .from('sys_perfis').select('id, nome, telefone')
+        .eq('ativo', true).neq('id', user.id).not('telefone', 'is', null)
+      const chave = telDigits.slice(-8)
+      const dono = (outros ?? []).find(
+        (p: { telefone: string | null }) => normalizarTelefone(p.telefone).slice(-8) === chave
+      ) as { nome: string } | undefined
+      if (dono) {
+        setTelefoneErro(`Este número já está cadastrado em ${dono.nome}. Remova de lá antes (dois donos deixam o Helpdesk sem saber de quem é o chamado).`)
+        return
+      }
+    }
     if (novaSenha) {
       if (novaSenha.length < 6) {
         setSenhaError('A senha deve ter pelo menos 6 caracteres')
@@ -873,6 +891,7 @@ function UserDetailPanel({
     setEditaFornecedor((user as any).edita_fornecedor ?? false)
     setAlcada(user.alcada_nivel)
     setTelefone(formatarTelefone(user.telefone))
+    setTelefoneErro('')
     setAtivo(user.ativo)
     setAltProxLogin(user.alterar_senha_proximo_login ?? false)
     setModulos(user.modulos ?? {})
@@ -1070,12 +1089,14 @@ function UserDetailPanel({
               placeholder="(67) 99999-9999"
               className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`}
             />
-            <p className={`mt-1 text-[11px] ${telefone && !telefoneValido(telefone) ? 'text-amber-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              {telefone && !telefoneValido(telefone)
-                ? 'Informe DDD + número (11 dígitos).'
-                : telefone
-                  ? 'Chamados abertos por este número no WhatsApp entram no nome desta pessoa.'
-                  : 'Sem telefone, os chamados desta pessoa pelo WhatsApp entram como contato externo.'}
+            <p className={`mt-1 text-[11px] ${telefoneErro || (telefone && !telefoneValido(telefone)) ? 'text-amber-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {telefoneErro
+                ? telefoneErro
+                : telefone && !telefoneValido(telefone)
+                  ? 'Informe DDD + número (11 dígitos).'
+                  : telefone
+                    ? 'Chamados abertos por este número no WhatsApp entram no nome desta pessoa.'
+                    : 'Sem telefone, os chamados desta pessoa pelo WhatsApp entram como contato externo.'}
             </p>
           </div>
 
