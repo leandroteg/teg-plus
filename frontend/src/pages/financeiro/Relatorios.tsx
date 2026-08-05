@@ -64,9 +64,10 @@ export const painelPeriodoDefault = () => {
   return { de: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, ate: ymHoje() }
 }
 
-// Fluxo de Caixa abre olhando pra FRENTE: próximo mês → dezembro do ano desse mês.
+// Fluxo de Caixa abre no MÊS CORRENTE → dezembro. Começar no mês seguinte
+// escondia o que ainda vence neste mês, que é o compromisso mais próximo.
 export const fluxoPeriodoDefault = () => {
-  const d = new Date(); d.setMonth(d.getMonth() + 1)
+  const d = new Date()
   const y = d.getFullYear()
   return { de: `${y}-${String(d.getMonth() + 1).padStart(2, '0')}`, ate: `${y}-12` }
 }
