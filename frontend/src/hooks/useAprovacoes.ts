@@ -513,6 +513,38 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         }
       }
 
+      // 5d. Busca dados de adiantamento (solicitacao_adiantamento)
+      //     Sem isso o card cai no fallback generico e o diretor aprova "no escuro".
+      const adtIds = aprData
+        .filter(a => a.tipo_aprovacao === 'solicitacao_adiantamento')
+        .map(a => a.entidade_id)
+        .filter(Boolean)
+
+      const adtMap = new Map<string, Record<string, unknown>>()
+      const adtDocMap = new Map<string, Record<string, unknown>[]>()
+      if (adtIds.length > 0) {
+        const { data: adtData } = await supabase
+          .from('desp_adiantamentos')
+          .select('id, numero, solicitante_nome, favorecido_nome, gestor_nome, centro_custo, classe_financeira, valor_solicitado, finalidade, justificativa, data_solicitacao, data_pagamento, data_limite_prestacao, chave_pix, banco, observacoes, status')
+          .in('id', adtIds)
+        for (const ad of adtData ?? []) {
+          adtMap.set(ad.id, ad)
+        }
+
+        // Anexos gravados por useDespesas em fin_documentos (entity_type='adiantamento')
+        const { data: adtDocs } = await supabase
+          .from('fin_documentos')
+          .select('entity_id, nome_arquivo, arquivo_url, tipo, mime_type')
+          .eq('entity_type', 'adiantamento')
+          .in('entity_id', adtIds)
+        for (const d of adtDocs ?? []) {
+          const eid = d.entity_id as string
+          const arr = adtDocMap.get(eid) ?? []
+          arr.push(d)
+          adtDocMap.set(eid, arr)
+        }
+      }
+
       // 6. Mescla aprovacoes com dados da requisicao/contrato/CP + cotacao
       return aprData
         .map(a => {
@@ -747,6 +779,48 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 volumes_total: (log.volumes_total as number) ?? undefined,
               }
             }
+          } else if (a.tipo_aprovacao === 'solicitacao_adiantamento') {
+            const adt = adtMap.get(a.entidade_id)
+            const favorecido = (adt?.favorecido_nome as string) ?? ''
+            const finalidade = (adt?.finalidade as string) ?? ''
+            requisicao = {
+              id: a.entidade_id,
+              numero: (adt?.numero as string) ?? a.entidade_numero ?? 'N/A',
+              solicitante_nome: (adt?.solicitante_nome as string) ?? '',
+              obra_nome: (adt?.centro_custo as string) ?? '',
+              descricao: [favorecido, finalidade].filter(Boolean).join(' — ') || 'Solicitacao de adiantamento',
+              valor_estimado: Number((adt?.valor_solicitado as number) ?? 0),
+              urgencia: 'normal',
+              status: 'em_aprovacao',
+              alcada_nivel: a.nivel,
+              created_at: a.created_at,
+            }
+            if (adt) {
+              ;(a as Record<string, unknown>)._adiantamento_detalhes = {
+                numero: (adt.numero as string) ?? a.entidade_numero ?? '',
+                solicitante_nome: (adt.solicitante_nome as string) ?? '',
+                favorecido_nome: favorecido,
+                gestor_nome: (adt.gestor_nome as string) ?? undefined,
+                valor_solicitado: Number((adt.valor_solicitado as number) ?? 0),
+                finalidade,
+                justificativa: (adt.justificativa as string) ?? undefined,
+                centro_custo: (adt.centro_custo as string) ?? undefined,
+                classe_financeira: (adt.classe_financeira as string) ?? undefined,
+                data_solicitacao: (adt.data_solicitacao as string) ?? undefined,
+                data_pagamento: (adt.data_pagamento as string) ?? undefined,
+                data_limite_prestacao: (adt.data_limite_prestacao as string) ?? undefined,
+                chave_pix: (adt.chave_pix as string) ?? undefined,
+                banco: (adt.banco as string) ?? undefined,
+                observacoes: (adt.observacoes as string) ?? undefined,
+                status: (adt.status as string) ?? undefined,
+                anexos: (adtDocMap.get(a.entidade_id) ?? []).map(d => ({
+                  nome: (d.nome_arquivo as string) ?? '',
+                  url: (d.arquivo_url as string) ?? '',
+                  tipo: (d.tipo as string) ?? 'outro',
+                  mime_type: (d.mime_type as string) ?? '',
+                })),
+              }
+            }
           } else {
             requisicao = {
               id: a.entidade_id,
@@ -768,6 +842,8 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           delete (a as Record<string, unknown>)._pagamento_detalhes
           const transporteDetalhes = (a as Record<string, unknown>)._transporte_detalhes as AprovacaoPendente['transporte_detalhes']
           delete (a as Record<string, unknown>)._transporte_detalhes
+          const adiantamentoDetalhes = (a as Record<string, unknown>)._adiantamento_detalhes as AprovacaoPendente['adiantamento_detalhes']
+          delete (a as Record<string, unknown>)._adiantamento_detalhes
 
           return {
             ...a,
@@ -783,6 +859,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             minuta_resumo: minutaResumo ?? undefined,
             pagamento_detalhes: pagamentoDetalhes ?? undefined,
             transporte_detalhes: transporteDetalhes ?? undefined,
+            adiantamento_detalhes: adiantamentoDetalhes ?? undefined,
             esclarecimento_historico: escHistMap.get(a.entidade_id) ?? undefined,
           } as unknown as AprovacaoPendente
         })

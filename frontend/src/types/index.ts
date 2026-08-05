@@ -277,6 +277,25 @@ export interface AprovacaoPendente extends Aprovacao {
       }
     }[]
   }
+  adiantamento_detalhes?: {
+    numero: string
+    solicitante_nome: string
+    favorecido_nome: string
+    gestor_nome?: string
+    valor_solicitado: number
+    finalidade: string
+    justificativa?: string
+    centro_custo?: string
+    classe_financeira?: string
+    data_solicitacao?: string
+    data_pagamento?: string
+    data_limite_prestacao?: string
+    chave_pix?: string
+    banco?: string
+    observacoes?: string
+    status?: string
+    anexos?: { nome: string, url: string, tipo: string, mime_type?: string }[]
+  }
   transporte_detalhes?: {
     origem: string
     destino: string

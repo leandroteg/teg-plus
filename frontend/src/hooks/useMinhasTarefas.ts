@@ -333,6 +333,7 @@ function humanTipoAprovacao(tipo: string): string {
     minuta_contratual:    'Minuta contratual aguardando sua aprovacao',
     autorizacao_pagamento:'Autorizacao de pagamento aguardando sua aprovacao',
     aprovacao_transporte: 'Solicitacao de transporte aguardando sua aprovacao',
+    solicitacao_adiantamento: 'Adiantamento aguardando sua aprovacao',
   }
   return map[tipo] || 'Aprovacao pendente'
 }

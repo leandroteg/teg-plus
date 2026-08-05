@@ -1041,13 +1041,15 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
               </div>
             )}
           </div>
+        ) : aprovacao.tipo_aprovacao === 'solicitacao_adiantamento' && aprovacao.adiantamento_detalhes ? (
+          <AdiantamentoDetalhesCard detalhes={aprovacao.adiantamento_detalhes} />
         ) : (
           <p className="text-sm text-slate-600">
             {aprovacao.requisicao?.descricao || `Aguardando aprovacao ${tipo.label.toLowerCase()}`}
           </p>
         )}
 
-        {aprovacao.requisicao?.valor_estimado > 0 && aprovacao.tipo_aprovacao !== 'minuta_contratual' && aprovacao.tipo_aprovacao !== 'autorizacao_pagamento' && (
+        {aprovacao.requisicao?.valor_estimado > 0 && aprovacao.tipo_aprovacao !== 'minuta_contratual' && aprovacao.tipo_aprovacao !== 'autorizacao_pagamento' && !(aprovacao.tipo_aprovacao === 'solicitacao_adiantamento' && aprovacao.adiantamento_detalhes) && (
           <div className="mt-3 bg-slate-50 rounded-xl p-3 flex justify-between items-center">
             <span className="text-xs text-slate-500">Valor</span>
             <span className={`text-lg font-extrabold ${tipo.textColor}`}>
@@ -1671,6 +1673,147 @@ function PagamentoDetalhesCard({ detalhes, loteId, selectedItemIds, setSelectedI
           <p className="mt-1.5">
             Ao aprovar, o financeiro podera efetuar o pagamento. Ao rejeitar, a CP voltara para revisao.
           </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Adiantamento Detalhes Card ────────────────────────────────────────────────
+
+function AdiantamentoDetalhesCard({ detalhes }: {
+  detalhes: NonNullable<AprovacaoPendente['adiantamento_detalhes']>
+}) {
+  const fmtDate = (d?: string) => {
+    if (!d) return '—'
+    const dt = new Date(d.length === 10 ? d + 'T00:00:00' : d)
+    return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('pt-BR')
+  }
+  const mesmaPessoa = detalhes.favorecido_nome
+    && detalhes.favorecido_nome.trim().toUpperCase() === detalhes.solicitante_nome.trim().toUpperCase()
+
+  return (
+    <div className="space-y-2">
+      {/* Valor + favorecido */}
+      <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-3 space-y-2">
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-cyan-700 font-medium">Valor Solicitado</span>
+          <span className="text-lg font-extrabold text-cyan-700">{fmt(detalhes.valor_solicitado)}</span>
+        </div>
+        <div className="flex items-center gap-2 pt-1 border-t border-cyan-200/70">
+          <Wallet size={13} className="text-cyan-600 flex-shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[10px] text-cyan-600 uppercase tracking-wider font-bold">Favorecido</p>
+            <p className="text-sm font-semibold text-slate-800 truncate">{detalhes.favorecido_nome || '—'}</p>
+          </div>
+        </div>
+        {/* Adiantamento em nome de terceiro: o dinheiro nao vai para quem pediu */}
+        {!mesmaPessoa && detalhes.favorecido_nome && (
+          <p className="text-[10px] text-cyan-700 bg-cyan-100/70 rounded-lg px-2 py-1">
+            Solicitado por <strong>{detalhes.solicitante_nome || '—'}</strong> em nome de terceiro
+          </p>
+        )}
+      </div>
+
+      {/* Finalidade / justificativa */}
+      <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+        <div>
+          <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Finalidade</p>
+          <p className="text-sm text-slate-800 font-medium leading-snug">{detalhes.finalidade || '—'}</p>
+        </div>
+        {detalhes.justificativa && (
+          <div>
+            <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Justificativa</p>
+            <p className="text-xs text-slate-600 leading-relaxed">{detalhes.justificativa}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Dados do lancamento */}
+      <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+        {detalhes.solicitante_nome && (
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-500">Solicitante</span>
+            <span className="text-slate-800 font-medium text-right">{detalhes.solicitante_nome}</span>
+          </div>
+        )}
+        {detalhes.centro_custo && (
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-500">Centro de Custo</span>
+            <span className="text-slate-800 font-medium">{detalhes.centro_custo}</span>
+          </div>
+        )}
+        {detalhes.classe_financeira && (
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-500">Classe Financeira</span>
+            <span className="text-slate-800 font-medium text-right">{detalhes.classe_financeira}</span>
+          </div>
+        )}
+        {detalhes.data_solicitacao && (
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-500">Data da Solicitacao</span>
+            <span className="text-slate-800 font-medium">{fmtDate(detalhes.data_solicitacao)}</span>
+          </div>
+        )}
+        {detalhes.data_pagamento && (
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-500">Pagamento Previsto</span>
+            <span className="text-slate-800 font-medium">{fmtDate(detalhes.data_pagamento)}</span>
+          </div>
+        )}
+        {detalhes.data_limite_prestacao && (
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-500">Prestacao de Contas ate</span>
+            <span className="text-slate-800 font-medium">{fmtDate(detalhes.data_limite_prestacao)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Dados de repasse */}
+      {(detalhes.chave_pix || detalhes.banco) && (
+        <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <Smartphone size={12} className="text-slate-400" />
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Repasse</span>
+          </div>
+          {detalhes.chave_pix && (
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-500">Chave PIX</span>
+              <span className="text-slate-800 font-medium break-all text-right">{detalhes.chave_pix}</span>
+            </div>
+          )}
+          {detalhes.banco && (
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-500">Banco</span>
+              <span className="text-slate-800 font-medium text-right">{detalhes.banco}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {detalhes.observacoes && (
+        <p className="text-xs text-slate-500 italic whitespace-pre-line">{detalhes.observacoes}</p>
+      )}
+
+      {/* Anexos (fin_documentos entity_type='adiantamento') */}
+      {detalhes.anexos && detalhes.anexos.length > 0 && (
+        <div className="bg-slate-50 rounded-xl p-3 space-y-1">
+          <div className="flex items-center gap-1.5">
+            <Paperclip size={12} className="text-slate-400" />
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Anexos</span>
+          </div>
+          {detalhes.anexos.map((anexo, idx) => (
+            <a
+              key={idx}
+              href={anexo.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-800 hover:underline truncate"
+            >
+              <span>📎</span>
+              <span className="truncate">{anexo.nome || 'Anexo'}</span>
+            </a>
+          ))}
         </div>
       )}
     </div>
