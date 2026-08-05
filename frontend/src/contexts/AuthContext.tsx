@@ -171,6 +171,8 @@ export interface Perfil {
   edita_previsao_fin: boolean
   /** Pode cancelar pedido de compra (supervisor de Compras) — cancela o pedido e cascateia os CP. */
   pode_cancelar_pedido: boolean
+  /** Pode editar dados cadastrais/bancários de fornecedor já cadastrado e excluir fornecedor sem lançamentos. */
+  edita_fornecedor: boolean
   ultimo_acesso: string | null
   created_at: string
   updated_at: string

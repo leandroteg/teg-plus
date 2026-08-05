@@ -747,6 +747,7 @@ function UserDetailPanel({
   const [aprovaCancelamentoFin, setAprovaCancelamentoFin] = useState<boolean>(user.aprova_cancelamento_fin ?? false)
   const [editaPrevisaoFin, setEditaPrevisaoFin] = useState<boolean>((user as any).edita_previsao_fin ?? false)
   const [podeCancelarPedidoFlag, setPodeCancelarPedidoFlag] = useState<boolean>(user.pode_cancelar_pedido ?? false)
+  const [editaFornecedor, setEditaFornecedor] = useState<boolean>((user as any).edita_fornecedor ?? false)
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
   const [telefone, setTelefone] = useState(formatarTelefone(user.telefone))
   const [ativo,   setAtivo]   = useState(user.ativo)
@@ -785,7 +786,7 @@ function UserDetailPanel({
   const aplicarCopia = async (origem: { id: string; nome: string }) => {
     const { data: o } = await supabase
       .from('sys_perfis')
-      .select('role, papel_global, permissoes_especiais, modulos, alcada_nivel, pode_receber, almoxarife, comprador, sala_tecnica, aprova_cancelamento_fin, edita_previsao_fin, pode_cancelar_pedido')
+      .select('role, papel_global, permissoes_especiais, modulos, alcada_nivel, pode_receber, almoxarife, comprador, sala_tecnica, aprova_cancelamento_fin, edita_previsao_fin, pode_cancelar_pedido, edita_fornecedor')
       .eq('id', origem.id)
       .maybeSingle()
     if (!o) return
@@ -801,6 +802,7 @@ function UserDetailPanel({
     setAprovaCancelamentoFin((o as any).aprova_cancelamento_fin ?? false)
     setEditaPrevisaoFin((o as any).edita_previsao_fin ?? false)
     setPodeCancelarPedidoFlag((o as any).pode_cancelar_pedido ?? false)
+    setEditaFornecedor((o as any).edita_fornecedor ?? false)
     setCopiadoDe(origem.nome)
     setShowCopiar(false)
   }
@@ -850,6 +852,7 @@ function UserDetailPanel({
       aprova_cancelamento_fin: aprovaCancelamentoFin,
       edita_previsao_fin: editaPrevisaoFin,
       pode_cancelar_pedido: podeCancelarPedidoFlag,
+      edita_fornecedor: editaFornecedor,
       modulos,
       permissoes_especiais: applyModuloPapeisOnPermissoes(permEspeciais, moduloPapeis),
     })
@@ -867,6 +870,7 @@ function UserDetailPanel({
     setAprovaCancelamentoFin(user.aprova_cancelamento_fin ?? false)
     setEditaPrevisaoFin((user as any).edita_previsao_fin ?? false)
     setPodeCancelarPedidoFlag(user.pode_cancelar_pedido ?? false)
+    setEditaFornecedor((user as any).edita_fornecedor ?? false)
     setAlcada(user.alcada_nivel)
     setTelefone(formatarTelefone(user.telefone))
     setAtivo(user.ativo)
@@ -1192,6 +1196,19 @@ function UserDetailPanel({
               />
               <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 Pode cancelar pedido de compra (supervisor de Compras) — cancela o pedido e os CP ligados
+              </span>
+            </label>
+
+            {/* Edita cadastro de fornecedor — libera dados cadastrais/bancários e a exclusão sem lançamentos */}
+            <label className={`mt-2 flex items-center gap-2 cursor-pointer select-none p-2 rounded-lg ${isDark ? 'bg-white/[0.03] hover:bg-white/[0.06]' : 'bg-slate-50 hover:bg-slate-100'}`}>
+              <input
+                type="checkbox"
+                checked={editaFornecedor}
+                onChange={e => setEditaFornecedor(e.target.checked)}
+                className="accent-primary"
+              />
+              <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                Edita cadastro de fornecedor — altera dados cadastrais/bancários e exclui fornecedor sem lançamento atrelado
               </span>
             </label>
 

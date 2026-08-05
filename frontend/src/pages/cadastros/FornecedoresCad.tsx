@@ -87,7 +87,10 @@ export default function FornecedoresCad({ segmentos, titulo, extra }: Fornecedor
   const { data: cartaoCnpjStatus } = useFornecedoresCartaoCnpjStatus()
   const salvar = useSalvarFornecedor()
   const aiParse = useAiCadastroParse()
-  const { isAdmin } = useAuth()
+  const { isAdmin, perfil } = useAuth()
+  // Editar cadastro/dados bancários e excluir fornecedor: admin ou quem tem a
+  // flag liberada no perfil. Mesma regra do pode_editar_fornecedor() no banco.
+  const podeEditarFornecedor = isAdmin || Boolean(perfil?.edita_fornecedor)
 
   const cnpjLookup = useConsultaCNPJ(useCallback((r) => {
     setEditItem(prev => prev ? {
@@ -160,9 +163,31 @@ export default function FornecedoresCad({ segmentos, titulo, extra }: Fornecedor
     if (selected.size === filtered.length) setSelected(new Set())
     else setSelected(new Set(filtered.map(i => i.id)))
   }
+  // Exclusão passa pela RPC: ela checa a permissão e os lançamentos atrelados e
+  // devolve o motivo. O .delete() direto batia no RLS e falhava calado — a tela
+  // recarregava e o fornecedor continuava lá.
   const handleBulkDelete = async () => {
     if (!confirm(`Excluir ${selected.size} item(s)?`)) return
-    await supabase.from('cmp_fornecedores').delete().in('id', [...selected])
+    const falhas: string[] = []
+    for (const id of selected) {
+      // Storage não sai por FK: limpa os arquivos antes de derrubar as linhas.
+      const { data: anexos } = await supabase
+        .from('cmp_fornecedor_anexos')
+        .select('storage_path')
+        .eq('fornecedor_id', id)
+      const { error } = await supabase.rpc('cmp_fornecedor_excluir', { p_fornecedor_id: id })
+      if (error) {
+        falhas.push(error.message)
+        continue
+      }
+      const paths = (anexos ?? []).map(a => a.storage_path as string).filter(Boolean)
+      if (paths.length > 0) {
+        await supabase.storage.from('fornecedores-docs').remove(paths)
+      }
+    }
+    if (falhas.length > 0) {
+      alert(falhas.join('\n\n'))
+    }
     setSelected(new Set())
     window.location.reload()
   }
@@ -197,9 +222,9 @@ export default function FornecedoresCad({ segmentos, titulo, extra }: Fornecedor
       ? 'text-emerald-700 font-semibold'
       : 'text-red-600 font-semibold'
     : ''
-  const sensitiveLocked = Boolean(editItem?.id && !isAdmin)
+  const sensitiveLocked = Boolean(editItem?.id && !podeEditarFornecedor)
   const sensitiveLockMessage = sensitiveLocked
-    ? 'Campos cadastrais e bancarios ficam bloqueados apos o cadastro. Solicite alteracao ao Leandro ou outro Admin.'
+    ? 'Campos cadastrais e bancarios ficam bloqueados apos o cadastro. Solicite alteracao ao Leandro ou a outro usuario liberado.'
     : null
 
   function getCnpjValidationMessage() {
@@ -259,7 +284,7 @@ export default function FornecedoresCad({ segmentos, titulo, extra }: Fornecedor
     if (sensitiveLocked) {
       const original = fornecedores.find(f => f.id === editItem.id)
       if (original && hasSensitiveChanges(original, editItem)) {
-        alert('Campos importantes desse fornecedor precisam de aprovacao do Leandro ou outro Admin.')
+        alert('Campos importantes desse fornecedor precisam de aprovacao do Leandro ou de outro usuario liberado.')
         return
       }
     }
@@ -568,9 +593,13 @@ export default function FornecedoresCad({ segmentos, titulo, extra }: Fornecedor
       {selected.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 text-sm font-semibold">
           <span>{selected.size} selecionado(s)</span>
-          <button onClick={handleBulkDelete} className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-xl transition-colors">
-            <Trash2 size={14} /> Excluir
-          </button>
+          {podeEditarFornecedor ? (
+            <button onClick={handleBulkDelete} className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-xl transition-colors">
+              <Trash2 size={14} /> Excluir
+            </button>
+          ) : (
+            <span className="text-[11px] text-slate-300 font-medium">Sem permissao para excluir</span>
+          )}
         </div>
       )}
 
