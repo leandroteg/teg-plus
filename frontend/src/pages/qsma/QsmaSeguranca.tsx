@@ -129,8 +129,13 @@ function RelatorioTag({ o, isDark, muted }: { o: QsmaOcorrencia; isDark: boolean
 export default function QsmaSeguranca() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
-  const { perfil } = useAuth()
+  const { perfil, getPapelForModule } = useAuth()
   const isAdmin = perfil?.role === 'administrador'
+  // As matrizes (Riscos, EPI/EPC, Treinamentos) sao mantidas pelo SESMT, nao pelo
+  // admin do sistema. Quem manda aqui e o papel DO MODULO, nao o role global:
+  // o supervisor de QSMA costuma ser 'gestor' no role legado e ficava sem editar.
+  const papelQsma = getPapelForModule('qsma')
+  const podeEditarMatriz = isAdmin || ['supervisor', 'diretor', 'ceo'].includes(papelQsma)
   const [params, setParams] = useSearchParams()
   const [aba, setAba] = useState<string>(params.get('aba') ?? 'ocorrencias')
   const [modalRisco, setModalRisco] = useState<QsmaRisco | 'novo' | null>(null)
@@ -275,7 +280,7 @@ export default function QsmaSeguranca() {
           </div>
         )
         if (subRisco === 'documentos') return <DocumentosSST subTabs={subTabsRisco} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} />
-        if (subRisco === 'matriz') return <MatrizRiscos subTabs={subTabsRisco} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />
+        if (subRisco === 'matriz') return <MatrizRiscos subTabs={subTabsRisco} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={podeEditarMatriz} />
         return (
           <CatalogoRiscos subTabs={subTabsRisco} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted}
             riscos={riscosF} busca={busca} onBusca={setBusca} escopoF={escopoF} onEscopo={setEscopoF}
@@ -298,7 +303,7 @@ export default function QsmaSeguranca() {
             ))}
           </div>
         )
-        if (subEpi === 'matriz') return <MatrizEpis subTabs={subTabsEpi} isDark={isDark} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />
+        if (subEpi === 'matriz') return <MatrizEpis subTabs={subTabsEpi} isDark={isDark} txtMain={txtMain} txtMuted={txtMuted} isAdmin={podeEditarMatriz} />
         if (subEpi === 'controle') return (
           epiColab
             ? <RHColaboradorDetalhe id={epiColab} onBack={() => setEpiColab(null)} soTreinamentos mostrarEpi />
@@ -334,7 +339,7 @@ export default function QsmaSeguranca() {
                 onSelectEpi={id => { setAba('epis'); setSubEpi('controle'); setEpiColab(id) }} />
             )}
 
-            {subTreino === 'matriz' && <MatrizTreinamentos subTabs={subTabsToggle} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={isAdmin} />}
+            {subTreino === 'matriz' && <MatrizTreinamentos subTabs={subTabsToggle} isDark={isDark} card={card} txtMain={txtMain} txtMuted={txtMuted} isAdmin={podeEditarMatriz} />}
 
             {subTreino === 'controle' && (
               treinoColab
