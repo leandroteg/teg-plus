@@ -5,7 +5,7 @@ import { valorAPagarCP } from '../types/financeiro'
 
 const SELECT_CP = `
   *,
-  pedido:cmp_pedidos!pedido_id(numero_pedido, status, data_pedido, data_prevista_entrega, status_pagamento),
+  pedido:cmp_pedidos!pedido_id(numero_pedido, status, data_pedido, data_prevista_entrega, status_pagamento, observacoes),
   requisicao:cmp_requisicoes!requisicao_id(numero, descricao, obra_nome, categoria, centro_custo, classe_financeira, projeto_id)
 `
 

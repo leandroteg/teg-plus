@@ -205,6 +205,9 @@ export interface ContaPagar {
     data_pedido: string
     data_prevista_entrega?: string
     status_pagamento?: string
+    /** Observações do comprador. Carregam instrução de pagamento ("só à vista",
+     *  "não aceita faturamento") que o Financeiro precisa ver antes de pagar. */
+    observacoes?: string | null
   } | null
   // Imposto / retenção
   imposto_tipo?: string | null

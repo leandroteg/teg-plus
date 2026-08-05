@@ -53,6 +53,7 @@ import CancelamentoDocControl from '../../components/financeiro/CancelamentoDocC
 import ImportarComprovantesModal from '../../components/financeiro/ImportarComprovantesModal'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras, useLookupEmpresas } from '../../hooks/useLookups'
 import { mapaEmpresaCurta } from '../../utils/empresaCurta'
+import { downloadRelatorioCPPdf, type LinhaRelatorioCP } from '../../utils/cp-lista-pdf'
 import {
   TIPOS_DOC_FINANCEIRO, rotuloCurtoDocFin,
   type TipoDocFinanceiro, type ArquivoFinanceiro,
@@ -415,6 +416,13 @@ type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
 type PipelineStageId = StatusCP | 'em_aprovacao'
 type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'this_month' | 'next_month' | 'future' | 'custom' | 'same_supplier' | 'same_work' | 'same_lote'
+/** Mesmos rótulos dos chips de vencimento — vão no cabeçalho do relatório. */
+const QUICK_FILTER_LABEL: Record<QuickFilterId, string> = {
+  all: 'Todos', overdue: 'Vencidos', today: 'Hoje', week: '7 dias',
+  this_month: 'Mês Atual', next_month: 'Próx. Mês', future: 'Futuros',
+  custom: 'Personalizado', same_supplier: 'Mesmo fornecedor',
+  same_work: 'Mesma obra', same_lote: 'Mesmo lote',
+}
 type StatusHintTone = 'amber' | 'rose' | 'sky'
 type StatusHint = { text: string; tone: StatusHintTone }
 const CP_TABLE_GRID = 'grid grid-cols-[20px_2px_minmax(0,1.8fr)_minmax(0,1.45fr)_minmax(0,1fr)_70px_110px_72px_96px] items-center gap-x-3'
@@ -3141,6 +3149,17 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             {cp.remessa_erro && (
               <p className="text-xs text-red-500 mt-1">{cp.remessa_erro}</p>
             )}
+            {/* Observações do pedido — costumam trazer instrução de pagamento
+                ("não aceita faturamento", "somente à vista") que só existia na
+                tela de Pedidos e não chegava a quem paga. */}
+            {cp.pedido?.observacoes && (
+              <div className={`mt-3 pt-3 border-t rounded-xl px-3.5 py-2.5 ${isDark ? 'border-white/10 bg-amber-500/10' : 'border-slate-200 bg-amber-50'}`}>
+                <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                  Observações do Pedido {cp.pedido.numero_pedido}
+                </p>
+                <p className={`text-xs leading-relaxed ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>{cp.pedido.observacoes}</p>
+              </div>
+            )}
             {/* Descrição da requisição de compra */}
             {cp.requisicao?.justificativa && (
               <div className={`mt-3 pt-3 border-t rounded-xl px-3.5 py-2.5 ${isDark ? 'border-white/10 bg-teal-500/10' : 'border-slate-200 bg-teal-50'}`}>
@@ -5158,6 +5177,66 @@ export default function CPPipeline() {
     showToast('success', `${toExport.length} registro(s) exportado(s)`)
   }
 
+  // Relatório em PDF da lista como ela está na tela: mesma aba, mesmos filtros,
+  // mesma ordem e as mesmas colunas. O CSV serve para trabalhar a planilha; este
+  // é o que o usuário imprime/anexa para conferência.
+  const handleExportPdf = async () => {
+    const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === activeTab)
+    const toExport = selectedIds.size > 0 ? activeCPs.filter(cp => selectedIds.has(cp.id)) : activeCPs
+    if (toExport.length === 0) return
+
+    const empresaLabel = empresaFilter === 'all'
+      ? 'Todas'
+      : empresaFilter === 'sem'
+        ? 'Sem empresa'
+        : (empresas.find(e => e.id === empresaFilter)?.nome_fantasia
+          || empresas.find(e => e.id === empresaFilter)?.razao_social
+          || 'Empresa')
+
+    const vencLabel = quickFilter === 'custom'
+      ? `${customDateFrom ? fmtData(customDateFrom) : '...'} a ${customDateTo ? fmtData(customDateTo) : '...'}`
+      : QUICK_FILTER_LABEL[quickFilter] ?? 'Todos'
+
+    const ordemLabel = `${SORT_OPTIONS.find(o => o.field === sortField)?.label ?? sortField} (${sortDir === 'asc' ? 'crescente' : 'decrescente'})`
+
+    const filtros = [`Empresa: ${empresaLabel}`, `Vencimento: ${vencLabel}`, `Ordenado por: ${ordemLabel}`]
+    if (busca.trim()) filtros.push(`Busca: "${busca.trim()}"`)
+
+    const linhas: LinhaRelatorioCP[] = toExport.map(cp => {
+      const pedidoNum = cp.pedido?.numero_pedido || ''
+      const selos: string[] = []
+      if (cp.devolucao_motivo) selos.push('Devolvido')
+      if (cp.origem === 'logistica') selos.push('Log')
+      if (cp.origem === 'compras' && pedidoNum) selos.push('Cmp')
+      if (isUrgentExtraordinary(cp)) selos.push('Urg')
+      return {
+        empresa: (cp.empresa_id ? empresasCurtas.get(cp.empresa_id) : '') || '',
+        fornecedor: cp.fornecedor_nome,
+        selos,
+        descricao: cp.descricao || '',
+        obra: cp.requisicao?.obra_nome || '',
+        origem: ORIGEM_CP_LABEL[cp.origem ?? 'manual']?.curto ?? cp.origem ?? '',
+        centroCusto: cp.centro_custo || '',
+        pedido: pedidoNum,
+        vencimento: cp.status === 'pago' && cp.data_pagamento ? cp.data_pagamento : cp.data_vencimento,
+        urgencia: getUrgency(cp),
+        valorOriginal: Number(cp.valor_original ?? 0) || 0,
+        valorAPagar: valorAPagarCP(cp),
+      }
+    })
+
+    try {
+      await downloadRelatorioCPPdf(linhas, {
+        etapa: stage?.label || activeTab,
+        filtros,
+        selecao: selectedIds.size > 0,
+      })
+      showToast('success', `Relatório com ${linhas.length} título(s) gerado`)
+    } catch {
+      showToast('error', 'Não foi possível gerar o relatório em PDF')
+    }
+  }
+
   // Bulk action config per tab
   const BULK_ACTIONS: Partial<Record<PipelineStageId, { label: string; icon: typeof CheckCircle2; className: string }>> = {
     previsto:      { label: 'Confirmar',     icon: CheckCircle2, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
@@ -5558,6 +5637,23 @@ export default function CPPipeline() {
           >
             <Download size={13} />
             CSV
+          </button>
+
+          {/* Relatório PDF — a lista como está na tela, para imprimir/anexar */}
+          <button
+            onClick={handleExportPdf}
+            disabled={activeCPs.length === 0}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all ${
+              isDark
+                ? 'text-slate-400 hover:text-white hover:bg-white/[0.04] disabled:opacity-30'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 disabled:opacity-30'
+            }`}
+            title={selectedIds.size > 0
+              ? `Relatório PDF dos ${selectedIds.size} título(s) selecionado(s)`
+              : 'Relatório PDF desta lista (com os filtros aplicados)'}
+          >
+            <FileText size={13} />
+            PDF
           </button>
 
           {/* Atualizar dados */}
