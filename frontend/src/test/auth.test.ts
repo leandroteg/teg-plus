@@ -53,6 +53,7 @@ function fakePerfil(overrides: Partial<Perfil> = {}): Perfil {
     email: 'teste@teguniao.com.br',
     cargo: 'Engenheiro',
     departamento: 'Obras',
+    telefone: null,
     avatar_url: null,
     role: 'comprador',
     alcada_nivel: 2,

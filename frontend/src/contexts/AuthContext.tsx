@@ -142,6 +142,9 @@ export interface Perfil {
   email: string
   cargo: string | null
   departamento: string | null
+  /** Celular/WhatsApp. É por ele que o Helpdesk identifica quem abre chamado
+   *  pelo WhatsApp (o bridge casa pelos últimos 8 dígitos). Só dígitos. */
+  telefone: string | null
   avatar_url: string | null
   role: Role
   papel_global?: PapelGlobal | null

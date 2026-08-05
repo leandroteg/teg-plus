@@ -328,6 +328,18 @@ export default function ChamadoDetalhe() {
                   {t.externalContact && <div className="text-[11px] font-medium text-emerald-600">Contato externo · via WhatsApp</div>}
                 </div>
               </div>
+              {/* Contato externo = o número não está em nenhum cadastro de usuário.
+                  Cadastrar o telefone em /admin/usuarios faz os próximos chamados
+                  desta pessoa já nascerem no nome dela. */}
+              {staff && t.externalContact && (
+                <p className="mt-2 text-[11px] text-slate-500">
+                  Número não vinculado a um usuário.{' '}
+                  <Link to="/admin/usuarios" className="font-medium text-primary hover:underline">
+                    Cadastrar no perfil da pessoa
+                  </Link>{' '}
+                  para os próximos chamados virem identificados.
+                </p>
+              )}
             </SidebarField>
             <div className="space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
               <div>Aberto em {formatDateTime(t.createdAt)}</div>

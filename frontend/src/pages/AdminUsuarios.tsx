@@ -4,7 +4,7 @@ import {
   Users, UserPlus, Search, Shield,
   Check, X, AlertCircle, Mail, RefreshCw,
   CheckCircle, Power, Edit3, ChevronDown, ChevronUp,
-  Calendar, Clock, Briefcase, Building2, Eye, EyeOff, Lock, Loader2,
+  Calendar, Clock, Briefcase, Building2, Eye, EyeOff, Lock, Loader2, Phone,
   LayoutGrid, LayoutList, SlidersHorizontal, MapPin, Copy,
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -16,6 +16,7 @@ import {
   ROLE_LABEL, ROLE_COLOR, ALCADA_LABEL, MODULOS_ERP, MODULOS_ERP_GROUPED,
 } from '../contexts/AuthContext'
 import { GRUPO_CONTRATO_OPTIONS } from '../constants/contratos'
+import { normalizarTelefone, mascaraTelefone, formatarTelefone, telefoneValido } from '../utils/telefone'
 import { useBases } from '../hooks/useEstoque'
 
 const INTERNAL_LOGIN_DOMAIN = 'login.teg.local'
@@ -667,10 +668,14 @@ function useCadastrarUsuario() {
               .maybeSingle()
 
             if (perfilN8n?.id) {
-              if (base_id !== undefined) {
-                await supabase.from('sys_perfis')
-                  .update({ base_id: base_id || null })
-                  .eq('id', perfilN8n.id)
+              // telefone: é o que liga a pessoa ao chamado que ela abre pelo
+              // WhatsApp do Helpdesk. Sem isso o chamado nasce como contato
+              // externo e a equipe não sabe qual funcionário é.
+              const patchN8n: Record<string, unknown> = {}
+              if (base_id !== undefined) patchN8n.base_id = base_id || null
+              if (whatsapp) patchN8n.telefone = normalizarTelefone(whatsapp)
+              if (Object.keys(patchN8n).length) {
+                await supabase.from('sys_perfis').update(patchN8n).eq('id', perfilN8n.id)
               }
               await syncPerfilSetores(perfilN8n.id, modulos, undefined, papel_global)
               return {
@@ -705,6 +710,7 @@ function useCadastrarUsuario() {
       const { error: updErr } = await supabase.from('sys_perfis').update({
         nome, email: loginEmail, role, alcada_nivel, modulos,
         base_id: base_id || null,
+        telefone: whatsapp ? normalizarTelefone(whatsapp) : null, // ↔ Helpdesk WhatsApp
         senha_definida: true, ativo: true,
       }).eq('id', perfilCriado.id)
       if (updErr) throw updErr
@@ -742,6 +748,7 @@ function UserDetailPanel({
   const [editaPrevisaoFin, setEditaPrevisaoFin] = useState<boolean>((user as any).edita_previsao_fin ?? false)
   const [podeCancelarPedidoFlag, setPodeCancelarPedidoFlag] = useState<boolean>(user.pode_cancelar_pedido ?? false)
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
+  const [telefone, setTelefone] = useState(formatarTelefone(user.telefone))
   const [ativo,   setAtivo]   = useState(user.ativo)
   const [altProxLogin, setAltProxLogin] = useState(user.alterar_senha_proximo_login ?? false)
   const [modulos, setModulos] = useState<Record<string, boolean>>(user.modulos ?? {})
@@ -832,6 +839,7 @@ function UserDetailPanel({
       role: mapPapelToLegacyRole(papelGlobal),
       papel_global: papelGlobal,
       alcada_nivel: alcada,
+      telefone: normalizarTelefone(telefone) || null, // ↔ Helpdesk WhatsApp
       ativo,
       alterar_senha_proximo_login: altProxLogin,
       base_id: baseId || null,
@@ -860,6 +868,7 @@ function UserDetailPanel({
     setEditaPrevisaoFin((user as any).edita_previsao_fin ?? false)
     setPodeCancelarPedidoFlag(user.pode_cancelar_pedido ?? false)
     setAlcada(user.alcada_nivel)
+    setTelefone(formatarTelefone(user.telefone))
     setAtivo(user.ativo)
     setAltProxLogin(user.alterar_senha_proximo_login ?? false)
     setModulos(user.modulos ?? {})
@@ -901,6 +910,16 @@ function UserDetailPanel({
           <div className="flex items-center gap-2 text-xs">
             <Building2 size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
             <span className={`truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{user.departamento || '—'}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Phone size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            {user.telefone ? (
+              <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>{formatarTelefone(user.telefone)}</span>
+            ) : (
+              <span className="text-amber-600" title="Sem telefone, os chamados desta pessoa pelo WhatsApp entram como contato externo">
+                sem WhatsApp cadastrado
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs">
             <Shield size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
@@ -1030,6 +1049,30 @@ function UserDetailPanel({
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Celular / WhatsApp — é o que liga a pessoa ao chamado que ela abre
+              pelo WhatsApp do Helpdesk (o bridge casa pelos últimos 8 dígitos).
+              Sem telefone, o chamado nasce como "contato externo". */}
+          <div>
+            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Celular / WhatsApp
+            </label>
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={telefone}
+              onChange={e => setTelefone(mascaraTelefone(e.target.value))}
+              placeholder="(67) 99999-9999"
+              className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`}
+            />
+            <p className={`mt-1 text-[11px] ${telefone && !telefoneValido(telefone) ? 'text-amber-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {telefone && !telefoneValido(telefone)
+                ? 'Informe DDD + número (11 dígitos).'
+                : telefone
+                  ? 'Chamados abertos por este número no WhatsApp entram no nome desta pessoa.'
+                  : 'Sem telefone, os chamados desta pessoa pelo WhatsApp entram como contato externo.'}
+            </p>
           </div>
 
           {/* Role */}
@@ -1506,15 +1549,21 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
                 />
               </div>
               <div>
-                <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>WhatsApp para compartilhar</label>
+                <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Celular / WhatsApp</label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="numeric"
                   value={form.whatsapp}
-                  onChange={set('whatsapp')}
-                  placeholder="(xx) xxxxx-xxxx"
+                  onChange={e => setForm(f => ({ ...f, whatsapp: mascaraTelefone(e.target.value) }))}
+                  placeholder="(67) 99999-9999"
                   className={`w-full px-3 py-2.5 rounded-xl border text-sm
                     focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:bg-white/[0.08]' : 'bg-slate-50 border-slate-200 focus:bg-white'}`}
                 />
+                <p className={`mt-1 text-[11px] ${form.whatsapp && !telefoneValido(form.whatsapp) ? 'text-amber-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {form.whatsapp && !telefoneValido(form.whatsapp)
+                    ? 'Informe DDD + número (11 dígitos).'
+                    : 'Usado para enviar os acessos e para identificar a pessoa no Helpdesk por WhatsApp.'}
+                </p>
               </div>
             </div>
 
@@ -2447,6 +2496,7 @@ export default function AdminUsuarios() {
                     </th>
                     <th className="px-3 py-3">Usuario</th>
                     <th className="px-3 py-3">Login</th>
+                    <th className="px-3 py-3">WhatsApp</th>
                     <th className="px-3 py-3">Papel</th>
                     <th className="px-3 py-3">Alcada</th>
                     <th className="px-3 py-3">Módulos</th>
@@ -2490,6 +2540,22 @@ export default function AdminUsuarios() {
                           </div>
                         </td>
                         <td className={`px-3 py-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatLoginUsuario(p.email)}</td>
+                        {/* WhatsApp: identifica a pessoa quando ela abre chamado
+                            pelo Helpdesk. Sem número, o chamado vira contato externo. */}
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          {p.telefone ? (
+                            <span className={`text-[13px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{formatarTelefone(p.telefone)}</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => { setSelectedIds([]); setEditModalUser(p) }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition-colors"
+                              title="Cadastrar o WhatsApp desta pessoa"
+                            >
+                              <Phone size={9} /> cadastrar
+                            </button>
+                          )}
+                        </td>
                         <td className="px-3 py-3">
                           <RoleBadge role={displayPapel} />
                         </td>
