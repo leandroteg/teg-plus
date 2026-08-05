@@ -434,20 +434,31 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
     return () => clearTimeout(t)
   }, [toast])
 
-  // Mais recentes primeiro (desempate por valor desc). Ordena ANTES do slice: cortando
-  // antes, os 30 exibidos eram os 30 primeiros da RPC, nao os 30 mais recentes.
-  const movimentacoesBanco = useMemo(
-    () => movimentacoes
+  // Ordenacao da coluna do extrato. Data desc e o padrao: extrato se le do mais
+  // recente pro mais antigo.
+  const [ordemExtrato, setOrdemExtrato] = useState<'data' | 'valor' | 'descricao'>('data')
+  const [ordemExtratoAsc, setOrdemExtratoAsc] = useState(false)
+
+  // Ordena ANTES do slice: cortando antes, os 30 exibidos seriam os 30 primeiros
+  // que a RPC devolveu, e nao os 30 primeiros da ordem escolhida.
+  const movimentacoesBanco = useMemo(() => {
+    const dir = ordemExtratoAsc ? 1 : -1
+    return movimentacoes
       .filter((mov) => !mov.conciliado && mov.tipo !== 'transferencia')
       .slice()
       .sort((a, b) => {
-        const porData = (b.data_movimentacao ?? '').localeCompare(a.data_movimentacao ?? '')
+        if (ordemExtrato === 'valor') return (Math.abs(a.valor) - Math.abs(b.valor)) * dir
+        if (ordemExtrato === 'descricao') {
+          return (a.descricao ?? a.categoria ?? '')
+            .localeCompare(b.descricao ?? b.categoria ?? '', 'pt-BR') * dir
+        }
+        const porData = (a.data_movimentacao ?? '').localeCompare(b.data_movimentacao ?? '') * dir
         if (porData !== 0) return porData
+        // Mesma data: maior primeiro, que e onde costuma estar a linha do lote.
         return Math.abs(b.valor) - Math.abs(a.valor)
       })
-      .slice(0, 30),
-    [movimentacoes],
-  )
+      .slice(0, 30)
+  }, [movimentacoes, ordemExtrato, ordemExtratoAsc])
 
   const sistemaPendente = useMemo(() => {
     // So titulos ja realizados: a conciliacao casa o extrato com o que JA saiu
@@ -648,9 +659,34 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
               <Landmark size={14} className="text-teal-500" />
               <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Extrato bancario</h3>
             </div>
-            {selMov && (
-              <button onClick={() => setSelMov(null)} className="text-[10px] text-slate-400 hover:text-slate-600 font-semibold">Limpar</button>
-            )}
+            <div className="flex items-center gap-1">
+              {([
+                { k: 'data' as const, label: 'Data' },
+                { k: 'valor' as const, label: 'Valor' },
+                { k: 'descricao' as const, label: 'Descr.' },
+              ]).map(op => (
+                <button
+                  key={op.k}
+                  onClick={() => {
+                    if (ordemExtrato === op.k) setOrdemExtratoAsc(v => !v)
+                    // Data e valor comecam decrescentes (recente/maior primeiro);
+                    // descricao comeca em A-Z.
+                    else { setOrdemExtrato(op.k); setOrdemExtratoAsc(op.k === 'descricao') }
+                  }}
+                  title={`Ordenar por ${op.label.toLowerCase()}`}
+                  className={`rounded-lg px-1.5 py-0.5 text-[10px] font-bold transition-colors ${
+                    ordemExtrato === op.k
+                      ? 'bg-teal-100 text-teal-700'
+                      : isDark ? 'text-slate-500 hover:bg-white/[0.06]' : 'text-slate-400 hover:bg-slate-100'
+                  }`}
+                >
+                  {op.label}{ordemExtrato === op.k ? (ordemExtratoAsc ? ' ↑' : ' ↓') : ''}
+                </button>
+              ))}
+              {selMov && (
+                <button onClick={() => setSelMov(null)} className="ml-1 text-[10px] text-slate-400 hover:text-slate-600 font-semibold">Limpar</button>
+              )}
+            </div>
           </div>
           <div className="divide-y divide-slate-100 p-2 max-h-[60vh] overflow-y-auto">
             {movimentacoesBanco.length === 0 ? (
