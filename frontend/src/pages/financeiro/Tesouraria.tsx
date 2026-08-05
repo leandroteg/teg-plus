@@ -948,9 +948,14 @@ function ContasBancariasPanel({ contas, isDark, onNovaConta, onImportOFX, onEdit
                 <p className={`text-xs font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                   {c.nome}
                 </p>
-                {c.banco_nome && (
-                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {c.banco_nome}
+                {/* Linha cinza identifica a conta: BANCO - numero. So o nome do
+                    banco nao distingue duas contas na mesma instituicao. */}
+                {(c.banco_nome || c.conta) && (
+                  <p
+                    className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}
+                    title={c.agencia ? `Agencia ${c.agencia}` : undefined}
+                  >
+                    {[c.banco_nome, c.conta].filter(Boolean).join(' - ')}
                   </p>
                 )}
               </div>
