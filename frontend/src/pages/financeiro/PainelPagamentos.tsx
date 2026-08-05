@@ -11,6 +11,10 @@ import { downloadPagamentosPrevistosPdf, type EscopoRelatorio } from '../../util
 import { useFaturaConciliacaoStatus } from '../../hooks/useCartoes'
 import { useLocFaturaResumo } from '../../hooks/useLocacao'
 import { supabase } from '../../services/supabase'
+import VencimentoFilterBar, {
+  filterByVencimento, VENC_RANGE_VAZIO,
+  type VencFilterId, type VencRange,
+} from '../../components/financeiro/VencimentoFilterBar'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -115,6 +119,8 @@ export default function PainelPagamentos() {
   const [exporting, setExporting] = useState(false)
   const [pendentesComprovante, setPendentesComprovante] = useState<ContaPagar[]>([])
   const [checandoComprovantes, setChecandoComprovantes] = useState(false)
+  const [vencFilter, setVencFilter] = useState<VencFilterId>('all')
+  const [vencRange, setVencRange] = useState<VencRange>(VENC_RANGE_VAZIO)
 
   const setEscopoPdf = useCallback((e: EscopoRelatorio) => {
     setEscopoPdfRaw(e)
@@ -122,7 +128,8 @@ export default function PainelPagamentos() {
   }, [])
 
   // ── Filter ──
-  const filtered = useMemo(() => {
+  // Busca textual — universo dos contadores da barra de vencimento
+  const buscados = useMemo(() => {
     if (!busca) return cps
     const q = busca.toLowerCase()
     return cps.filter(c =>
@@ -132,6 +139,12 @@ export default function PainelPagamentos() {
       || c.centro_custo?.toLowerCase().includes(q)
     )
   }, [cps, busca])
+
+  // Filtro por data de vencimento — vale para KPIs, agrupamento, seleção e PDF
+  const filtered = useMemo(
+    () => filterByVencimento(buscados, vencFilter, vencRange, c => c.data_vencimento),
+    [buscados, vencFilter, vencRange],
+  )
 
   // ── KPIs ──
   const kpis = useMemo(() => {
@@ -427,6 +440,17 @@ export default function PainelPagamentos() {
           )
         })()}
       </div>
+
+      {/* Filtro por data de vencimento */}
+      <VencimentoFilterBar
+        items={buscados}
+        value={vencFilter}
+        onChange={setVencFilter}
+        range={vencRange}
+        onRangeChange={setVencRange}
+        getVencimento={cp => cp.data_vencimento}
+        isDark={isDark}
+      />
 
       {/* Loading */}
       {isLoading && (

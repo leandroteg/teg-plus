@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, Fragment } from 'react'
 import {
   FileText, Search, X, LayoutList, LayoutGrid, ArrowUp, ArrowDown,
   ChevronLeft, ChevronRight, Pencil, Plus, Download, Send, Loader2, RotateCcw,
@@ -701,9 +701,18 @@ function ImovelFaturasModal({
       elegiveis.every(f => prev.has(f.id)) ? new Set() : new Set(elegiveis.map(f => f.id)),
     )
 
-  const faturaByTipo = useMemo(() => {
-    const map: Partial<Record<TipoFatura, LocFatura>> = {}
-    mesFaturas.forEach(f => { map[f.tipo] = f })
+  // TODAS as faturas de cada tipo no mês, não só a última. O mesmo endereço
+  // pode receber duas contas de energia no mês (medidores separados, conta
+  // retificada, período quebrado) — antes o map guardava uma só por tipo e as
+  // demais sumiam da tela, mesmo já lançadas e enviadas ao Financeiro.
+  const faturasPorTipo = useMemo(() => {
+    const map: Partial<Record<TipoFatura, LocFatura[]>> = {}
+    for (const f of mesFaturas) {
+      (map[f.tipo] ??= []).push(f)
+    }
+    for (const lista of Object.values(map)) {
+      lista?.sort((a, b) => (a.vencimento ?? '').localeCompare(b.vencimento ?? ''))
+    }
     return map
   }, [mesFaturas])
 
@@ -714,11 +723,13 @@ function ImovelFaturasModal({
   const esperadas = imovel.faturas_esperadas ?? null
   const tiposVisiveis = useMemo(() => {
     const base = esperadas && esperadas.length > 0 ? esperadas : TIPOS_PADRAO
-    return TIPOS.filter(t => base.includes(t) || faturaByTipo[t])
-  }, [esperadas, faturaByTipo])
+    return TIPOS.filter(t => base.includes(t) || (faturasPorTipo[t]?.length ?? 0) > 0)
+  }, [esperadas, faturasPorTipo])
 
-  // Descontos do aluguel do mês (afetam o líquido enviado ao Financeiro)
-  const aluguelFat = faturaByTipo['aluguel']
+  // Descontos do aluguel do mês (afetam o líquido enviado ao Financeiro).
+  // Ficam presos ao PRIMEIRO aluguel do mês — hook não pode ser chamado por
+  // linha. Mês com dois aluguéis mostra o botão de desconto só na primeira.
+  const aluguelFat = faturasPorTipo['aluguel']?.[0]
   const { data: descAluguel = [] } = useDescontosFatura(aluguelFat?.id)
   const totalDescAluguel = descAluguel.reduce((s, d) => s + d.valor, 0)
   const [showDescAluguel, setShowDescAluguel] = useState(false)
@@ -880,7 +891,7 @@ function ImovelFaturasModal({
               <div className="flex flex-wrap gap-1.5">
                 {TIPOS.map(t => {
                   const on = esperadas ? esperadas.includes(t) : false
-                  const temLancamento = !!faturaByTipo[t]
+                  const temLancamento = (faturasPorTipo[t]?.length ?? 0) > 0
                   return (
                     <button
                       key={t}
@@ -940,33 +951,43 @@ function ImovelFaturasModal({
                 </tr>
               </thead>
               {tiposVisiveis.map(tipo => {
-                const fat = faturaByTipo[tipo] || null
-                const isEditing = editingRow?.tipo === tipo
-                const elegivel = !!fat && elegiveis.some(e => e.id === fat.id)
+                const lista = faturasPorTipo[tipo] ?? []
+                // Edição de conta NOVA é identificada pelo tipo; edição de conta
+                // existente, pelo id — senão abrir a 2ª energia abriria a 1ª.
+                const editandoNova = editingRow?.tipo === tipo && !editingRow.fatura
 
                 return (
                   <tbody key={tipo}>
+                    {lista.map((fat, idx) => {
+                      const isEditing = editingRow?.fatura?.id === fat.id
+                      const elegivel = elegiveis.some(e => e.id === fat.id)
+                      const ehUltima = idx === lista.length - 1
+                      return (
+                        <Fragment key={fat.id}>
                     <tr className={`border-t ${isDark ? 'border-white/[0.04]' : 'border-slate-100'} ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'} transition-colors`}>
                       <td className="w-8 text-center px-2 py-2.5">
                         {elegivel && (
                           <input
                             type="checkbox"
-                            checked={!desmarcadas.has(fat!.id)}
-                            onChange={() => toggleFatura(fat!.id)}
+                            checked={!desmarcadas.has(fat.id)}
+                            onChange={() => toggleFatura(fat.id)}
                             title="Incluir esta fatura no envio ao Financeiro"
                             className="cursor-pointer accent-indigo-600"
                           />
                         )}
                       </td>
-                      <td className={`px-4 py-2.5 font-semibold ${txtMain}`}>{TIPO_FATURA_LABEL[tipo]}</td>
-                      {fat ? (
-                        <>
+                      <td className={`px-4 py-2.5 font-semibold ${txtMain}`}>
+                        {TIPO_FATURA_LABEL[tipo]}
+                        {lista.length > 1 && (
+                          <span className={`ml-1.5 text-[10px] font-normal ${txtMuted}`}>{idx + 1}/{lista.length}</span>
+                        )}
+                      </td>
                           <td className={`text-center px-2 py-2.5 ${txtMuted}`}>
                             {fat.mes_referencia ? mesRefLabel(fat.mes_referencia) : "—"}
                           </td>
                           <td className={`text-center px-2 py-2.5 ${txtMuted}`}>{fmtDate(fat.vencimento)}</td>
                           <td className={`text-right px-2 py-2.5 font-semibold ${txtMain}`}>
-                            {tipo === 'aluguel' && totalDescAluguel > 0 ? (
+                            {tipo === 'aluguel' && idx === 0 && totalDescAluguel > 0 ? (
                               <span className="inline-flex flex-col items-end leading-tight">
                                 <span className={`text-[10px] line-through ${txtMuted}`}>{fmtCurrency(getFaturaValor(fat))}</span>
                                 <span>{fmtCurrency(getFaturaValor(fat) - totalDescAluguel)}</span>
@@ -975,7 +996,7 @@ function ImovelFaturasModal({
                           </td>
                           <td className="text-right px-4 py-2.5">
                             <div className="flex items-center justify-end gap-2">
-                              {tipo === 'aluguel' && (
+                              {tipo === 'aluguel' && idx === 0 && (
                                 <button
                                   onClick={() => setShowDescAluguel(v => !v)}
                                   className={`inline-flex items-center gap-1 px-1.5 py-1 rounded text-[10px] font-semibold transition-colors ${
@@ -1056,48 +1077,6 @@ function ImovelFaturasModal({
                               )}
                             </div>
                           </td>
-                        </>
-                      ) : tipo === 'aluguel' && imovel.valor_aluguel_mensal ? (
-                        /* Aluguel ainda não lançado: prévia com valor + vencimento do contrato */
-                        <>
-                          <td className={`text-center px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
-                          <td className="text-center px-2 py-2.5">
-                            <span className="text-amber-500" title="Vencimento do contrato">{fmtDate(aluguelVencDefault(modalCompetencia, imovel.dia_vencimento))}</span>
-                          </td>
-                          <td className="text-right px-2 py-2.5">
-                            <span className="text-amber-500 font-semibold" title="Valor do contrato">{fmtCurrency(imovel.valor_aluguel_mensal)}</span>
-                          </td>
-                          <td className="text-right px-4 py-2.5">
-                            <button
-                              onClick={() => setEditingRow(isEditing ? null : { tipo, fatura: null })}
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
-                                isDark ? 'text-indigo-400 hover:bg-indigo-500/10 border border-indigo-500/20' : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200'
-                              }`}
-                              title="Lançar o aluguel (valor e vencimento já vêm do contrato)"
-                            >
-                              <Plus size={10} /> Lancar
-                            </button>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className={`text-center px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
-                          <td className={`text-center px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
-                          <td className={`text-right px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
-                          <td className="text-right px-4 py-2.5">
-                            <button
-                              onClick={() => setEditingRow(isEditing ? null : { tipo, fatura: null })}
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
-                                isDark
-                                  ? 'text-indigo-400 hover:bg-indigo-500/10 border border-indigo-500/20'
-                                  : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200'
-                              }`}
-                            >
-                              <Plus size={10} /> Lancar
-                            </button>
-                          </td>
-                        </>
-                      )}
                     </tr>
                     {isEditing && (
                       <InlineEditForm
@@ -1109,8 +1088,91 @@ function ImovelFaturasModal({
                         onClose={closeEditing}
                       />
                     )}
-                    {tipo === 'aluguel' && fat && showDescAluguel && (
+                    {tipo === 'aluguel' && idx === 0 && showDescAluguel && (
                       <DescontosAluguel fatura={fat} isDark={isDark} />
+                    )}
+                    {/* O tipo já tem conta, mas pode chegar outra no mesmo mês
+                        (dois medidores, conta retificada, período quebrado). */}
+                    {ehUltima && (
+                      <tr className={isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}>
+                        <td />
+                        <td colSpan={4} className="px-4 pb-2">
+                          <button
+                            onClick={() => setEditingRow(editandoNova ? null : { tipo, fatura: null })}
+                            className={`inline-flex items-center gap-1 text-[10px] font-semibold transition-colors ${
+                              isDark ? 'text-slate-500 hover:text-indigo-300' : 'text-slate-400 hover:text-indigo-600'
+                            }`}
+                            title={`Lançar outra conta de ${TIPO_FATURA_LABEL[tipo]} neste mês`}
+                          >
+                            <Plus size={10} /> outra conta de {TIPO_FATURA_LABEL[tipo].toLowerCase()}
+                          </button>
+                        </td>
+                        <td />
+                      </tr>
+                    )}
+                        </Fragment>
+                      )
+                    })}
+
+                    {lista.length === 0 && (
+                      <tr className={`border-t ${isDark ? 'border-white/[0.04]' : 'border-slate-100'} ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'} transition-colors`}>
+                        <td className="w-8 text-center px-2 py-2.5" />
+                        <td className={`px-4 py-2.5 font-semibold ${txtMain}`}>{TIPO_FATURA_LABEL[tipo]}</td>
+                        {tipo === 'aluguel' && imovel.valor_aluguel_mensal ? (
+                          /* Aluguel ainda não lançado: prévia com valor + vencimento do contrato */
+                          <>
+                            <td className={`text-center px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
+                            <td className="text-center px-2 py-2.5">
+                              <span className="text-amber-500" title="Vencimento do contrato">{fmtDate(aluguelVencDefault(modalCompetencia, imovel.dia_vencimento))}</span>
+                            </td>
+                            <td className="text-right px-2 py-2.5">
+                              <span className="text-amber-500 font-semibold" title="Valor do contrato">{fmtCurrency(imovel.valor_aluguel_mensal)}</span>
+                            </td>
+                            <td className="text-right px-4 py-2.5">
+                              <button
+                                onClick={() => setEditingRow(editandoNova ? null : { tipo, fatura: null })}
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                                  isDark ? 'text-indigo-400 hover:bg-indigo-500/10 border border-indigo-500/20' : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200'
+                                }`}
+                                title="Lançar o aluguel (valor e vencimento já vêm do contrato)"
+                              >
+                                <Plus size={10} /> Lancar
+                              </button>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className={`text-center px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
+                            <td className={`text-center px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
+                            <td className={`text-right px-2 py-2.5 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>—</td>
+                            <td className="text-right px-4 py-2.5">
+                              <button
+                                onClick={() => setEditingRow(editandoNova ? null : { tipo, fatura: null })}
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                                  isDark
+                                    ? 'text-indigo-400 hover:bg-indigo-500/10 border border-indigo-500/20'
+                                    : 'text-indigo-600 hover:bg-indigo-50 border border-indigo-200'
+                                }`}
+                              >
+                                <Plus size={10} /> Lancar
+                              </button>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    )}
+
+                    {/* Formulário da conta nova — serve tanto para o tipo vazio
+                        quanto para a 2ª conta do mesmo tipo */}
+                    {editandoNova && (
+                      <InlineEditForm
+                        tipo={tipo}
+                        fatura={null}
+                        imovel={imovel}
+                        competencia={modalCompetencia}
+                        isDark={isDark}
+                        onClose={closeEditing}
+                      />
                     )}
                   </tbody>
                 )
@@ -1267,8 +1329,10 @@ export default function Faturas() {
       const hasOverdue = imoFaturas.some(f => isOverdue(f))
       const allPaid = imoFaturas.length > 0 && imoFaturas.every(f => f.status === 'pago')
 
-      const byTipo: Partial<Record<TipoFatura, LocFatura>> = {}
-      imoFaturas.forEach(f => { byTipo[f.tipo] = f })
+      // Lista por tipo, não uma só: com duas contas de energia no mês a última
+      // sobrescrevia a anterior e a coluna deixava de fechar com o Total.
+      const byTipo: Partial<Record<TipoFatura, LocFatura[]>> = {}
+      for (const f of imoFaturas) (byTipo[f.tipo] ??= []).push(f)
 
       return { imovel: imo, faturas: imoFaturas, byTipo, totalMes, hasOverdue, allPaid }
     })
@@ -1347,13 +1411,22 @@ export default function Faturas() {
   // deixava uma coluna de traco atravessando a tabela inteira.
   const mainTipos: TipoFatura[] = ['aluguel', 'energia', 'agua', 'internet']
 
-  function renderCellValue(fat: LocFatura | undefined) {
-    if (!fat) return <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>—</span>
-    const stDot = isOverdue(fat) ? STATUS_DOT.vencido : STATUS_DOT[fat.status] || 'bg-slate-400'
+  // A célula soma o tipo inteiro — assim as colunas fecham com o Total da linha.
+  // Com mais de uma conta, marca a quantidade; o detalhe fica no modal do imóvel.
+  function renderCellValue(lista: LocFatura[] | undefined) {
+    if (!lista || lista.length === 0) return <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>—</span>
+    const soma = lista.reduce((s, f) => s + getFaturaValor(f), 0)
+    const pior = lista.find(f => isOverdue(f)) ?? lista[lista.length - 1]
+    const stDot = isOverdue(pior) ? STATUS_DOT.vencido : STATUS_DOT[pior.status] || 'bg-slate-400'
     return (
       <div className="flex flex-col items-center gap-0.5">
         <span className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>
-          {fmtCurrency(getFaturaValor(fat))}
+          {fmtCurrency(soma)}
+          {lista.length > 1 && (
+            <span className={`ml-1 text-[9px] font-normal ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title={`${lista.length} contas neste mês`}>
+              ×{lista.length}
+            </span>
+          )}
         </span>
         <span className={`w-1.5 h-1.5 rounded-full ${stDot}`} />
       </div>
@@ -1568,9 +1641,11 @@ export default function Faturas() {
                 {/* Faturas pills */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {mainTipos.map(tipo => {
-                    const fat = row.byTipo[tipo]
-                    if (!fat) return null
-                    const stDot = isOverdue(fat) ? STATUS_DOT.vencido : STATUS_DOT[fat.status] || 'bg-slate-400'
+                    const lista = row.byTipo[tipo]
+                    if (!lista || lista.length === 0) return null
+                    const soma = lista.reduce((s, f) => s + getFaturaValor(f), 0)
+                    const pior = lista.find(f => isOverdue(f)) ?? lista[lista.length - 1]
+                    const stDot = isOverdue(pior) ? STATUS_DOT.vencido : STATUS_DOT[pior.status] || 'bg-slate-400'
                     return (
                       <span
                         key={tipo}
@@ -1579,7 +1654,8 @@ export default function Faturas() {
                         }`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${stDot}`} />
-                        {TIPO_FATURA_LABEL[tipo]} {fmtCurrency(getFaturaValor(fat))}
+                        {TIPO_FATURA_LABEL[tipo]} {fmtCurrency(soma)}
+                        {lista.length > 1 && <span className="opacity-70">×{lista.length}</span>}
                       </span>
                     )
                   })}
