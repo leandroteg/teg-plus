@@ -3791,9 +3791,26 @@ function CpColResizeHandle({ colIndex, onStart }: {
   )
 }
 
+// ══ Observação do título ════════════════════════════════════════
+
+/**
+ * O que mostrar na coluna Observações. A observação do pedido é a que costuma
+ * carregar a instrução de pagamento ("multa placa X", "não aceita faturamento")
+ * e por isso vem primeiro; a do próprio título entra quando não há pedido.
+ * Divergência já tem selo próprio no detalhe, mas aqui vale aparecer — é
+ * justamente o tipo de coisa que o financeiro precisa ver antes de pagar.
+ */
+function obsDoTitulo(cp: ContaPagar): { texto: string; doPedido: boolean } | null {
+  const doPedido = cp.pedido?.observacoes?.trim()
+  if (doPedido) return { texto: doPedido, doPedido: true }
+  const doTitulo = cp.observacoes?.trim()
+  if (doTitulo) return { texto: doTitulo, doPedido: false }
+  return null
+}
+
 // ══ CPRow (compact table row) ═══════════════════════════════════
 
-function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empresaLabel }: {
+function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empresaLabel, showObs }: {
   cp: ContaPagar
   onClick: () => void
   isDark: boolean
@@ -3802,11 +3819,14 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empres
   approvalHint?: StatusHint | null
   /** Apelido curto da empresa pagadora (Teg - CG, União, Holding...) */
   empresaLabel?: string
+  /** Coluna Observações (só nas abas Previstos/Confirmados) */
+  showObs?: boolean
 }) {
   const urgency = getUrgency(cp)
   const isUrgentRequest = isUrgentExtraordinary(cp)
   const obraNome = cp.requisicao?.obra_nome
   const pedidoNum = cp.pedido?.numero_pedido
+  const obs = obsDoTitulo(cp)
 
   return (
     <div
@@ -3894,6 +3914,25 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empres
           </span>
         )}
       </div>
+
+      {showObs && (
+        <span className="min-w-0">
+          {obs ? (
+            <span
+              className={`block truncate text-[11px] ${
+                obs.doPedido
+                  ? isDark ? 'text-amber-300' : 'text-amber-700'
+                  : isDark ? 'text-slate-500' : 'text-slate-400'
+              }`}
+              title={obs.doPedido ? `Observa\u00e7\u00f5es do pedido ${pedidoNum ?? ''}: ${obs.texto}` : obs.texto}
+            >
+              {obs.texto}
+            </span>
+          ) : (
+            <span className="block truncate text-[11px] text-slate-300">{'\u2014'}</span>
+          )}
+        </span>
+      )}
 
       <span className={`text-[11px] truncate min-w-0 flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {obraNome ? <><Building2 size={9} className="shrink-0" /> {obraNome}</> : '\u2014'}
@@ -4498,10 +4537,25 @@ export default function CPPipeline() {
   const empresasLookup = useLookupEmpresas()
   const empresasCurtas = useMemo(() => mapaEmpresaCurta(empresasLookup), [empresasLookup])
 
+  // Observações só nas etapas em que o financeiro ainda está decidindo o
+  // pagamento (Previstos/Confirmados) — depois de virar lote a instrução do
+  // pedido já não muda nada e a coluna só roubaria espaço.
+  const showObsCol = activeTab === 'previsto' || activeTab === 'confirmado'
+
   // Resizable columns
   const cpTableRef = useRef<HTMLDivElement>(null)
   const cpColWidthsRef = useRef<number[]>([])
-  const CP_COLS_DEFAULT = '20px 2px 86px minmax(0,1.8fr) minmax(0,1.45fr) minmax(0,1fr) 84px 70px 110px 72px 96px'
+  // A largura salva no ref tem uma entrada por coluna; ao entrar/sair das abas
+  // com Observações a contagem muda e o cache precisa ser descartado, senão o
+  // grid fica com uma coluna a mais ou a menos que os cabeçalhos.
+  const showObsColRef = useRef(showObsCol)
+  if (showObsColRef.current !== showObsCol) {
+    showObsColRef.current = showObsCol
+    cpColWidthsRef.current = []
+  }
+  const CP_COLS_DEFAULT = showObsCol
+    ? '20px 2px 86px minmax(0,1.5fr) minmax(0,1.2fr) minmax(0,1.3fr) minmax(0,0.9fr) 84px 70px 110px 72px 96px'
+    : '20px 2px 86px minmax(0,1.8fr) minmax(0,1.45fr) minmax(0,1fr) 84px 70px 110px 72px 96px'
   const startCpColResize = useCallback((colIndex: number, startX: number) => {
     const container = cpTableRef.current
     if (!container) return
@@ -5812,11 +5866,14 @@ export default function CPPipeline() {
                 <span className="relative" data-cph>Empresa<CpColResizeHandle colIndex={0} onStart={startCpColResize} /></span>
                 <span className="relative" data-cph>Fornecedor<CpColResizeHandle colIndex={1} onStart={startCpColResize} /></span>
                 <span className="relative" data-cph>{`Descri\u00e7\u00e3o`}<CpColResizeHandle colIndex={2} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Obra<CpColResizeHandle colIndex={3} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Origem<CpColResizeHandle colIndex={4} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>CC<CpColResizeHandle colIndex={5} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Pedido<CpColResizeHandle colIndex={6} onStart={startCpColResize} /></span>
-                <span className="relative text-right" data-cph>Venc.<CpColResizeHandle colIndex={7} onStart={startCpColResize} /></span>
+                {showObsCol && (
+                  <span className="relative" data-cph>{`Observa\u00e7\u00f5es`}<CpColResizeHandle colIndex={3} onStart={startCpColResize} /></span>
+                )}
+                <span className="relative" data-cph>Obra<CpColResizeHandle colIndex={showObsCol ? 4 : 3} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Origem<CpColResizeHandle colIndex={showObsCol ? 5 : 4} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>CC<CpColResizeHandle colIndex={showObsCol ? 6 : 5} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Pedido<CpColResizeHandle colIndex={showObsCol ? 7 : 6} onStart={startCpColResize} /></span>
+                <span className="relative text-right" data-cph>Venc.<CpColResizeHandle colIndex={showObsCol ? 8 : 7} onStart={startCpColResize} /></span>
                 <span className="text-right" data-cph>Valor</span>
               </div>
               {activeCPs.map(cp => (
@@ -5829,6 +5886,7 @@ export default function CPPipeline() {
                   onSelect={toggleSelect}
                   approvalHint={getApprovalHint(cp)}
                   empresaLabel={cp.empresa_id ? empresasCurtas.get(cp.empresa_id) : undefined}
+                  showObs={showObsCol}
                 />
               ))}
             </div>
