@@ -6,7 +6,7 @@ import {
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
   ChevronLeft, ChevronRight, ArrowRight,
-  Plus, Save, Loader2, RefreshCw, Landmark, Pencil, Undo2, AlertCircle,
+  Plus, Save, Loader2, RefreshCw, Landmark, Pencil, Undo2, AlertCircle, Upload,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -50,6 +50,7 @@ import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import { useCadFornecedores } from '../../hooks/useCadastros'
 import { formatCNPJ, formatCpfCnpj, isCpfOuCnpj, normalizeDigits } from '../../hooks/useFornecedorVinculo'
 import CancelamentoDocControl from '../../components/financeiro/CancelamentoDocControl'
+import ImportarComprovantesModal from '../../components/financeiro/ImportarComprovantesModal'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras, useLookupEmpresas } from '../../hooks/useLookups'
 import { mapaEmpresaCurta } from '../../utils/empresaCurta'
 import {
@@ -4104,6 +4105,13 @@ function LoteItemsPanel({
   const empresasLookup = useLookupEmpresas()
   const empresasCurtas = useMemo(() => mapaEmpresaCurta(empresasLookup), [empresasLookup])
 
+  const [showComprovantes, setShowComprovantes] = useState(false)
+  // Comprovante é anexado na CP (fin_documentos), então item sem cp fica de fora.
+  const cpsDoLote = useMemo(
+    () => (data?.itens ?? []).map(i => i.cp).filter(Boolean) as ContaPagar[],
+    [data?.itens],
+  )
+
   if (isLoading) {
     return (
       <div className={`rounded-2xl border px-4 py-4 text-sm ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
@@ -4190,7 +4198,27 @@ function LoteItemsPanel({
         <span>{itens.length} itens</span>
         <span>{approvedCount} aprovados</span>
         <span>{rejectedCount} excluídos</span>
+
+        <button
+          type="button"
+          onClick={() => setShowComprovantes(true)}
+          disabled={cpsDoLote.length === 0}
+          title="Sobe um PDF com vários comprovantes e distribui cada página no título correspondente"
+          className={`ml-auto inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+            isDark ? 'bg-white/[0.06] text-slate-200 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <Upload size={12} /> Importar comprovantes
+        </button>
       </div>
+
+      {showComprovantes && (
+        <ImportarComprovantesModal
+          itens={cpsDoLote}
+          isDark={isDark}
+          onClose={() => setShowComprovantes(false)}
+        />
+      )}
     </div>
   )
 }

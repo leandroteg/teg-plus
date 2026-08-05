@@ -273,20 +273,37 @@ export default function PainelPagamentos() {
     setChecandoComprovantes(true)
     ;(async () => {
       const pedidoIds = Array.from(new Set(comPedido.map(c => c.pedido_id as string)))
-      const { data, error } = await supabase
-        .from('cmp_pedidos_anexos')
-        .select('pedido_id')
-        .eq('tipo', 'comprovante_pagamento')
-        .in('pedido_id', pedidoIds)
+      const cpIds = comPedido.map(c => c.id)
+
+      // Duas fontes valem como comprovante: o anexo no pedido (fluxo de Compras)
+      // e o documento na própria CP (fin_documentos) — é onde cai o comprovante
+      // avulso e o que vem do desmembramento do PDF do lote. Checar só a
+      // primeira fazia o painel acusar pendência com o comprovante já anexado.
+      const [anexosPedido, docsCp] = await Promise.all([
+        supabase
+          .from('cmp_pedidos_anexos')
+          .select('pedido_id')
+          .eq('tipo', 'comprovante_pagamento')
+          .in('pedido_id', pedidoIds),
+        supabase
+          .from('fin_documentos')
+          .select('entity_id')
+          .eq('entity_type', 'cp')
+          .eq('tipo', 'comprovante')
+          .in('entity_id', cpIds),
+      ])
       if (cancelado) return
       setChecandoComprovantes(false)
-      if (error) {
+      if (anexosPedido.error || docsCp.error) {
         setToast({ type: 'error', msg: 'Erro ao verificar comprovantes' })
         setTimeout(() => setToast(null), 3000)
         return
       }
-      const comComprovante = new Set((data ?? []).map(r => r.pedido_id))
-      setPendentesComprovante(comPedido.filter(c => !comComprovante.has(c.pedido_id as string)))
+      const pedidosComComprovante = new Set((anexosPedido.data ?? []).map(r => r.pedido_id))
+      const cpsComComprovante = new Set((docsCp.data ?? []).map(r => r.entity_id))
+      setPendentesComprovante(comPedido.filter(c =>
+        !pedidosComComprovante.has(c.pedido_id as string) && !cpsComComprovante.has(c.id)
+      ))
     })()
     return () => { cancelado = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -664,7 +681,7 @@ export default function PainelPagamentos() {
                   </span>
                 </div>
                 <p className="text-[11px] text-red-600 mb-2">
-                  Anexe o comprovante no pedido antes de registrar a baixa.
+                  Anexe o comprovante — no pedido ou no próprio título — antes de registrar a baixa.
                 </p>
                 <ul className="text-[11px] text-red-700 space-y-0.5 max-h-32 overflow-auto">
                   {pendentesComprovante.map(cp => (
