@@ -348,6 +348,23 @@ export default function ModuloSelector() {
             Minhas Cautelas
           </button>
 
+          {/* Cadastros: visível para não-admins que têm o módulo (admin já vê no bloco abaixo).
+              Espelha o mesmo atalho do menu do avatar dentro dos módulos (ModuleLayout). */}
+          {!isAdmin && hasModule('cadastros') && (
+            <>
+              <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/cadastros') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <Settings size={15} className="shrink-0 opacity-50" />
+                Cadastros
+              </button>
+            </>
+          )}
+
           {isAdmin && (
             <>
               <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
