@@ -184,7 +184,12 @@ export default function Conciliacao() {
     if (selecionadas.length === 0) return
     try {
       const r = await aplicarAuto.mutateAsync(
-        selecionadas.map(s => ({ mov_id: s.mov_id, tipo_match: s.tipo_match, cand_id: s.cand_id }))
+        selecionadas.map(s => ({
+          mov_id: s.mov_id,
+          tipo_match: s.tipo_match,
+          cand_id: s.cand_id,
+          cand_ids: s.cand_ids ?? [s.cand_id],
+        }))
       )
       setShowAutoModal(false)
       setToast({ type: 'success', msg: `${r.aplicadas} conciliação(ões) aplicada(s)` })

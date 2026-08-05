@@ -1105,6 +1105,8 @@ export function useConciliarCPBatch() {
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
       qc.invalidateQueries({ queryKey: ['pedidos'] })
       qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['tesouraria-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['movimentacoes-tesouraria'] })
     },
   })
 }
@@ -1157,6 +1159,8 @@ export function useConciliarCRBatch() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contas-receber'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['tesouraria-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['movimentacoes-tesouraria'] })
     },
   })
 }
@@ -1481,7 +1485,14 @@ export function useExtratoCandidatos(opts: {
 export function useAplicarConciliacaoAuto() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (matches: Array<{ mov_id: string; tipo_match: 'cp' | 'cr'; cand_id: string }>) => {
+    // cand_ids e obrigatorio no match de grupo: sem ele a RPC cai no fallback
+    // cand_id e conciliaria so um titulo dos N, dando a linha por resolvida.
+    mutationFn: async (matches: Array<{
+      mov_id: string
+      tipo_match: 'cp' | 'cr' | 'cp_grupo' | 'cr_grupo'
+      cand_id: string
+      cand_ids?: string[]
+    }>) => {
       const { data, error } = await supabase.rpc('fn_aplicar_conciliacao_tesouraria', {
         p_matches: matches as any,
       })
@@ -1493,6 +1504,10 @@ export function useAplicarConciliacaoAuto() {
       qc.invalidateQueries({ queryKey: ['contas-receber'] })
       qc.invalidateQueries({ queryKey: ['movimentacoes-tesouraria'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      // A coluna do extrato na Tesouraria vem do dashboard, nao de
+      // movimentacoes-tesouraria: sem esta linha o movimento conciliado
+      // continuava na tela ate dar refresh.
+      qc.invalidateQueries({ queryKey: ['tesouraria-dashboard'] })
     },
   })
 }
