@@ -21,7 +21,7 @@
         "run",
         "dev"
       ],
-      "cwd": "C:/teg-plus/frontend",
+      "cwd": "C:/Users/Gabriel/Pessoal/teg-plus/frontend",
       "port": 5173,
       "autoPort": true
     }

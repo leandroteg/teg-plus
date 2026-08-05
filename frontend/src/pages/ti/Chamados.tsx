@@ -9,6 +9,7 @@ import type { Status, Priority } from './data/shapes'
 import { STATUS_LIST, PRIORITY_LIST, STATUS_META, PRIORITY_META } from './lib/constants'
 import { PageHeader, Spinner, EmptyState } from './components/ui'
 import { TiTabs } from './components/TiTabs'
+import { TiSubmenu } from './components/TiSubmenu'
 import { StatusBadge, PriorityBadge, CategoryBadge, EscaladoBadge } from './components/Badges'
 import { SlaBadge } from './components/SlaBadge'
 import { Avatar } from './components/Avatar'
@@ -47,6 +48,7 @@ function ChamadosStaff() {
       <PageHeader
         title={staff ? 'Chamados' : 'Meus Chamados'}
         subtitle={staff ? 'Todos os chamados da T.I.' : 'Chamados que você abriu'}
+        titleExtra={staff ? <TiSubmenu /> : undefined}
       />
 
       <TiTabs />
