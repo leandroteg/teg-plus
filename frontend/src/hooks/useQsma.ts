@@ -52,7 +52,7 @@ export function relatorioLinkPublico(path?: string | null): string | null {
   return `${base}/functions/v1/qsma-relatorio-view?p=${encodeURIComponent(path)}`
 }
 
-async function proximoCodigo(tipo: string): Promise<string | null> {
+export async function proximoCodigo(tipo: string): Promise<string | null> {
   const { data } = await supabase.rpc('qsma_proximo_codigo', { p_tipo: tipo })
   return (data as string) ?? null
 }
@@ -92,15 +92,17 @@ export function useSalvarModelo() {
 
 // ── Inspeções ────────────────────────────────────────────────────────────────
 
-export function useInspecoes(filtros?: { status?: StatusInspecao; obra_id?: string }) {
+export function useInspecoes(filtros?: { status?: StatusInspecao; obra_id?: string; imovel_id?: string; apenasImoveis?: boolean }) {
   return useQuery({
     queryKey: ['qsma_inspecoes', filtros],
     queryFn: async () => {
       let q = supabase.from('qsma_inspecoes')
-        .select('*, modelo:qsma_modelos_checklist(id, nome, grupo, tipo, escopo, exige_veredito, itens)')
+        .select('*, modelo:qsma_modelos_checklist(id, nome, grupo, tipo, escopo, exige_veredito, itens), imovel:loc_imoveis(id, titulo, nome, cidade, uf)')
         .order('created_at', { ascending: false })
       if (filtros?.status) q = q.eq('status', filtros.status)
       if (filtros?.obra_id) q = q.eq('obra_id', filtros.obra_id)
+      if (filtros?.imovel_id) q = q.eq('imovel_id', filtros.imovel_id)
+      if (filtros?.apenasImoveis) q = q.not('imovel_id', 'is', null)
       const { data, error } = await q
       if (error) throw error
       return (data ?? []) as QsmaInspecao[]
@@ -114,14 +116,18 @@ export function useSalvarInspecao() {
     mutationFn: async (payload: Partial<QsmaInspecao>) => {
       if (payload.id) {
         const { id, modelo: _m, ...rest } = payload as Partial<QsmaInspecao> & { modelo?: unknown }
-        const { error } = await supabase.from('qsma_inspecoes')
+        const { data, error } = await supabase.from('qsma_inspecoes')
           .update({ ...rest, updated_at: new Date().toISOString() }).eq('id', id)
+          .select('id, codigo').single()
         if (error) throw error
+        return data as { id: string; codigo: string }
       } else {
         const codigo = await proximoCodigo('INS')
         const { modelo: _m, ...rest } = payload as Partial<QsmaInspecao> & { modelo?: unknown }
-        const { error } = await supabase.from('qsma_inspecoes').insert({ ...rest, codigo })
+        const { data, error } = await supabase.from('qsma_inspecoes').insert({ ...rest, codigo })
+          .select('id, codigo').single()
         if (error) throw error
+        return data as { id: string; codigo: string }
       }
     },
     onSuccess: () => {

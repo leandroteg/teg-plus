@@ -2,12 +2,13 @@ import { useState, useMemo } from 'react'
 import {
   Building2, Search, LayoutList, LayoutGrid, X, MapPin, Calendar, Phone,
   User, FileText, Clock, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown,
-  Pencil, Save, Loader2, Plus, Sparkles, Wrench,
+  Pencil, Save, Loader2, Plus, Sparkles, Wrench, ShieldCheck,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useImoveis, useAditivos, useVistorias, useAtualizarImovel, useSolicitacoesLocacao } from '../../hooks/useLocacao'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import NovoImovelModal from '../../components/locacao/NovoImovelModal'
+import { InspecaoAlojamentoFluxo } from '../../components/qsma/InspecaoAlojamento'
 import { UpperInput } from '../../components/UpperInput'
 import { fmtEndereco, STATUS_SOLICITACAO_LABEL, TIPO_SOLICITACAO_LABEL } from '../../types/locacao'
 import type { LocImovel, LocAditivo, LocVistoria } from '../../types/locacao'
@@ -418,6 +419,8 @@ export default function Ativos() {
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [detail, setDetail] = useState<LocImovel | null>(null)
   const [showNovo, setShowNovo] = useState(false)
+  // Inspecao disparada direto da linha do imovel (icone da 1a coluna)
+  const [inspecionar, setInspecionar] = useState<LocImovel | null>(null)
   // Padrão inicial: ordenado por NOME decrescente
   const [sortCol, setSortCol] = useState<string>('nome')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -551,6 +554,7 @@ export default function Ativos() {
             <thead>
               <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
                 {[
+                  { key: '', label: '', align: 'text-center' },
                   { key: 'nome', label: 'NOME', align: 'text-left' },
                   { key: 'cidade', label: 'CIDADE', align: 'text-left' },
                   { key: 'imovel', label: 'IMÓVEL', align: 'text-left' },
@@ -581,6 +585,18 @@ export default function Ativos() {
                 return (
                   <tr key={imo.id} onClick={() => setDetail(imo)}
                     className={`cursor-pointer transition-all ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.04]' : 'border-b border-slate-100 hover:bg-slate-50'}`}>
+                    <td className="px-2 py-2.5 text-center">
+                      <button
+                        onClick={e => { e.stopPropagation(); setInspecionar(imo) }}
+                        title="Executar inspeção neste alojamento"
+                        className={`inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors ${
+                          isDark
+                            ? 'text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10'
+                            : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50'
+                        }`}>
+                        <ShieldCheck size={15} />
+                      </button>
+                    </td>
                     <td className={`px-3 py-2.5 font-bold whitespace-nowrap ${isDark ? 'text-indigo-300' : 'text-indigo-700'}`}>
                       {(imo as any).nome || (imo as any).titulo || '—'}
                     </td>
@@ -639,6 +655,14 @@ export default function Ativos() {
       {/* Modal */}
       {detail && <ImovelDetailModal key={detail.id} imovel={detail} aditivos={aditivos} vistorias={vistorias} onClose={() => setDetail(null)} isDark={isDark} />}
       {showNovo && <NovoImovelModal onClose={() => setShowNovo(false)} />}
+      {inspecionar && (
+        <InspecaoAlojamentoFluxo
+          key={inspecionar.id}
+          isDark={isDark}
+          imovelInicial={inspecionar.id}
+          onClose={() => setInspecionar(null)}
+        />
+      )}
     </div>
   )
 }

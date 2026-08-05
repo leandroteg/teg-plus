@@ -23,6 +23,7 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
 }) {
   const atualizar = useAtualizarSolicitacaoLocacao()
   const [anexo, setAnexo] = useState<string | null>(null)
+  const [outrosAnexos, setOutrosAnexos] = useState<string[]>([])
   const [salvando, setSalvando] = useState(false)
   const [motivoPausa, setMotivoPausa] = useState('')
   const [pausando, setPausando] = useState(false)
@@ -46,6 +47,20 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
     })
     return () => { vivo = false }
   }, [sol.anexo_url])
+
+  // Mesma regra do anexo principal: "fotos" mistura URL publica (vistoria do
+  // Portal) e caminho no bucket privado (anexos extras) — assina so o que precisa.
+  useEffect(() => {
+    let vivo = true
+    const brutos = sol.fotos ?? []
+    if (!brutos.length) { setOutrosAnexos([]); return }
+    Promise.all(brutos.map(async raw => {
+      if (/^https?:\/\//i.test(raw)) return raw
+      const { data } = await supabase.storage.from('locacao-faturas').createSignedUrl(raw, 3600)
+      return data?.signedUrl ?? null
+    })).then(urls => { if (vivo) setOutrosAnexos(urls.filter((u): u is string => !!u)) })
+    return () => { vivo = false }
+  }, [sol.fotos])
 
   const salvar = async (patch: Partial<LocSolicitacao>) => {
     setSalvando(true)
@@ -198,13 +213,14 @@ export default function SolicitacaoModal({ sol, onClose, isDark }: {
             </div>
           )}
 
-          {(sol.fotos ?? []).length > 0 && (
+          {outrosAnexos.length > 0 && (
             <div>
-              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${txtMuted}`}>Fotos</p>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${txtMuted}`}>Fotos e anexos</p>
               <div className="flex flex-wrap gap-2">
-                {sol.fotos!.map(url => (
+                {outrosAnexos.map(url => (
                   <a key={url} href={url} target="_blank" rel="noopener noreferrer">
-                    <img src={url} alt="" className={`w-20 h-20 rounded-xl object-cover border ${border}`} />
+                    <img src={url} alt="" className={`w-20 h-20 rounded-xl object-cover border ${border}`}
+                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
                   </a>
                 ))}
               </div>

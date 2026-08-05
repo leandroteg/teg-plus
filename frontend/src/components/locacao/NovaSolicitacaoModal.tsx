@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Wrench, RefreshCw, Loader2, Paperclip, ShieldAlert } from 'lucide-react'
+import { X, Wrench, RefreshCw, Loader2, Paperclip, ShieldAlert, XCircle } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useImoveis, useCriarSolicitacaoLocacao } from '../../hooks/useLocacao'
@@ -30,7 +30,8 @@ export default function NovaSolicitacaoModal({ onClose, tipoInicial }: Props) {
   const [descricao, setDescricao] = useState('')
   const [urgente, setUrgente] = useState(false)
   const [dataLimite, setDataLimite] = useState('')
-  const [anexo, setAnexo] = useState<File | null>(null)
+  const MAX_ANEXOS = 5
+  const [anexos, setAnexos] = useState<File[]>([])
   const [enviando, setEnviando] = useState(false)
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
@@ -51,11 +52,20 @@ export default function NovaSolicitacaoModal({ onClose, tipoInicial }: Props) {
     if (!tipo) return
     setEnviando(true)
     try {
+      // O 1o arquivo vira o "Anexo" principal (anexo_url/anexo_nome, colunas
+      // singulares ja exibidas em todo lugar); os demais entram em "fotos"
+      // (jsonb, ja suporta lista) — evita migracao de banco so pra aceitar N
+      // arquivos. locacao-faturas e bucket PRIVADO: grava-se o CAMINHO, nunca a
+      // URL — a assinatura e feita na hora de exibir (ver SolicitacaoModal).
       let anexoUrl: string | undefined, anexoNome: string | undefined
-      if (anexo) {
-        const path = `solicitacoes/${Date.now()}_${anexo.name.replace(/[^A-Za-z0-9._-]/g, '_')}`
-        const { error: upErr } = await supabase.storage.from('locacao-faturas').upload(path, anexo)
-        if (!upErr) { anexoUrl = path; anexoNome = anexo.name }
+      const outrosPaths: string[] = []
+      for (let i = 0; i < anexos.length; i++) {
+        const arq = anexos[i]
+        const path = `solicitacoes/${Date.now()}_${i}_${arq.name.replace(/[^A-Za-z0-9._-]/g, '_')}`
+        const { error: upErr } = await supabase.storage.from('locacao-faturas').upload(path, arq)
+        if (upErr) continue
+        if (i === 0) { anexoUrl = path; anexoNome = arq.name }
+        else outrosPaths.push(path)
       }
       await criar.mutateAsync({
         tipo, titulo, descricao,
@@ -63,6 +73,7 @@ export default function NovaSolicitacaoModal({ onClose, tipoInicial }: Props) {
         imovel_id: imovelId || undefined,
         data_limite: dataLimite,
         anexo_url: anexoUrl, anexo_nome: anexoNome,
+        fotos: outrosPaths.length ? outrosPaths : undefined,
       } as any)
       onClose()
     } finally { setEnviando(false) }
@@ -186,13 +197,30 @@ export default function NovaSolicitacaoModal({ onClose, tipoInicial }: Props) {
               </div>
             </div>
 
-            {/* Anexo */}
+            {/* Anexos */}
             <div>
-              <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Anexo</label>
+              <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>
+                Anexos {anexos.length > 0 && <span className="opacity-50">· {anexos.length}/{MAX_ANEXOS}</span>}
+              </label>
+              {anexos.length > 0 && (
+                <ul className="mb-1.5 space-y-1">
+                  {anexos.map((f, i) => (
+                    <li key={`${f.name}-${i}`} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs ${inputCls}`}>
+                      <Paperclip size={12} className="shrink-0 opacity-60" />
+                      <span className="flex-1 truncate">{f.name}</span>
+                      <button type="button" onClick={() => setAnexos(prev => prev.filter((_, j) => j !== i))}
+                        className="shrink-0 text-slate-400 hover:text-rose-500">
+                        <XCircle size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer text-sm ${inputCls}`}>
                 <Paperclip size={14} className="shrink-0 opacity-60" />
-                <span className={anexo ? '' : 'opacity-50'}>{anexo ? anexo.name : 'Selecionar arquivo...'}</span>
-                <input type="file" className="hidden" onChange={e => setAnexo(e.target.files?.[0] ?? null)} />
+                <span className="opacity-50">Adicionar arquivo(s)...</span>
+                <input type="file" multiple className="hidden"
+                  onChange={e => { setAnexos(prev => [...prev, ...Array.from(e.target.files ?? [])].slice(0, MAX_ANEXOS)); e.target.value = '' }} />
               </label>
             </div>
 

@@ -10,7 +10,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BedDouble, Ban, CheckCircle2, Clock, Loader2, Play, ShieldCheck, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useModelosChecklist, useSalvarInspecao, evidenciaUrl } from '../../hooks/useQsma'
+import { useModelosChecklist, useSalvarInspecao, evidenciaUrl, proximoCodigo } from '../../hooks/useQsma'
+import { useCriarSolicitacaoLocacao } from '../../hooks/useLocacao'
 import { useAlojamentos } from '../../hooks/useLeitos'
 import { gerarInspecaoPdf } from '../../utils/inspecao-pdf'
 import { QsmaModal, ModalFooter, FotosUpload } from './ModalBits'
@@ -160,6 +161,7 @@ function InspecaoAlojamentoModal({ isDark, modelos, alojamentos, imovelInicial, 
 
 export function ExecutarInspecaoModal({ isDark, inspecao, obraNomeStr, onClose }: { isDark: boolean; inspecao: QsmaInspecao; obraNomeStr?: string; onClose: () => void }) {
   const salvar = useSalvarInspecao()
+  const criarSolicitacao = useCriarSolicitacaoLocacao()
   const { perfil } = useAuth()
   const itens = inspecao.modelo?.itens ?? []
   const [respostas, setRespostas] = useState<RespostaItem[]>(
@@ -332,7 +334,7 @@ export function ExecutarInspecaoModal({ isDark, inspecao, obraNomeStr, onClose }
         onSave={async () => {
           setSalvandoTudo(true)
           try {
-            await salvar.mutateAsync({
+            const salvo = await salvar.mutateAsync({
               id: inspecao.id,
               // p/ inspeção avulsa (sem id) persiste também o vínculo do modelo e
               // do alvo — obra ou alojamento, conforme o caso
@@ -350,6 +352,33 @@ export function ExecutarInspecaoModal({ isDark, inspecao, obraNomeStr, onClose }
               executor_id: perfil?.id, executor_nome: perfil?.nome,
               status: 'executada',
             })
+            const codigoInspecao = salvo?.codigo ?? inspecao.codigo
+            // Alojamento (nao obra) com NC: cada nao conformidade vira uma
+            // solicitacao propria (NC de Seguranca) no mesmo Kanban de
+            // Manutencoes e Servicos, com numero unico — igual a uma OS nova.
+            // Falha aqui nao derruba o fluxo: a inspecao ja esta salva.
+            if (inspecao.imovel_id && ncs > 0) {
+              for (const item of itens) {
+                const r = respostas.find(x => x.ordem === item.ordem)
+                if (r?.resposta !== 'nc') continue
+                try {
+                  const codigoNc = await proximoCodigo('NC')
+                  await criarSolicitacao.mutateAsync({
+                    tipo: 'nc_seguranca',
+                    imovel_id: inspecao.imovel_id,
+                    titulo: `[${codigoNc ?? 'NC'}] ${item.texto}`.slice(0, 160),
+                    descricao: [
+                      `Nao conformidade identificada na inspecao ${codigoInspecao ?? ''} (${inspecao.modelo?.nome ?? 'checklist'}).`,
+                      r.obs ? `Observacao: ${r.obs}` : null,
+                      `Fotos e evidencias: ver o relatorio ${codigoInspecao ?? ''} na aba Relatorios de Inspecao.`,
+                    ].filter(Boolean).join('\n'),
+                    urgencia: 'normal',
+                  } as never)
+                } catch (ncErr) {
+                  console.error('Falha ao gerar NC a partir da inspecao:', ncErr)
+                }
+              }
+            }
             if (gerarPdf) {
               const itensPdf = await Promise.all(itens.map(async it => {
                 const r = respostas.find(x => x.ordem === it.ordem)

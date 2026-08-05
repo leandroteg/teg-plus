@@ -50,6 +50,7 @@ export interface QsmaInspecao {
   obra_id?: string
   /** Alvo alternativo à obra: alojamento/imóvel (modelos de escopo "area" da Locação). */
   imovel_id?: string | null
+  imovel?: { id: string; titulo?: string; nome?: string; cidade?: string; uf?: string } | null
   frente?: string
   base_id?: string
   centro_custo_id?: string
