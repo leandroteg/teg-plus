@@ -50,6 +50,7 @@ import { useCadFornecedores } from '../../hooks/useCadastros'
 import { formatCNPJ, formatCpfCnpj, isCpfOuCnpj, normalizeDigits } from '../../hooks/useFornecedorVinculo'
 import CancelamentoDocControl from '../../components/financeiro/CancelamentoDocControl'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras, useLookupEmpresas } from '../../hooks/useLookups'
+import { mapaEmpresaCurta } from '../../utils/empresaCurta'
 import {
   TIPOS_DOC_FINANCEIRO, rotuloCurtoDocFin,
   type TipoDocFinanceiro, type ArquivoFinanceiro,
@@ -3763,13 +3764,15 @@ function CpColResizeHandle({ colIndex, onStart }: {
 
 // ══ CPRow (compact table row) ═══════════════════════════════════
 
-function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
+function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empresaLabel }: {
   cp: ContaPagar
   onClick: () => void
   isDark: boolean
   isSelected: boolean
   onSelect: (id: string) => void
   approvalHint?: StatusHint | null
+  /** Apelido curto da empresa pagadora (Teg - CG, União, Holding...) */
+  empresaLabel?: string
 }) {
   const urgency = getUrgency(cp)
   const isUrgentRequest = isUrgentExtraordinary(cp)
@@ -3797,6 +3800,19 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
       <div className={`w-0.5 h-4 rounded-full shrink-0 ${
         urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
       }`} />
+
+      <span className="min-w-0 truncate">
+        <span
+          className={`inline-block max-w-full truncate text-[9px] font-bold rounded-md px-1.5 py-0.5 ${
+            empresaLabel
+              ? isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+              : isDark ? 'text-slate-600' : 'text-slate-300'
+          }`}
+          title={empresaLabel ?? 'Sem empresa'}
+        >
+          {empresaLabel ?? '—'}
+        </span>
+      </span>
 
       <div className="min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -3862,7 +3878,7 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
           <FileText size={9} className="shrink-0" /> {pedidoNum}
         </span>
       ) : (
-        <span className="truncate text-[10px] text-slate-300">\u2014</span>
+        <span className="truncate text-[10px] text-slate-300">{'\u2014'}</span>
       )}
 
       <span className={`text-[11px] text-right ${
@@ -3890,13 +3906,15 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
 
 // ══ CPCard (block/card view) ════════════════════════════════════
 
-function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
+function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empresaLabel }: {
   cp: ContaPagar
   onClick: () => void
   isDark: boolean
   isSelected: boolean
   onSelect: (id: string) => void
   approvalHint?: StatusHint | null
+  /** Apelido curto da empresa pagadora (Teg - CG, União, Holding...) */
+  empresaLabel?: string
 }) {
   const urgency = getUrgency(cp)
   const isUrgentRequest = isUrgentExtraordinary(cp)
@@ -3930,6 +3948,13 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
         <div className={`w-1 h-6 rounded-full shrink-0 ${
           urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
         }`} />
+        {empresaLabel && (
+          <span className={`text-[9px] font-bold rounded-md px-1.5 py-0.5 shrink-0 ${
+            isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+          }`}>
+            {empresaLabel}
+          </span>
+        )}
         <p className={`text-sm font-bold truncate flex-1 min-w-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
           {cp.fornecedor_nome}
         </p>
@@ -4357,10 +4382,15 @@ export default function CPPipeline() {
   // Per-tab filter memory: preserves busca and quickFilter when switching tabs (#134)
   const tabFiltersRef = useRef<Map<PipelineStageId, { busca: string; quickFilter: QuickFilterId }>>(new Map())
 
+  // Empresa pagadora abreviada na primeira coluna da lista — o nome fantasia
+  // completo não cabe. Resolvido aqui num mapa, não por linha.
+  const empresasLookup = useLookupEmpresas()
+  const empresasCurtas = useMemo(() => mapaEmpresaCurta(empresasLookup), [empresasLookup])
+
   // Resizable columns
   const cpTableRef = useRef<HTMLDivElement>(null)
   const cpColWidthsRef = useRef<number[]>([])
-  const CP_COLS_DEFAULT = '20px 2px minmax(0,1.8fr) minmax(0,1.45fr) minmax(0,1fr) 84px 70px 110px 72px 96px'
+  const CP_COLS_DEFAULT = '20px 2px 86px minmax(0,1.8fr) minmax(0,1.45fr) minmax(0,1fr) 84px 70px 110px 72px 96px'
   const startCpColResize = useCallback((colIndex: number, startX: number) => {
     const container = cpTableRef.current
     if (!container) return
@@ -5554,13 +5584,14 @@ export default function CPPipeline() {
               >
                 <span />
                 <span />
-                <span className="relative" data-cph>Fornecedor<CpColResizeHandle colIndex={0} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>{`Descri\u00e7\u00e3o`}<CpColResizeHandle colIndex={1} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Obra<CpColResizeHandle colIndex={2} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Origem<CpColResizeHandle colIndex={3} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>CC<CpColResizeHandle colIndex={4} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Pedido<CpColResizeHandle colIndex={5} onStart={startCpColResize} /></span>
-                <span className="relative text-right" data-cph>Venc.<CpColResizeHandle colIndex={6} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Empresa<CpColResizeHandle colIndex={0} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Fornecedor<CpColResizeHandle colIndex={1} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>{`Descri\u00e7\u00e3o`}<CpColResizeHandle colIndex={2} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Obra<CpColResizeHandle colIndex={3} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Origem<CpColResizeHandle colIndex={4} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>CC<CpColResizeHandle colIndex={5} onStart={startCpColResize} /></span>
+                <span className="relative" data-cph>Pedido<CpColResizeHandle colIndex={6} onStart={startCpColResize} /></span>
+                <span className="relative text-right" data-cph>Venc.<CpColResizeHandle colIndex={7} onStart={startCpColResize} /></span>
                 <span className="text-right" data-cph>Valor</span>
               </div>
               {activeCPs.map(cp => (
@@ -5572,6 +5603,7 @@ export default function CPPipeline() {
                   isSelected={selectedIds.has(cp.id)}
                   onSelect={toggleSelect}
                   approvalHint={getApprovalHint(cp)}
+                  empresaLabel={cp.empresa_id ? empresasCurtas.get(cp.empresa_id) : undefined}
                 />
               ))}
             </div>
@@ -5586,6 +5618,7 @@ export default function CPPipeline() {
                   isSelected={selectedIds.has(cp.id)}
                   onSelect={toggleSelect}
                   approvalHint={getApprovalHint(cp)}
+                  empresaLabel={cp.empresa_id ? empresasCurtas.get(cp.empresa_id) : undefined}
                 />
               ))}
             </div>
