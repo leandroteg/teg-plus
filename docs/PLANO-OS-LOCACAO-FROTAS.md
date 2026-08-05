@@ -109,9 +109,11 @@ O que existe em produção agora:
 
 **Regras que a execução tem de obedecer — sem exceção:**
 
-1. **Só migração aditiva.** `ADD COLUMN ... NULL` e `CREATE TABLE`. Nenhum
-   `ALTER COLUMN`, `DROP`, `RENAME` ou `NOT NULL` em coluna existente. Coluna nova
-   entra sempre anulável e sem default que reescreva linha.
+1. **Só migração aditiva, e `DROP`/`REPLACE` são PROIBIDOS — inclusive em rollback.**
+   Permitido: `ADD COLUMN ... NULL` e `CREATE TABLE`. Proibido: `DROP TABLE`,
+   `DROP COLUMN`, `DROP FUNCTION`, `CREATE OR REPLACE FUNCTION` sobre função que já
+   está em produção, `ALTER COLUMN`, `RENAME`, `NOT NULL` em coluna existente.
+   Coluna nova entra sempre anulável e sem default que reescreva linha.
 2. **Nenhum backfill nas 16 OS e nas 20 solicitações.** Elas continuam exatamente
    como estão; o recurso novo aparece vazio nelas, não migrado à força.
 3. **Nada de tocar em `fro_cotacoes_os` além de acrescentar colunas** — só 1 linha,
@@ -126,5 +128,13 @@ O que existe em produção agora:
    com a main sincronizada imediatamente antes do push (há várias sessões
    trabalhando no mesmo repositório ao mesmo tempo).
 
-**Rollback:** como tudo é aditivo, desfazer é `DROP` da coluna/tabela nova — nenhum
-dado pré-existente é reescrito em nenhum momento, então não há o que restaurar.
+7. **Função em produção não se altera: cria-se outra, com outro nome.** Se um
+   comportamento novo exigir mudar uma RPC existente, o caminho é `portalteg_x_v2`
+   convivendo com a `portalteg_x` — nunca substituir a que está no ar. Quem chama a
+   antiga continua funcionando; a migração de chamador é decisão separada e sua.
+
+**Rollback — sem apagar nada.** Como tudo é aditivo, desfazer é **parar de usar**:
+o front deixa de ler/escrever o campo, e a coluna ou tabela nova fica lá, vazia e
+inerte. Nenhum `DROP` em nenhuma hipótese. Coluna anulável sem uso não custa nada e
+não afeta consulta nenhuma; apagar, sim, é risco. Se um dia for realmente para
+remover, isso é uma decisão à parte, com backup e fora deste plano.
