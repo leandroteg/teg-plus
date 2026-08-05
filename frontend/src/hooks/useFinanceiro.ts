@@ -1394,13 +1394,17 @@ export function useObras() {
 
 export interface SugestaoConciliacao {
   mov_id: string
-  mov_tipo: 'debito' | 'credito'
+  /** Vocabulário real da tabela; 'debito'/'credito' são legado. */
+  mov_tipo: 'saida' | 'entrada' | 'debito' | 'credito'
   mov_valor: number
   mov_data: string
   mov_descricao: string | null
   mov_conta_id: string | null
-  tipo_match: 'cp' | 'cr'
+  /** *_grupo = uma linha do extrato cobrindo vários títulos (SISPAG). */
+  tipo_match: 'cp' | 'cr' | 'cp_grupo' | 'cr_grupo'
   cand_id: string
+  /** Títulos cobertos. 1 item no match simples, N no de grupo. */
+  cand_ids?: string[]
   cand_nome: string
   cand_descricao: string | null
   cand_valor: number

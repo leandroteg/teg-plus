@@ -1169,18 +1169,29 @@ export default function Conciliacao() {
                         <div>
                           <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Extrato</p>
                           <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                            {s.mov_tipo === 'debito' ? '↓' : '↑'} {valor}
+                            {s.mov_tipo === 'saida' || s.mov_tipo === 'debito' ? '↓' : '↑'} {valor}
                           </p>
                           <p className="text-[11px] text-slate-500 truncate">{s.mov_descricao || '—'}</p>
                           <p className="text-[10px] text-slate-400 mt-0.5">{fmtData(s.mov_data)}</p>
                         </div>
                         <div>
                           <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                            {s.tipo_match === 'cp' ? 'Conta a Pagar' : 'Conta a Receber'}
+                            {s.tipo_match.startsWith('cp') ? 'Conta a Pagar' : 'Conta a Receber'}
+                            {s.tipo_match.endsWith('_grupo') && (
+                              <span className="ml-1 normal-case text-[9px] font-bold text-violet-500">
+                                • pago em lote
+                              </span>
+                            )}
                           </p>
                           <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'} truncate`}>{s.cand_nome}</p>
-                          <p className="text-[11px] text-slate-500 truncate">{s.cand_descricao || '—'}</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">venc. {fmtData(s.cand_vencimento)}</p>
+                          <p className={`text-[11px] text-slate-500 ${s.tipo_match.endsWith('_grupo') ? '' : 'truncate'}`}>
+                            {s.cand_descricao || '—'}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            {s.tipo_match.endsWith('_grupo')
+                              ? `pago em ${fmtData(s.cand_vencimento)}`
+                              : `venc. ${fmtData(s.cand_vencimento)}`}
+                          </p>
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
