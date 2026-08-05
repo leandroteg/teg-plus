@@ -37,6 +37,16 @@ function matchSector(text, sectors) {
     || sectors.find((s) => t.length >= 3 && normalize(s.nome).includes(t))
     || null
 }
+// "Oi", "Bom dia" e afins não descrevem problema nenhum: sem isso o chamado
+// nasce intitulado com a saudação e a equipe tem que perguntar tudo do zero.
+const SAUDACAO = /^(oi+|ola+|opa+|e ai|bom dia|boa tarde|boa noite|tudo bem|tudo bom|blz|beleza|ei|hey)[\s!,.?]*$/
+function relatoInsuficiente(t) {
+  const s = String(t || '').trim()
+  if (!s) return true
+  if (SAUDACAO.test(normalize(s))) return true
+  return [...s].length < 10
+}
+
 function sectorQuestion(sectors) {
   const lines = sectors.map((s, i) => `${i + 1}. ${s.nome}`).join('\n')
   return `👋 Olá! Para abrir seu chamado, de qual setor você está falando?\n\n${lines}\n\nResponda com o número ou o nome do setor.`
@@ -53,6 +63,8 @@ function extFromMime(mime) {
   return map[mime] || ''
 }
 
+const ROTULO_MIDIA = { audio: 'um áudio', image: 'uma imagem', video: 'um vídeo', document: 'um documento', sticker: 'uma figurinha' }
+
 // Desembrulha wrappers (efêmera, visualização única) até a mensagem real.
 function unwrap(message) {
   let m = message || {}
@@ -67,6 +79,19 @@ function unwrap(message) {
 
 function extractText(m) {
   return (m.conversation || m.extendedTextMessage?.text || '').trim()
+}
+
+// Texto da mensagem CITADA (quando a pessoa usa "Responder" do WhatsApp).
+// Serve SÓ para achar o CH-xxxx: se entrasse no corpo, a nossa própria
+// mensagem viraria a descrição do chamado.
+function extractQuotedText(m) {
+  const ctx = m.extendedTextMessage?.contextInfo || m.imageMessage?.contextInfo
+    || m.videoMessage?.contextInfo || m.documentMessage?.contextInfo || m.audioMessage?.contextInfo
+  const q = ctx?.quotedMessage
+  if (!q) return ''
+  const i = unwrap(q)
+  return (i.conversation || i.extendedTextMessage?.text
+    || i.imageMessage?.caption || i.videoMessage?.caption || '').trim()
 }
 
 function detectMedia(m) {
@@ -140,6 +165,7 @@ async function handleOne(raw) {
   const m = unwrap(raw.message)
   const mediaInfo = detectMedia(m)
   const body = extractText(m) || mediaInfo?.caption || ''
+  const quoted = extractQuotedText(m)
   if (!body && !mediaInfo) return // reação/protocolo/etc — nada a fazer
   if (isSpam(body, digits)) { log('spam descartado:', digits); return }
 
@@ -155,7 +181,7 @@ async function handleOne(raw) {
   // duplicaria anexos/comentários já gravados.
   const efeitos = { commit: false }
   try {
-    await processMessage({ raw, digits, name, body, mediaInfo, msgId, efeitos })
+    await processMessage({ raw, digits, name, body, quoted, mediaInfo, msgId, efeitos })
   } catch (e) {
     if (msgId && !efeitos.commit) {
       await db.desfazerClaim(msgId).catch(() => {}) // permite retry da Evolution
@@ -169,7 +195,7 @@ async function handleOne(raw) {
   }
 }
 
-async function processMessage({ raw, digits, name, body, mediaInfo, msgId, efeitos }) {
+async function processMessage({ raw, digits, name, body, quoted, mediaInfo, msgId, efeitos }) {
   gcPending()
 
   // baixa mídia (se houver)
@@ -197,17 +223,26 @@ async function processMessage({ raw, digits, name, body, mediaInfo, msgId, efeit
   let ticket = null
   // \b é essencial: sem ele "o switch 8 caiu" viraria comentário no CH-0008
   // de outra pessoa (o mesmo vale para patch/touch/match + número).
-  const cit = body.match(/\bCH[-\s]?(\d+)/i)
-  if (cit) ticket = await db.findTicketByNumero(parseInt(cit[1], 10))
-  if (!ticket) {
-    ticket = known
-      ? await db.findRecentOpenTicketForRequester(solicitanteId, sinceISO)
-      : await db.findRecentOpenTicketForPhone(telKey, sinceISO)
+  // O texto CITADO (responder do WhatsApp) entra só aqui, para achar o número —
+  // nunca no corpo, senão nossa própria mensagem viraria a descrição.
+  const cit = body.match(/\bCH[-\s]?(\d+)/i) || String(quoted || '').match(/\bCH[-\s]?(\d+)/i)
+  const citNum = cit ? parseInt(cit[1], 10) : null
+  if (citNum) ticket = await db.findTicketByNumero(citNum)
+  // Citou um CH que NÃO está aberto (resolvido/fechado/número errado): não pode
+  // cair nos fallbacks — a mensagem iria parar em OUTRO chamado, e o ramo de
+  // comentário não responde nada (o usuário ficaria no silêncio). Vira conversa
+  // nova, que ao menos confirma o número do chamado criado.
+  if (!ticket && !citNum) {
+    ticket = await db.findConversaAtiva({
+      solicitanteId: known ? solicitanteId : null,
+      telKey: known ? null : telKey,
+      janelaMin: config.janelaMin,
+    })
   }
   // Fora da janela normal, ainda reancora em chamado 'aguardando_usuario':
   // esse status é literalmente "a equipe espera a resposta do solicitante", e
   // ela costuma vir horas/dias depois do aviso — sem isso viraria chamado novo.
-  if (!ticket) {
+  if (!ticket && !citNum) {
     const aguardandoISO = new Date(Date.now() - config.aguardandoJanelaMin * 60 * 1000).toISOString()
     ticket = known
       ? await db.findAguardandoTicketForRequester(solicitanteId, aguardandoISO)
@@ -217,7 +252,15 @@ async function processMessage({ raw, digits, name, body, mediaInfo, msgId, efeit
   if (ticket) {
     efeitos.commit = true // primeira escrita a seguir — claim definitivo
     if (media) await db.saveAttachment({ chamadoId: ticket.id, autorId: solicitanteId, buffer: media.buffer, filename: media.filename, mime: media.mime })
-    const texto = body || (media ? `📎 Enviou um anexo pelo WhatsApp: ${media.filename}` : '')
+    let texto = body || (media ? `📎 Enviou um anexo pelo WhatsApp: ${media.filename}` : '')
+    // Mídia detectada mas sem conteúdo (download falhou): registrar mesmo assim.
+    // Sem isso um áudio sem legenda some por completo — nada é gravado, o
+    // usuário não é avisado e o log ainda diz "+coment".
+    if (mediaInfo && !media) {
+      const rotulo = ROTULO_MIDIA[mediaInfo.kind] || 'um anexo'
+      const alerta = `⚠️ O solicitante enviou ${rotulo} pelo WhatsApp, mas o arquivo não pôde ser baixado. Peça para reenviar.`
+      texto = texto ? `${texto}\n\n${alerta}` : alerta
+    }
     if (texto) await db.addComment({ chamadoId: ticket.id, autorId: solicitanteId, mensagem: texto })
     if (msgId) await db.vincularMensagemAoChamado(msgId, ticket.id)
     log(`+coment CH-${ticket.numero} (${digits})`)
@@ -241,12 +284,44 @@ async function processMessage({ raw, digits, name, body, mediaInfo, msgId, efeit
   }
   const pend = pendingSector.get(digits)
   if (!pend) {
-    pendingSector.set(digits, { solicitanteId, contatoExterno, firstText: body, media, tries: 0, ts: Date.now() })
-    await sendWhatsApp({ to: digits, text: sectorQuestion(sectors) })
+    // Sem pendência = 1ª mensagem OU o estado se perdeu (deploy/restart/TTL de
+    // 15 min). Texto que é SÓ um setor ("5", "RH") é resposta a uma pergunta
+    // nossa: o relato original vivia só na memória e sumiu. Não pode virar a
+    // descrição do chamado — assume a perda e pede o relato de novo.
+    const orfao = !media && !!body && !!matchSector(body, sectors)
+    if (orfao) err('mini-fluxo: estado perdido (restart/TTL) —', digits)
+    pendingSector.set(digits, { solicitanteId, contatoExterno, firstText: orfao ? '' : body, media, tries: 0, ts: Date.now() })
+    await sendWhatsApp({
+      to: digits,
+      text: orfao
+        ? `Desculpe, me perdi aqui 😅 Pode me contar de novo, em uma mensagem, o que está acontecendo?\n\n${sectorQuestion(sectors)}`
+        : sectorQuestion(sectors),
+    })
     return
   }
+  // Fase "conte o problema": a pessoa já escolheu o setor mas só tinha
+  // cumprimentado. Esta mensagem É o relato — abre o chamado com ela.
+  if (pend.aguardandoRelato) {
+    pendingSector.delete(digits)
+    await abrirChamado({
+      solicitanteId: pend.solicitanteId, contatoExterno: pend.contatoExterno,
+      body: body || pend.firstText, media: pend.media || media,
+      setorId: pend.setorId, to: digits, msgId, efeitos,
+    })
+    return
+  }
+
   const chosen = matchSector(body, sectors)
   if (chosen) {
+    // Setor escolhido, mas sem relato ("Bom dia" + "8"): pergunta o problema
+    // antes de abrir, senão o chamado nasce com a saudação no título.
+    if (relatoInsuficiente(pend.firstText) && !pend.media && !media) {
+      pend.aguardandoRelato = true
+      pend.setorId = chosen.id
+      pend.ts = Date.now()
+      await sendWhatsApp({ to: digits, text: `Certo, *${chosen.nome}* 👍\n\nAgora me conta rapidamente: o que está acontecendo?` })
+      return
+    }
     pendingSector.delete(digits)
     // `pend.media || media`: divergência INTENCIONAL do worker — mídia enviada
     // junto com a resposta de setor é anexada (o worker a descartava).

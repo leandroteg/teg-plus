@@ -11,7 +11,7 @@ import { aiEnabled, aiRouter } from './ai.js'
 
 // Versão do código: vai para o log de boot E para ti_whatsapp.worker_versao,
 // então dá para conferir por SQL se um deploy aplicou mesmo o código novo.
-const BUILD = '1.3.0-preprod'
+const BUILD = '1.4.0-ciclo-conversa'
 
 // Estado local espelhado em ti_whatsapp (o painel do TEG+ lê de lá).
 let local = { status: 'disconnected', numero: null }
@@ -186,9 +186,17 @@ async function loopSaida() {
 const TEXTO_STATUS = {
   em_atendimento: (n) => `🔧 Seu chamado *CH-${n}* está em *atendimento* — nossa equipe de T.I. já está cuidando dele.`,
   aguardando_usuario: (n) => `⏳ Seu chamado *CH-${n}* está *aguardando sua resposta*. É só responder por aqui (se demorar, cite *CH-${n}* na mensagem).`,
-  resolvido: (n) => `✅ Seu chamado *CH-${n}* foi *resolvido*. Se o problema voltar, responda citando *CH-${n}*.`,
+  // Chamado encerrado não aceita mais mensagem: citar o número abre um chamado
+  // NOVO já com a referência no título. O texto precisa dizer isso, senão o
+  // usuário segue a instrução e não entende por que "voltou pro começo".
+  resolvido: (n) => `✅ Seu chamado *CH-${n}* foi *resolvido*. Se o problema voltar, escreva aqui citando *CH-${n}* — abrimos um novo chamado ligado a ele.`,
   fechado: (n) => `🔒 Seu chamado *CH-${n}* foi *encerrado*. Obrigado! 🙌`,
 }
+
+// Voltar para 'aberto' vindo de resolvido/fechado é REABERTURA de verdade (não
+// é a equipe arrumando o quadro): a última coisa que o usuário leu foi "foi
+// resolvido", então sem este aviso ele não tem como saber que voltou a andar.
+const TEXTO_REABERTO = (n) => `🔄 Seu chamado *CH-${n}* foi *reaberto* e voltou para a fila da nossa equipe de T.I.`
 
 async function loopStatus() {
   while (!stopped) {
@@ -196,7 +204,9 @@ async function loopStatus() {
       const { out: mudancas, lastSeen } = await db.getStatusChanges(statusCursor)
       let falhou = false
       for (const m of mudancas) {
-        const texto = TEXTO_STATUS[m.para]
+        const texto = m.para === 'aberto'
+          ? (['resolvido', 'fechado'].includes(m.de) ? TEXTO_REABERTO : null)
+          : TEXTO_STATUS[m.para]
         if (!texto) continue // status sem mensagem definida → não avisa
         const ok = await evo.sendWhatsApp({ to: m.to, text: texto(String(m.numero).padStart(4, '0')) })
         if (!ok) { err(`status CH-${m.numero}: envio falhou — segurando cursor p/ nova tentativa`); falhou = true; break }

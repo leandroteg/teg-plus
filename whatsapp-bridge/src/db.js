@@ -133,6 +133,35 @@ export async function findRecentOpenTicketForPhone(key, sinceISO) {
   return data ? { id: data.id, numero: data.numero } : null
 }
 
+// Conversa ativa: chamado aberto cuja ÚLTIMA MENSAGEM (comentário de qualquer
+// lado, ou a abertura) esteja dentro da janela. As buscas antigas ancoravam em
+// ti_chamados.created_at, então a conversa "morria" 6h depois da abertura por
+// mais ativa que estivesse — e a próxima fala do usuário virava chamado novo no
+// meio do atendimento. (Trocar por updated_at não resolveria: comentário não
+// mexe nesse campo — só o trigger BEFORE UPDATE em ti_chamados.)
+export async function findConversaAtiva({ solicitanteId, telKey, janelaMin }) {
+  const corteISO = new Date(Date.now() - janelaMin * 60 * 1000).toISOString()
+  let q = supabase.from('ti_chamados')
+    .select(`id, numero, created_at,
+      comentarios:ti_chamado_comentarios!ti_chamado_comentarios_chamado_id_fkey(created_at)`)
+    .in('status', ABERTOS)
+    .order('created_at', { ascending: false })
+    .limit(20)
+  q = telKey ? q.eq('contato_externo->>telefone_key', telKey) : q.eq('solicitante_id', solicitanteId)
+  const { data, error } = await q
+  if (error) throw error
+
+  let melhor = null
+  for (const c of data ?? []) {
+    const datas = (c.comentarios ?? []).map((x) => x.created_at)
+    const ultima = datas.length ? datas.reduce((a, b) => (a > b ? a : b)) : c.created_at
+    if (ultima >= corteISO && (!melhor || ultima > melhor.ultima)) {
+      melhor = { id: c.id, numero: c.numero, ultima }
+    }
+  }
+  return melhor ? { id: melhor.id, numero: melhor.numero } : null
+}
+
 export async function createTicket({ titulo, descricao, categoria, categoriaId, setorId, solicitanteId, contatoExterno }) {
   const { data, error } = await supabase.from('ti_chamados').insert({
     titulo: String(titulo).slice(0, 200),
