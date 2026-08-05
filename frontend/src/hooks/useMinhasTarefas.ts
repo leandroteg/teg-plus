@@ -245,29 +245,12 @@ export function useMinhasTarefas() {
         })
       }
 
-      // 9. Adiantamentos para aprovar (gestor = eu)
-      const { data: adtos } = await supabase
-        .from('desp_adiantamentos')
-        .select('id, numero, status, valor, created_at, solicitante_nome')
-        .eq('gestor_id', authId)
-        .in('status', ['aguardando_aprovacao', 'pendente'])
-        .order('created_at', { ascending: false })
+      // Adiantamentos para aprovar NAO tem bloco proprio: useCriarSolicitacaoAdiantamento
+      // grava a linha em apr_aprovacoes (modulo 'desp', tipo 'solicitacao_adiantamento',
+      // aprovador_email) no mesmo insert, entao o bloco 1 ja cobre — e leva pro /aprovai,
+      // que e onde a aprovacao pode ser executada de fato.
 
-      for (const a of adtos ?? []) {
-        tarefas.push({
-          id: `adto-${a.id}`,
-          modulo: 'despesas',
-          moduloLabel: MODULO_LABEL.despesas,
-          tipo: 'Adiantamento — Aprovar',
-          numero: (a.numero as string) || 'N/A',
-          titulo: `${(a as { solicitante_nome?: string }).solicitante_nome || 'Colaborador'}${a.valor ? ` — R$ ${Number(a.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}`,
-          prioridade: 'normal',
-          criadoEm: a.created_at as string,
-          link: `/despesas/adiantamentos`,
-        })
-      }
-
-      // 10. Ações do SGI (metas/OKR, melhoria contínua, ocorrências) onde EU sou o responsável
+      // 9. Ações do SGI (metas/OKR, melhoria contínua, ocorrências) onde EU sou o responsável
       if (perfilId) {
         const { data: acoes } = await supabase
           .from('sgi_acoes')
