@@ -8,7 +8,7 @@ Levantado em 05/08/2026 lendo o código e o banco (não é estimativa de memóri
 |---|---|---|
 | Tabela principal | `fro_ordens_servico` | `loc_solicitacoes` |
 | Orçamentos por fornecedor | `fro_cotacoes_os` (N por OS) | **não existe** — só um campo `valor_estimado` |
-| Itens (peça / mão de obra) | `fro_os_itens`, com garantia em dias/km e histórico de preço | **não existe** |
+| Itens (peça / mão de obra) | `fro_itens_os`, com garantia em dias/km e histórico de preço | **não existe** |
 | Anexos por etapa | `fro_os_anexos` (requisição / cotação / execução) | **não existe** — só 1 `anexo_url` + array `fotos` |
 | Histórico de status | `fro_os_status_hist` | **não existe** |
 | Comentários | `fro_os_comentarios` | **não existe** |
@@ -63,7 +63,7 @@ mas **não existe onde lançar o segundo**. Hoje o campo é um só: "Valor cotad
 - SLA de cotação com contador de dias, igual ao Frotas.
 
 ### Fase 5 (avaliar antes) — Itens estruturados na Locação
-- `loc_solicitacao_itens`, espelho de `fro_os_itens`.
+- `loc_solicitacao_itens`, espelho de `fro_itens_os`.
 - **Ressalva honesta:** para manutenção predial isso pode ser peso morto. O Frotas
   precisa por causa da garantia por peça (dias/km) e do histórico de preço de peça.
   Em imóvel, "trocar a resistência do chuveiro" raramente vira lista de itens.
@@ -91,3 +91,40 @@ mas **não existe onde lançar o segundo**. Hoje o campo é um só: "Valor cotad
 - **`valor_estimado` continua sendo a fonte da alçada** enquanto os orçamentos não
   estiverem em uso — a Fase 1 deve preencher `valor_estimado` a partir do orçamento
   selecionado, para não quebrar as telas que já leem esse campo.
+
+---
+
+## 6. Garantias de não-quebra (levantado no banco em 05/08/2026, 16h)
+
+O que existe em produção agora:
+
+| Tabela | Linhas |
+|---|---|
+| `fro_ordens_servico` | 16 |
+| `fro_cotacoes_os` | 1 |
+| `fro_os_anexos` | 2 |
+| `fro_os_status_hist` | 8 |
+| `fro_os_comentarios` | 5 |
+| `loc_solicitacoes` | 20 (15 manutenção + 5 NC) |
+
+**Regras que a execução tem de obedecer — sem exceção:**
+
+1. **Só migração aditiva.** `ADD COLUMN ... NULL` e `CREATE TABLE`. Nenhum
+   `ALTER COLUMN`, `DROP`, `RENAME` ou `NOT NULL` em coluna existente. Coluna nova
+   entra sempre anulável e sem default que reescreva linha.
+2. **Nenhum backfill nas 16 OS e nas 20 solicitações.** Elas continuam exatamente
+   como estão; o recurso novo aparece vazio nelas, não migrado à força.
+3. **Nada de tocar em `fro_cotacoes_os` além de acrescentar colunas** — só 1 linha,
+   mas é dado real de uma OS viva.
+4. **As RPCs do Portal TEG (`portalteg_manutencao_solicitar`,
+   `portalteg_limpeza_salvar`) não podem mudar de assinatura.** São outro repositório,
+   com deploy independente: se a assinatura mudar, o Portal quebra em silêncio e o
+   colaborador perde o chamado sem aviso. Parâmetro novo, se preciso, só com DEFAULT.
+5. **Tela nova lê campo novo com fallback.** Toda leitura de coluna nova assume
+   `null` para os registros antigos — nenhuma tela pode depender do campo existir.
+6. **Publicar fase por fase**, cada uma com o `tsc` comparado ao baseline da main, e
+   com a main sincronizada imediatamente antes do push (há várias sessões
+   trabalhando no mesmo repositório ao mesmo tempo).
+
+**Rollback:** como tudo é aditivo, desfazer é `DROP` da coluna/tabela nova — nenhum
+dado pré-existente é reescrito em nenhum momento, então não há o que restaurar.
