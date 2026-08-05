@@ -171,8 +171,9 @@ async function handleFromMe(raw) {
   if (!digits) return
 
   const m = unwrap(raw.message)
-  const texto = extractText(m) || detectMedia(m)?.caption || ''
-  if (!texto) return // mídia enviada pelo atendente: fica só no WhatsApp
+  const mediaInfo = detectMedia(m)
+  const texto = extractText(m) || mediaInfo?.caption || ''
+  if (!texto && !mediaInfo) return // reação/protocolo — nada a registrar
 
   if (!(await db.claimMensagem(msgId))) return // enviada pelo próprio bridge
 
@@ -186,9 +187,26 @@ async function handleFromMe(raw) {
   if (!ticket) { log(`resposta manual sem chamado aberto (${digits}) — não registrada`); return }
 
   const suporteId = await db.getSuportePerfilId()
-  await db.addComment({ chamadoId: ticket.id, autorId: suporteId, mensagem: texto })
+
+  // Anexo enviado pelo atendente (print de solução, manual, áudio explicando)
+  // entra no chamado igual ao do solicitante — senão o histórico fica pela metade.
+  let media = null
+  if (mediaInfo) {
+    const buffer = await fetchMediaBuffer(raw, mediaInfo)
+    if (buffer && buffer.length > 0) {
+      media = { buffer, mime: mediaInfo.mime, filename: mediaInfo.filename || `anexo${extFromMime(mediaInfo.mime)}` }
+      await db.saveAttachment({ chamadoId: ticket.id, autorId: suporteId, buffer, filename: media.filename, mime: media.mime })
+    } else {
+      err('mídia do atendente sem conteúdo (base64 indisponível):', msgId)
+    }
+  }
+
+  let mensagem = texto
+  if (!mensagem) mensagem = media ? `📎 Enviou um anexo pelo WhatsApp: ${media.filename}` : ''
+  else if (mediaInfo && !media) mensagem += '\n\n⚠️ Um anexo foi enviado pelo WhatsApp, mas não pôde ser baixado.'
+  if (mensagem) await db.addComment({ chamadoId: ticket.id, autorId: suporteId, mensagem })
   await db.vincularMensagemAoChamado(msgId, ticket.id)
-  log(`+resposta do celular em CH-${ticket.numero} (${digits})`)
+  log(`+resposta do celular em CH-${ticket.numero} (${digits})${media ? ' [com anexo]' : ''}`)
 }
 
 async function handleOne(raw) {

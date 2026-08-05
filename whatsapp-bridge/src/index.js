@@ -11,7 +11,7 @@ import { aiEnabled, aiRouter } from './ai.js'
 
 // Versão do código: vai para o log de boot E para ti_whatsapp.worker_versao,
 // então dá para conferir por SQL se um deploy aplicou mesmo o código novo.
-const BUILD = '1.5.0-resposta-celular'
+const BUILD = '1.6.0-anexo-celular'
 
 // Estado local espelhado em ti_whatsapp (o painel do TEG+ lê de lá).
 let local = { status: 'disconnected', numero: null }
