@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { X, PlusCircle, Trash2, Loader2, AlertTriangle, ShoppingCart, Search, UserPlus, CheckCircle2, Landmark, Upload, Paperclip, FileText, ExternalLink } from 'lucide-react'
-import { useEmitirPedidoDireto, useEditarPedidoDireto, type TipoPedidoDireto } from '../hooks/usePedidos'
+import { useEmitirPedidoDireto, useEditarPedidoDireto, CP_ABERTAS, type TipoPedidoDireto } from '../hooks/usePedidos'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL, type PedidoAnexo } from '../hooks/useAnexos'
 import { useCadFornecedores, useCadClasses, useSalvarFornecedor } from '../hooks/useCadastros'
 import { useLookupObras, useLookupEmpresas } from '../hooks/useLookups'
@@ -193,21 +193,27 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
     setJustificativa(pedido.justificativa_sem_cotacao ?? '')
     setObservacoes(pedido.observacoes ?? '')
     setItens(pedido.itens_direto?.length ? pedido.itens_direto.map((i: any) => ({ ...i })) : [emptyItem()])
+    // Vencimento explícito gravado no próprio pedido. Sem isto a edição perdia a
+    // data fechada do boleto e o Financeiro recebia a parcela recalculada pela
+    // condição de pagamento (ou "Revisar manualmente", quando ela não é interpretável).
+    setDataVencimento(pedido.data_vencimento ?? '')
     // Forma de pagamento/cartão vivem na parcela do Contas a Pagar
     supabase
       .from('fin_contas_pagar')
       .select('forma_pagamento, cartao_id, data_vencimento')
       .eq('pedido_id', pedido.id)
-      .in('status', ['previsto', 'confirmado'])
+      .in('status', [...CP_ABERTAS])
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         const primeira = data?.[0]
         setFormaPagamento((primeira?.forma_pagamento as FormaPagamentoPedido) ?? '')
         setCartaoId(primeira?.cartao_id ?? '')
-        // Só reexibe como vencimento explícito quando é parcela única sem condição
-        // — com condição preenchida, quem manda continua sendo ela.
-        const semCondicao = !(pedido.condicao_pagamento ?? '').trim()
-        setDataVencimento(semCondicao && data?.length === 1 ? (primeira?.data_vencimento ?? '') : '')
+        // Pedido antigo, sem vencimento explícito gravado: reexibe o da parcela
+        // quando é única e sem condição — com condição, quem manda é ela.
+        if (!pedido.data_vencimento) {
+          const semCondicao = !(pedido.condicao_pagamento ?? '').trim()
+          setDataVencimento(semCondicao && data?.length === 1 ? (primeira?.data_vencimento ?? '') : '')
+        }
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, pedido?.id])

@@ -5,6 +5,14 @@ import { supabase } from '../services/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { gerarPreviaParcelas } from '../utils/pagamentos'
 
+/**
+ * Parcelas do pedido que ainda não entraram no fluxo de pagamento e, por isso,
+ * são as que a edição do Pedido Extraordinário regrava. Desde a mig 212 o título
+ * nasce em `aguardando_conferencia`: fora desta lista, a edição não achava a
+ * parcela existente e criava uma DUPLICADA no Contas a Pagar.
+ */
+export const CP_ABERTAS = ['aguardando_conferencia', 'previsto', 'confirmado'] as const
+
 export function usePedidos(status?: string) {
   return useQuery<Pedido[]>({
     queryKey: ['pedidos', status],
@@ -974,7 +982,7 @@ export function useEditarPedidoDireto() {
         .eq('pedido_id', payload.pedidoId)
         .order('created_at', { ascending: true })
       if (cpErr) throw new Error(cpErr.message)
-      const emProcesso = (cps ?? []).filter((cp: any) => !['aguardando_conferencia', 'previsto', 'confirmado', 'cancelado'].includes(cp.status))
+      const emProcesso = (cps ?? []).filter((cp: any) => ![...CP_ABERTAS, 'cancelado'].includes(cp.status))
       if (emProcesso.length > 0) {
         throw new Error('Uma parcela deste pedido já está em lote/pagamento — ajuste pelo Financeiro.')
       }
@@ -1041,7 +1049,7 @@ export function useEditarPedidoDireto() {
 
       // Reescreve só as parcelas em aberto; canceladas ficam como estão.
       const existingIds = (cps ?? [])
-        .filter((cp: any) => ['previsto', 'confirmado'].includes(cp.status))
+        .filter((cp: any) => CP_ABERTAS.includes(cp.status))
         .map((cp: any) => cp.id)
       const idsToUpdate = existingIds.slice(0, cpPayloads.length)
       const payloadsToInsert = cpPayloads.slice(idsToUpdate.length)
