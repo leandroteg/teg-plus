@@ -18,7 +18,9 @@ import {
   useDevolverLoteEdicao,
   useDesfazerLote,
   useCPsParaPagamento,
+  useComentariosItens,
 } from '../../hooks/useLotesPagamento'
+import ComentarioItemLote from '../../components/financeiro/ComentarioItemLote'
 import type { StatusLote, DecisaoLoteItem, LoteItem } from '../../types/financeiro'
 import { useLookupEmpresas } from '../../hooks/useLookups'
 
@@ -95,6 +97,11 @@ export default function LoteDetalhe() {
   const { data: cpsConfirmadas = [] } = useCPsParaPagamento(['confirmado'])
   const [showAdicionar, setShowAdicionar] = useState(false)
   const empresas = useLookupEmpresas()
+  // Esclarecimento por título (mig 229): é aqui que o Financeiro lê a dúvida do
+  // aprovador e responde, sem depender do esclarecimento do lote inteiro.
+  const { data: comentariosPorCp = {} } = useComentariosItens(
+    (lote?.itens ?? []).map(i => i.cp_id).filter(Boolean)
+  )
 
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [historico, setHistorico] = useState<MsgEsclarecimento[]>([])
@@ -577,6 +584,13 @@ export default function LoteDetalhe() {
               }`}
             >
               <div className="flex items-center gap-3">
+                {/* Nº do título no lote (mig 228) — do menor para o maior valor */}
+                <span
+                  title="Número do título dentro do lote"
+                  className={`w-5 shrink-0 text-right text-[11px] font-bold tabular-nums ${isDark ? 'text-slate-500' : 'text-slate-400'}`}
+                >
+                  {item.ordem ?? '—'}
+                </span>
                 {/* Status icon */}
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                   item.decisao === 'aprovado'
@@ -641,6 +655,16 @@ export default function LoteDetalhe() {
                   💬 {item.observacao}
                 </div>
               )}
+
+              {/* Esclarecimento deste título — o Financeiro responde aqui */}
+              <div className="mt-1.5 ml-11">
+                <ComentarioItemLote
+                  cpId={item.cp_id}
+                  loteId={lote.id}
+                  comentarios={comentariosPorCp[item.cp_id]}
+                  dark={isDark}
+                />
+              </div>
             </div>
           )
         })}

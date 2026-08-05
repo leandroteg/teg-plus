@@ -28,9 +28,11 @@ export default function AprovacoesPagamento() {
   const { data: contas = [], isLoading } = useContasPagar()
   const aprovarMutation = useAprovarPagamento()
 
-  const pendentes = contas.filter(cp =>
-    cp.status === 'confirmado' || cp.status === 'em_lote'
-  )
+  // Titulo que ja esta num lote NAO entra aqui: quem decide e' a aprovacao do
+  // lote (AprovAi). Aprovar individualmente jogava a CP pra 'aprovado_pgto'
+  // sem mexer no lote — o mesmo lote passava a aparecer em "Em Aprovacao" e em
+  // "Painel de Pagamento" ao mesmo tempo, e o item saia do controle do lote.
+  const pendentes = contas.filter(cp => cp.status === 'confirmado' && !cp.lote_id)
   const aprovadas = contas.filter(cp =>
     ['aprovado_pgto', 'em_pagamento', 'pago', 'conciliado'].includes(cp.status)
   )

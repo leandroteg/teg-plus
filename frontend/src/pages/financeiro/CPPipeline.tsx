@@ -43,6 +43,7 @@ import {
   useRegistrarPagamentoBatch,
   useEnviarRemessaPagamentoBatch,
   useSincronizarRemessasPagamento,
+  useComentariosItens,
 } from '../../hooks/useLotesPagamento'
 import { supabase } from '../../services/supabase'
 import { useConsultaCNPJ } from '../../hooks/useConsultas'
@@ -2875,7 +2876,10 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const anexarDocs = useAnexarDocumentosCP()
   const [tipoDocNovo, setTipoDocNovo] = useState<TipoDocFinanceiro>('outro')
   const [erroAnexoCP, setErroAnexoCP] = useState('')
-  const podeAnexarDocCP = !cp.pedido_id && cp.status !== 'cancelado'
+  // Título COM pedido também precisa receber anexo pela CP: o comprovante
+  // bancário é documento do Financeiro, não do pedido de compra. Antes a
+  // condição exigia !cp.pedido_id e esses títulos ficavam sem caminho nenhum.
+  const podeAnexarDocCP = cp.status !== 'cancelado'
   // mig 215: dados_pagamento é a fonte estruturada. O fallback cobre as CPs
   // antigas em que o extraordinário só deixou o rastro em remessa_payload.
   const bankInfo = (cp.dados_pagamento && Object.keys(cp.dados_pagamento).length > 0)
@@ -4090,6 +4094,11 @@ function LoteItemsPanel({
   onOpenCP: (cp: ContaPagar) => void
 }) {
   const { data, isLoading } = useLoteById(loteId)
+  // Só o contador aqui: a linha inteira já é um botão que abre a CP, e um
+  // botão dentro de outro é HTML inválido. Responder é no detalhe do lote.
+  const { data: comentariosPorCp = {} } = useComentariosItens(
+    (data?.itens ?? []).map(i => i.cp_id).filter(Boolean)
+  )
 
   if (isLoading) {
     return (
@@ -4105,7 +4114,8 @@ function LoteItemsPanel({
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/80'}`}>
-      <div className={`grid grid-cols-[minmax(0,1.8fr)_110px_90px_110px_120px] gap-x-3 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500 border-b border-white/[0.08]' : 'text-slate-400 border-b border-slate-200'}`}>
+      <div className={`grid grid-cols-[34px_minmax(0,1.8fr)_110px_90px_110px_120px] gap-x-3 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500 border-b border-white/[0.08]' : 'text-slate-400 border-b border-slate-200'}`}>
+        <span title="Número do título dentro do lote, do menor para o maior valor">Nº</span>
         <span>Item</span>
         <span>Documento</span>
         <span>Venc.</span>
@@ -4118,8 +4128,11 @@ function LoteItemsPanel({
             key={item.id}
             type="button"
             onClick={() => item.cp && onOpenCP(item.cp)}
-            className={`grid w-full grid-cols-[minmax(0,1.8fr)_110px_90px_110px_120px] gap-x-3 px-4 py-2.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-white'}`}
+            className={`grid w-full grid-cols-[34px_minmax(0,1.8fr)_110px_90px_110px_120px] gap-x-3 px-4 py-2.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-white'}`}
           >
+            <span className={`text-[11px] font-bold tabular-nums ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              {item.ordem ?? '\u2014'}
+            </span>
             <div className="min-w-0">
               <p className={`truncate text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{item.cp?.fornecedor_nome || 'Item sem fornecedor'}</p>
               <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.descricao || '\u2014'}</p>
@@ -4127,14 +4140,26 @@ function LoteItemsPanel({
             <span className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.numero_documento || '\u2014'}</span>
             <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp ? fmtData(item.cp.data_vencimento) : '\u2014'}</span>
             <span className="text-right text-[11px] font-semibold text-emerald-600">{item.cp ? fmt(item.cp.valor_original) : '\u2014'}</span>
-            <span className={`inline-flex h-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-              item.decisao === 'aprovado'
-                ? isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'
-                : item.decisao === 'rejeitado'
-                  ? isDark ? 'bg-rose-500/10 text-rose-300' : 'bg-rose-50 text-rose-700'
-                  : isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'
-            }`}>
-              {item.decisao === 'aprovado' ? 'Aprovado' : item.decisao === 'rejeitado' ? 'Rejeitado' : 'Pendente'}
+            <span className="flex h-fit items-center gap-1.5">
+              <span className={`inline-flex h-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                item.decisao === 'aprovado'
+                  ? isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'
+                  : item.decisao === 'rejeitado'
+                    ? isDark ? 'bg-rose-500/10 text-rose-300' : 'bg-rose-50 text-rose-700'
+                    : isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'
+              }`}>
+                {item.decisao === 'aprovado' ? 'Aprovado' : item.decisao === 'rejeitado' ? 'Rejeitado' : 'Pendente'}
+              </span>
+              {(comentariosPorCp[item.cp_id]?.length ?? 0) > 0 && (
+                <span
+                  title={`${comentariosPorCp[item.cp_id].length} comentário(s) — abra o lote para ler e responder`}
+                  className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                    isDark ? 'bg-sky-500/15 text-sky-300' : 'bg-sky-50 text-sky-700 border border-sky-200'
+                  }`}
+                >
+                  <MessageSquare size={9} /> {comentariosPorCp[item.cp_id].length}
+                </span>
+              )}
             </span>
           </button>
         ))}
@@ -4455,6 +4480,9 @@ export default function CPPipeline() {
   const enviarLoteMut = useEnviarLoteAprovacao()
   const registrarBatchMut = useRegistrarPagamentoBatch()
   const uploadComprovante = useUploadAnexo()
+  // Comprovante do pagamento como documento da CP — vale para título com ou
+  // sem pedido de compra (ver executarPagamento).
+  const anexarDocsCP = useAnexarDocumentosCP()
   const enviarRemessaMut = useEnviarRemessaPagamentoBatch()
   const syncRemessasMut = useSincronizarRemessasPagamento()
 
@@ -4866,16 +4894,38 @@ export default function CPPipeline() {
   const executarPagamento = async () => {
     if (!pagModal) return
     setPagUploading(true)
+    // O comprovante ia para cmp_pedidos_anexos, que exige pedido de compra:
+    // título avulso do Financeiro (a maioria dos lançamentos manuais) tinha o
+    // arquivo DESCARTADO em silêncio. Agora o comprovante sempre vira documento
+    // da CP (fin_documentos) — é de lá que o detalhe do título lista os anexos —
+    // e o pedido, quando existe, continua recebendo a sua cópia.
+    let falhaAnexo: string | null = null
     try {
-      // 1. Upload comprovante se fornecido
-      if (pagFile && pagModal.pedidoId) {
-        await uploadComprovante.mutateAsync({
-          pedidoId: pagModal.pedidoId,
-          file: pagFile,
-          tipo: 'comprovante_pagamento',
-          observacao: `Pagamento registrado em ${pagData}`,
-          origem: 'financeiro',
-        })
+      if (pagFile) {
+        try {
+          // Pagamento em lote: o mesmo comprovante cobre todos os títulos da
+          // remessa, então cada um recebe a sua referência — senão o resto do
+          // lote fica sem prova de pagamento.
+          for (const cpId of pagModal.cpIds) {
+            await anexarDocsCP.mutateAsync({
+              cpId,
+              arquivos: [{ file: pagFile, tipo: 'comprovante' }],
+              fornecedorNome: contasById.get(cpId)?.fornecedor_nome,
+            })
+          }
+          if (pagModal.pedidoId) {
+            await uploadComprovante.mutateAsync({
+              pedidoId: pagModal.pedidoId,
+              file: pagFile,
+              tipo: 'comprovante_pagamento',
+              observacao: `Pagamento registrado em ${pagData}`,
+              origem: 'financeiro',
+            })
+          }
+        } catch (e) {
+          // Falha de anexo não impede o pagamento, mas não pode passar calada.
+          falhaAnexo = e instanceof Error ? e.message : 'falha ao anexar o comprovante'
+        }
       }
       // 2. Registrar pagamento
       const count = await registrarBatchMut.mutateAsync({
@@ -4885,6 +4935,8 @@ export default function CPPipeline() {
       setPagModal(null)
       if (count === 0) {
         showToast('error', 'Nenhum título elegível para pagamento')
+      } else if (falhaAnexo) {
+        showToast('error', `${count} pagamento(s) registrado(s), mas o comprovante não subiu: ${falhaAnexo}. Anexe pelo detalhe do título.`)
       } else {
         showToast('success', `${count} pagamento(s) registrado(s)${pagFile ? ' com comprovante' : ''}`)
       }

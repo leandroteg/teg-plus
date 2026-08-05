@@ -4,7 +4,10 @@ import { enforceRateLimit } from "../_shared/rate-limit.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  // supabase-js manda authorization + apikey + x-client-info no invoke; faltando
+  // qualquer um deles o browser barra o POST depois do preflight.
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
 
@@ -109,7 +112,13 @@ Deno.serve(async (req: Request) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
   const rl = await enforceRateLimit(req, rlClient, { key: "parse-extrato", limit: 10, windowSec: 60 });
-  if (!rl.allowed) return rl.response!;
+  if (!rl.allowed) {
+    // Reemite o 429 com CORS, senao o browser esconde a mensagem do limiter.
+    return new Response(await rl.response!.text(), {
+      status: 429,
+      headers: { ...CORS, "Retry-After": rl.response!.headers.get("Retry-After") ?? "60" },
+    });
+  }
 
   let importId = "";
   try {

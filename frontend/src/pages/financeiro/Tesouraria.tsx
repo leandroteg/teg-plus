@@ -1454,8 +1454,10 @@ function ImportExtratoModal({ isDark, contas, onClose }: {
 
   const handleSubmit = () => {
     if (!canSubmit || !file) return
-    importar.mutate({ contaId, file }, { onSuccess: () => onClose() })
+    importar.mutate({ contaId, file })
   }
+
+  const resultado = importar.data as { total?: number; importados?: number; duplicados?: number } | undefined
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -1498,6 +1500,23 @@ function ImportExtratoModal({ isDark, contas, onClose }: {
               O upload usa um bucket dedicado da Tesouraria e permanece isolado dos fluxos fiscais.
             </p>
           </div>
+
+          {importar.isError && (
+            <div className={`rounded-xl px-3 py-2.5 text-xs font-semibold ${
+              isDark ? 'border border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border border-rose-200 bg-rose-50 text-rose-700'
+            }`}>
+              {(importar.error as Error)?.message || 'Falha ao importar o extrato.'}
+            </div>
+          )}
+
+          {importar.isSuccess && (
+            <div className={`rounded-xl px-3 py-2.5 text-xs font-semibold ${
+              isDark ? 'border border-teal-500/30 bg-teal-500/10 text-teal-300' : 'border border-teal-200 bg-teal-50 text-teal-700'
+            }`}>
+              {resultado?.importados ?? 0} lancamento(s) importado(s)
+              {(resultado?.duplicados ?? 0) > 0 && ` — ${resultado?.duplicados} ja existiam e foram ignorados`}
+            </div>
+          )}
         </div>
 
         <div className={`flex justify-end gap-2 px-5 py-4 ${
@@ -1509,15 +1528,17 @@ function ImportExtratoModal({ isDark, contas, onClose }: {
               isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            Cancelar
+            {importar.isSuccess ? 'Fechar' : 'Cancelar'}
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit || importar.isPending}
-            className="rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {importar.isPending ? 'Importando...' : 'Enviar extrato'}
-          </button>
+          {!importar.isSuccess && (
+            <button
+              onClick={handleSubmit}
+              disabled={!canSubmit || importar.isPending}
+              className="rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {importar.isPending ? 'Importando...' : 'Enviar extrato'}
+            </button>
+          )}
         </div>
       </div>
     </div>

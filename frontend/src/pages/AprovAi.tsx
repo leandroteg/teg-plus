@@ -21,6 +21,8 @@ import {
 } from '../hooks/useAprovacoes'
 import type { HistoricoFiltros } from '../hooks/useAprovacoes'
 import { useHistoricoAlteracoesItens, type AlteracaoItemSnapshot } from '../hooks/useRequisicoes'
+import { useComentariosItens } from '../hooks/useLotesPagamento'
+import ComentarioItemLote from '../components/financeiro/ComentarioItemLote'
 import FluxoTimeline from '../components/FluxoTimeline'
 import { useLinhaTempoCompra } from '../hooks/useLinhaTempoCompra'
 import { UpperTextarea } from '../components/UpperInput'
@@ -780,7 +782,6 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   aprovadorNome: string
   aprovadorEmail: string
 }) {
-  const { perfil } = useAuth()
   const mutation = useDecisaoGenerica()
   const [expanded, setExpanded] = useState(false)
   const [observacao, setObservacao] = useState('')
@@ -817,6 +818,8 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
   const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
     setAction(decisao)
+    const isLoteComItens = !!aprovacao.pagamento_detalhes?.is_lote
+      && !!aprovacao.pagamento_detalhes?.itens?.length
     try {
       await mutation.mutateAsync({
         aprovacaoId: aprovacao.id,
@@ -829,24 +832,15 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         observacao: observacao || undefined,
         aprovadorNome,
         aprovadorEmail,
+        // Item desmarcado no card NAO e' rejeicao: a mutation tira ele do lote
+        // aprovado e devolve num lote novo em montagem (CP volta pra em_lote),
+        // pronto pro financeiro reenviar. Antes o card gravava 'rejeitado'
+        // direto em fin_lote_itens depois da decisao — o titulo ficava preso
+        // no lote ja aprovado, sem caminho de volta pra fila de aprovacao.
+        selectedItemIds: decisao === 'aprovada' && isLoteComItens
+          ? Array.from(selectedItemIds)
+          : undefined,
       })
-
-      // After generic approval succeeds, apply per-item decisions for lotes
-      if (decisao === 'aprovada' && aprovacao.pagamento_detalhes?.is_lote && aprovacao.pagamento_detalhes.itens?.length) {
-        const allItems = aprovacao.pagamento_detalhes.itens
-        for (const item of allItems) {
-          const itemDecisao = selectedItemIds.has(item.id) ? 'aprovado' : 'rejeitado'
-          await supabase
-            .from('fin_lote_itens')
-            .update({
-              decisao: itemDecisao,
-              decidido_por: perfil?.nome ?? aprovadorNome ?? 'Aprovador',
-              decidido_em: new Date().toISOString(),
-            })
-            .eq('lote_id', aprovacao.entidade_id)
-            .eq('cp_id', item.id)
-        }
-      }
     } catch { /* error handled by mutation state */ }
   }
 
@@ -1010,6 +1004,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.pagamento_detalhes ? (
           <PagamentoDetalhesCard
             detalhes={aprovacao.pagamento_detalhes}
+            loteId={aprovacao.pagamento_detalhes.is_lote ? aprovacao.entidade_id : undefined}
             selectedItemIds={selectedItemIds}
             setSelectedItemIds={setSelectedItemIds}
           />
@@ -1158,13 +1153,20 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
 // ── Issue #35: Pagamento Detalhes Card ────────────────────────────────────────
 
-function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }: {
+function PagamentoDetalhesCard({ detalhes, loteId, selectedItemIds, setSelectedItemIds }: {
   detalhes: NonNullable<AprovacaoPendente['pagamento_detalhes']>
+  /** Lote em aprovação — habilita o comentário por título (mig 229). */
+  loteId?: string
   selectedItemIds?: Set<string>
   setSelectedItemIds?: React.Dispatch<React.SetStateAction<Set<string>>>
 }) {
   const [showEntender, setShowEntender] = useState(false)
   const [showItens, setShowItens] = useState(false)
+  // detalhes.itens[].id É o cp_id (useAprovacoes monta assim), que é a chave
+  // dos comentários.
+  const { data: comentariosPorCp = {} } = useComentariosItens(
+    (detalhes.itens ?? []).map(i => i.id).filter(Boolean)
+  )
   const fmtDate = (d: string) => {
     if (!d) return '—'
     const dt = new Date(d.length === 10 ? d + 'T00:00:00' : d)
@@ -1335,6 +1337,10 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
                       <div className="flex-1 min-w-0 space-y-0.5">
                         <div className="flex justify-between items-start gap-2">
                           <span className="text-xs font-semibold text-slate-800 truncate">
+                            {/* Mesmo Nº que o Financeiro usa no lote */}
+                            {item.ordem != null && (
+                              <span className="text-slate-400 font-bold tabular-nums mr-1">{item.ordem}.</span>
+                            )}
                             {item.fornecedor_nome || '—'}
                           </span>
                           <span className="text-xs font-bold text-amber-700 whitespace-nowrap">
@@ -1403,6 +1409,16 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
                             ))}
                           </div>
                         )}
+
+                        {/* Esclarecimento deste título (mig 229) — dúvida em um
+                            item não precisa mais devolver o lote inteiro. */}
+                        <div className="mt-1.5">
+                          <ComentarioItemLote
+                            cpId={item.id}
+                            loteId={loteId}
+                            comentarios={comentariosPorCp[item.id]}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>

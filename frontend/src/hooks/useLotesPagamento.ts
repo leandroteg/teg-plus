@@ -183,10 +183,14 @@ export function useLoteById(loteId?: string) {
       if (lErr) throw lErr
 
       // 2. Fetch itens
+      // Ordena pela numeração do lote (mig 228: 1..N, do menor valor para o
+      // maior) — é a ordem que o Financeiro leva para o banco. created_at
+      // continua como desempate para lote antigo ainda sem ordem.
       const { data: itens, error: iErr } = await supabase
         .from('fin_lote_itens')
         .select('*')
         .eq('lote_id', loteId!)
+        .order('ordem', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true })
       if (iErr) throw iErr
 
@@ -212,6 +216,67 @@ export function useLoteById(loteId?: string) {
     enabled: !!loteId,
     // Só faz poll enquanto o lote está em pagamento (aguardando baixa); para nos estados finais.
     refetchInterval: (query) => query.state.data?.status === 'em_pagamento' ? 10_000 : false,
+  })
+}
+
+// ── Comentários por título do lote (mig 229) ─────────────────────────────────
+// Esclarecimento item a item: o do lote inteiro devolve tudo por causa de uma
+// linha só. Chaveado por cp_id (não pelo id do fin_lote_itens) porque a
+// aprovação parcial apaga o item e recria noutro lote — o histórico do título
+// tem que sobreviver a isso.
+
+export interface LoteItemComentario {
+  id: string
+  cp_id: string
+  lote_id: string | null
+  texto: string
+  autor_nome: string
+  autor_papel: 'aprovador' | 'financeiro'
+  created_at: string
+}
+
+/** Comentários de vários títulos de uma vez, agrupados por cp_id. */
+export function useComentariosItens(cpIds: string[]) {
+  const key = [...cpIds].sort().join(',')
+  return useQuery<Record<string, LoteItemComentario[]>>({
+    queryKey: ['lote-item-comentarios', key],
+    enabled: cpIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fin_lote_item_comentarios')
+        .select('*')
+        .in('cp_id', cpIds)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      const porCp: Record<string, LoteItemComentario[]> = {}
+      for (const row of (data ?? []) as LoteItemComentario[]) {
+        ;(porCp[row.cp_id] ??= []).push(row)
+      }
+      return porCp
+    },
+    staleTime: 15_000,
+  })
+}
+
+export function useComentarItemLote() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ cpId, loteId, texto }: { cpId: string; loteId?: string | null; texto: string }) => {
+      // RPC SECURITY DEFINER: fin_lote_item_comentarios só aceita escrita por
+      // ela. O aprovador não tem o módulo financeiro e um insert direto do
+      // cliente seria barrado pela RLS sem avisar ninguém.
+      const { data, error } = await supabase.rpc('fin_lote_item_comentar', {
+        p_cp_id: cpId,
+        p_lote_id: loteId ?? null,
+        p_texto: texto,
+      })
+      if (error) throw new Error(error.message)
+      return data as LoteItemComentario
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lote-item-comentarios'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+    },
   })
 }
 

@@ -351,6 +351,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
               id,
               lote_id,
               decisao,
+              ordem,
               cp:fin_contas_pagar!cp_id(
                 id,
                 fornecedor_nome,
@@ -436,6 +437,12 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             const current = loteItensMap.get(loteId) ?? []
             current.push(item as Record<string, unknown>)
             loteItensMap.set(loteId, current)
+          }
+          // Mesma ordem do lote no Financeiro (mig 228): menor valor primeiro.
+          for (const [loteId, itens] of loteItensMap) {
+            loteItensMap.set(loteId, itens.sort((a, b) =>
+              ((a.ordem as number) ?? Number.MAX_SAFE_INTEGER) - ((b.ordem as number) ?? Number.MAX_SAFE_INTEGER)
+            ))
           }
         }
 
@@ -662,6 +669,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                   ]
                   return {
                     id: cpId || (item.id as string),
+                    // Nº do título no lote (mig 228) — o aprovador vê a mesma
+                    // numeração que o Financeiro leva para o banco.
+                    ordem: (item.ordem as number | null) ?? null,
                     fornecedor_nome: (cp?.fornecedor_nome as string) ?? '',
                     numero_documento: (cp?.numero_documento as string) ?? '',
                     descricao: (cp?.descricao as string) ?? '',

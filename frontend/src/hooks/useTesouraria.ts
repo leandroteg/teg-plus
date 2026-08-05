@@ -206,10 +206,10 @@ export function useImportExtrato() {
       let bucket = 'tesouraria-extratos'
       let uploadResult = await supabase.storage.from(bucket).upload(path, file)
       if (uploadResult.error) {
-        bucket = 'notas-fiscais'
+        bucket = 'financeiro-docs'
         uploadResult = await supabase.storage.from(bucket).upload(path, file)
       }
-      if (uploadResult.error) throw uploadResult.error
+      if (uploadResult.error) throw new Error(`Falha ao enviar o arquivo: ${uploadResult.error.message}`)
 
       const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
 
@@ -231,7 +231,13 @@ export function useImportExtrato() {
         body: { import_id: importRec.id },
       })
       if (parseErr) {
-        throw new Error(parseErr.message || 'Falha ao processar extrato')
+        // FunctionsHttpError so traz "non-2xx status code"; o motivo real vem no corpo.
+        let detalhe = ''
+        try {
+          const corpo = await (parseErr as any)?.context?.json?.()
+          detalhe = corpo?.error ?? ''
+        } catch { /* corpo nao-JSON: fica so a mensagem generica */ }
+        throw new Error(detalhe || parseErr.message || 'Falha ao processar extrato')
       }
       if (parseResult?.error) {
         throw new Error(parseResult.error)

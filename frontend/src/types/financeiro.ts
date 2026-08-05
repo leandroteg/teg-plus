@@ -429,6 +429,8 @@ export interface LoteItem {
   id: string
   lote_id: string
   cp_id: string
+  /** Número do título dentro do lote (1..N), do menor para o maior valor (mig 228). */
+  ordem?: number | null
   valor: number
   decisao: DecisaoLoteItem
   decidido_por?: string
