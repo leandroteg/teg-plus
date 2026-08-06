@@ -11,7 +11,7 @@ import { downloadPagamentosPrevistosPdf, type EscopoRelatorio } from '../../util
 import { useFaturaConciliacaoStatus } from '../../hooks/useCartoes'
 import { useLocFaturaResumo } from '../../hooks/useLocacao'
 import { useLookupEmpresas } from '../../hooks/useLookups'
-import { mapaEmpresaCurta } from '../../utils/empresaCurta'
+import { mapaEmpresaPagadora } from '../../utils/empresaCurta'
 import { supabase } from '../../services/supabase'
 import VencimentoFilterBar, {
   filterByVencimento, VENC_RANGE_VAZIO,
@@ -114,7 +114,7 @@ export default function PainelPagamentos() {
   // Empresa pagadora abreviada na linha — mesmo apelido curto usado na lista de
   // Contas a Pagar, resolvido por mapa para nao virar um lookup por linha.
   const empresasLookup = useLookupEmpresas()
-  const empresasCurtas = useMemo(() => mapaEmpresaCurta(empresasLookup), [empresasLookup])
+  const empresasCurtas = useMemo(() => mapaEmpresaPagadora(empresasLookup), [empresasLookup])
 
   const [busca, setBusca] = useState('')
   const [groupBy, setGroupBy] = useState<GroupBy>('vencimento')

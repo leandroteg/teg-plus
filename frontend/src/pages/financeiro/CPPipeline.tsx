@@ -52,7 +52,7 @@ import { formatCNPJ, formatCpfCnpj, isCpfOuCnpj, normalizeDigits } from '../../h
 import CancelamentoDocControl from '../../components/financeiro/CancelamentoDocControl'
 import ImportarComprovantesModal from '../../components/financeiro/ImportarComprovantesModal'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras, useLookupEmpresas } from '../../hooks/useLookups'
-import { mapaEmpresaCurta } from '../../utils/empresaCurta'
+import { mapaEmpresaPagadora } from '../../utils/empresaCurta'
 import { downloadRelatorioCPPdf, type LinhaRelatorioCP } from '../../utils/cp-lista-pdf'
 import {
   TIPOS_DOC_FINANCEIRO, rotuloCurtoDocFin,
@@ -4188,7 +4188,7 @@ function LoteItemsPanel({
   // Mesmo apelido curto da coluna Empresa da lista de CPs — o lote mistura
   // empresas pagadoras, entao a coluna evita ter que abrir titulo por titulo.
   const empresasLookup = useLookupEmpresas()
-  const empresasCurtas = useMemo(() => mapaEmpresaCurta(empresasLookup), [empresasLookup])
+  const empresasCurtas = useMemo(() => mapaEmpresaPagadora(empresasLookup), [empresasLookup])
 
   const [showComprovantes, setShowComprovantes] = useState(false)
   // Comprovante é anexado na CP (fin_documentos), então item sem cp fica de fora.
@@ -4545,7 +4545,7 @@ export default function CPPipeline() {
   // Empresa pagadora abreviada na primeira coluna da lista — o nome fantasia
   // completo não cabe. Resolvido aqui num mapa, não por linha.
   const empresasLookup = useLookupEmpresas()
-  const empresasCurtas = useMemo(() => mapaEmpresaCurta(empresasLookup), [empresasLookup])
+  const empresasCurtas = useMemo(() => mapaEmpresaPagadora(empresasLookup), [empresasLookup])
 
   // Nas etapas em que o financeiro ainda está decidindo o pagamento
   // (Previstos/Confirmados), a terceira coluna mostra a observação no lugar da
