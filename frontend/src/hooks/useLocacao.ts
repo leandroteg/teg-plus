@@ -536,6 +536,19 @@ export function useEnviarFaturasFinanceiro() {
         p_fatura_ids: faturaIds,
       })
       if (error) throw error
+
+      // O anexo acompanha o documento ate o fim do processo: o boleto lancado na
+      // fatura vai junto para a CP. Sem isso quem paga nao ve o boleto — foi
+      // assim que 21 titulos ficaram com favorecido errado sem ninguem notar.
+      // Best-effort: o titulo ja foi criado, falha aqui nao desfaz o envio.
+      try {
+        await supabase.functions.invoke('loc-boleto-para-cp', {
+          body: { fatura_ids: faturaIds },
+        })
+      } catch (e) {
+        console.warn('[locacao] boleto nao propagado para a CP:', e)
+      }
+
       return data as {
         enviadas: number
         puladas: number
