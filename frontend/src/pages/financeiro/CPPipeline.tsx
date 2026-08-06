@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { Fragment, useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   Receipt, Search, Calendar, AlertTriangle, CheckCircle2, Clock,
   FileText, ChevronDown, ChevronUp, Banknote, X, ShieldCheck,
@@ -7,6 +7,7 @@ import {
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
   ChevronLeft, ChevronRight, ArrowRight,
   Plus, Save, Loader2, RefreshCw, Landmark, Pencil, Undo2, AlertCircle, Upload,
+  Settings2, Eye, EyeOff,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -3778,8 +3779,8 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
 // ══ CpColResizeHandle ════════════════════════════════════════════
 
 function CpColResizeHandle({ colIndex, onStart }: {
-  colIndex: number
-  onStart: (colIndex: number, startX: number) => void
+  colIndex: string
+  onStart: (colKey: string, startX: number) => void
 }) {
   return (
     <div
@@ -3826,23 +3827,201 @@ function obsDoTitulo(cp: ContaPagar): { texto: string; doPedido: boolean } | nul
 
 // ══ CPRow (compact table row) ═══════════════════════════════════
 
-function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empresaLabel, showObs }: {
+// ── Colunas configuráveis da lista de CPs ───────────────────────────────────
+// O usuário reordena e oculta colunas pelo menu "Colunas" (engrenagem na
+// barra); a escolha fica em localStorage. Fornecedor e Valor são fixos — sem
+// eles a linha perde a identidade. A coluna 'obs' alterna o rótulo entre
+// Observações e Descrição conforme a aba.
+type CpColKey = 'empresa' | 'fornecedor' | 'obs' | 'obra' | 'origem' | 'cc' | 'pedido' | 'venc' | 'valor'
+const CP_COL_DEFS: Array<{ key: CpColKey; label: string; def: string; right?: boolean; fixa?: boolean }> = [
+  { key: 'empresa',    label: 'Empresa',         def: '86px' },
+  { key: 'fornecedor', label: 'Fornecedor',      def: 'minmax(0,1.8fr)', fixa: true },
+  { key: 'obs',        label: 'Descrição',       def: 'minmax(0,1.45fr)' },
+  { key: 'obra',       label: 'Obra',            def: 'minmax(0,1fr)' },
+  { key: 'origem',     label: 'Origem',          def: '84px' },
+  { key: 'cc',         label: 'Centro de Custo', def: '130px' },
+  { key: 'pedido',     label: 'Pedido',          def: '110px' },
+  { key: 'venc',       label: 'Venc.',           def: '72px', right: true },
+  { key: 'valor',      label: 'Valor',           def: '96px', right: true, fixa: true },
+]
+const CP_COLS_LS_KEY = 'teg-cp-colunas-v1'
+function carregarColunasCp(): { ordem: CpColKey[]; ocultas: CpColKey[] } {
+  const padrao = { ordem: CP_COL_DEFS.map(c => c.key), ocultas: [] as CpColKey[] }
+  try {
+    const raw = localStorage.getItem(CP_COLS_LS_KEY)
+    if (!raw) return padrao
+    const salvo = JSON.parse(raw) as { ordem?: string[]; ocultas?: string[] }
+    const validas = new Set<string>(CP_COL_DEFS.map(c => c.key))
+    const ordem = (salvo.ordem ?? []).filter(k => validas.has(k)) as CpColKey[]
+    // Coluna nova de um deploy futuro entra no fim em vez de sumir.
+    for (const c of CP_COL_DEFS) if (!ordem.includes(c.key)) ordem.push(c.key)
+    const ocultas = (salvo.ocultas ?? [])
+      .filter(k => validas.has(k) && !CP_COL_DEFS.find(c => c.key === k)?.fixa) as CpColKey[]
+    return { ordem, ocultas }
+  } catch { return padrao }
+}
+
+function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empresaLabel, showObs, colunas, ccLabel }: {
   cp: ContaPagar
   onClick: () => void
   isDark: boolean
   isSelected: boolean
   onSelect: (id: string) => void
   approvalHint?: StatusHint | null
-  /** Apelido curto da empresa pagadora (Teg - CG, União, Holding...) */
+  /** Apelido curto da empresa pagadora (Teg - CG, Uniao, Holding...) */
   empresaLabel?: string
-  /** Coluna Observações (só nas abas Previstos/Confirmados) */
+  /** Coluna Observacoes (so nas abas Previstos/Confirmados) */
   showObs?: boolean
+  /** Colunas visiveis, na ordem escolhida pelo usuario (menu Colunas) */
+  colunas: CpColKey[]
+  /** Nome do centro de custo — a coluna mostra o nome; o codigo vai no title */
+  ccLabel?: string
 }) {
   const urgency = getUrgency(cp)
   const isUrgentRequest = isUrgentExtraordinary(cp)
   const obraNome = cp.requisicao?.obra_nome
   const pedidoNum = cp.pedido?.numero_pedido
   const obs = obsDoTitulo(cp)
+
+  // Cada celula e independente para a ordem (e a visibilidade) ser decidida
+  // pelo usuario — o grid segue exatamente `colunas`.
+  const celulas: Record<CpColKey, React.ReactNode> = {
+    empresa: (
+      <span className="min-w-0 truncate">
+        <span
+          className={`inline-block max-w-full truncate text-[9px] font-bold rounded-md px-1.5 py-0.5 ${
+            empresaLabel
+              ? isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
+              : isDark ? 'text-slate-600' : 'text-slate-300'
+          }`}
+          title={empresaLabel ?? 'Sem empresa'}
+        >
+          {empresaLabel ?? '—'}
+        </span>
+      </span>
+    ),
+    fornecedor: (
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            {cp.fornecedor_nome}
+          </span>
+          {/* Sem isto a devolucao era invisivel na lista: o titulo continuava
+              com cara de normal e so o detalhe mostrava a pendencia. */}
+          {cp.devolucao_motivo && (
+            <span
+              title={`Devolvido para correcao${cp.devolvido_para_nome ? ` — ${cp.devolvido_para_nome}` : ''}: ${cp.devolucao_motivo}`}
+              className={`inline-flex items-center gap-0.5 text-[9px] font-bold rounded-full px-1.5 py-0.5 shrink-0 ${
+                isDark ? 'bg-rose-500/15 text-rose-300' : 'bg-rose-50 text-rose-700 border border-rose-200'
+              }`}
+            >
+              <Undo2 size={8} /> Devolvido
+            </span>
+          )}
+          {cp.origem === 'logistica' && (
+            <span className="inline-flex items-center gap-0.5 bg-purple-50 text-purple-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
+              <Truck size={8} /> Log
+            </span>
+          )}
+          {cp.origem === 'compras' && pedidoNum && (
+            <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
+              <Package size={8} /> Cmp
+            </span>
+          )}
+          {isUrgentRequest && (
+            <span className="inline-flex items-center gap-0.5 bg-rose-50 text-rose-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
+              <AlertTriangle size={8} /> Urg
+            </span>
+          )}
+        </div>
+      </div>
+    ),
+    obs: (
+      <div className="min-w-0">
+        {showObs ? (
+          <span
+            className={`block truncate text-[11px] ${
+              obs?.doPedido
+                ? isDark ? 'text-amber-300' : 'text-amber-700'
+                : isDark ? 'text-slate-500' : 'text-slate-400'
+            }`}
+            title={obs ? (obs.doPedido ? `Observacoes do pedido ${pedidoNum ?? ''}: ${obs.texto}` : obs.texto) : undefined}
+          >
+            {obs?.texto || '—'}
+          </span>
+        ) : (
+          <span className={`block truncate text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {cp.descricao || '—'}
+          </span>
+        )}
+        {approvalHint && (
+          <span className={`block truncate text-[10px] font-medium ${
+            approvalHint.tone === 'rose'
+              ? isDark ? 'text-rose-300' : 'text-rose-700'
+              : approvalHint.tone === 'sky'
+                ? isDark ? 'text-sky-300' : 'text-sky-700'
+                : isDark ? 'text-amber-300' : 'text-amber-700'
+          }`}>
+            {approvalHint.text}
+          </span>
+        )}
+      </div>
+    ),
+    obra: (
+      <span className={`text-[11px] truncate min-w-0 flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        {obraNome ? <><Building2 size={9} className="shrink-0" /> {obraNome}</> : '—'}
+      </span>
+    ),
+    origem: (
+      <span className="min-w-0 truncate">
+        <span
+          className={`inline-block max-w-full truncate text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${
+            isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'
+          }`}
+          title={ORIGEM_CP_LABEL[cp.origem ?? 'manual']?.label ?? cp.origem ?? '—'}
+        >
+          {ORIGEM_CP_LABEL[cp.origem ?? 'manual']?.curto ?? cp.origem ?? '—'}
+        </span>
+      </span>
+    ),
+    cc: (
+      <span
+        className={`text-[11px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}
+        title={cp.centro_custo ? `${cp.centro_custo}${ccLabel ? ` — ${ccLabel}` : ''}` : undefined}
+      >
+        {ccLabel || cp.centro_custo || '—'}
+      </span>
+    ),
+    pedido: pedidoNum ? (
+      <span className="text-[10px] font-semibold text-teal-600 truncate flex items-center gap-0.5">
+        <FileText size={9} className="shrink-0" /> {pedidoNum}
+      </span>
+    ) : (
+      <span className="truncate text-[10px] text-slate-300">{'—'}</span>
+    ),
+    venc: (
+      <span className={`text-[11px] text-right ${
+        cp.status === 'pago'
+          ? isDark ? 'text-teal-400' : 'text-teal-600'
+          : urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
+      }`}>
+        {cp.status === 'pago' && cp.data_pagamento ? fmtData(cp.data_pagamento) : fmtData(cp.data_vencimento)}
+      </span>
+    ),
+    valor: (
+      <span
+        className={`text-xs font-bold text-right ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}
+        title={temAjusteCP(cp) ? `Titulo ${fmt(cp.valor_original)} · desconto ${fmt(cp.valor_desconto ?? 0)} · juros/multa ${fmt(cp.valor_juros_multa ?? 0)}${cp.imposto_deduzir ? ` · imposto retido ${fmt(cp.imposto_valor ?? 0)}` : ''}` : undefined}
+      >
+        {temAjusteCP(cp) ? (
+          <span className="inline-flex flex-col items-end leading-tight">
+            <span className="text-[9px] font-medium line-through text-slate-400">{fmt(cp.valor_original)}</span>
+            <span>{fmt(valorAPagarCP(cp))}</span>
+          </span>
+        ) : fmt(cp.valor_original)}
+      </span>
+    ),
+  }
 
   return (
     <div
@@ -3866,130 +4045,7 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empres
         urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
       }`} />
 
-      <span className="min-w-0 truncate">
-        <span
-          className={`inline-block max-w-full truncate text-[9px] font-bold rounded-md px-1.5 py-0.5 ${
-            empresaLabel
-              ? isDark ? 'bg-indigo-500/15 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
-              : isDark ? 'text-slate-600' : 'text-slate-300'
-          }`}
-          title={empresaLabel ?? 'Sem empresa'}
-        >
-          {empresaLabel ?? '—'}
-        </span>
-      </span>
-
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className={`text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            {cp.fornecedor_nome}
-          </span>
-          {/* Sem isto a devolução era invisível na lista: o título continuava
-              com cara de normal e só o detalhe mostrava a pendência. */}
-          {cp.devolucao_motivo && (
-            <span
-              title={`Devolvido para correção${cp.devolvido_para_nome ? ` — ${cp.devolvido_para_nome}` : ''}: ${cp.devolucao_motivo}`}
-              className={`inline-flex items-center gap-0.5 text-[9px] font-bold rounded-full px-1.5 py-0.5 shrink-0 ${
-                isDark ? 'bg-rose-500/15 text-rose-300' : 'bg-rose-50 text-rose-700 border border-rose-200'
-              }`}
-            >
-              <Undo2 size={8} /> Devolvido
-            </span>
-          )}
-          {cp.origem === 'logistica' && (
-            <span className="inline-flex items-center gap-0.5 bg-purple-50 text-purple-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
-              <Truck size={8} /> Log
-            </span>
-          )}
-      {cp.origem === 'compras' && pedidoNum && (
-        <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
-          <Package size={8} /> Cmp
-        </span>
-      )}
-      {isUrgentRequest && (
-        <span className="inline-flex items-center gap-0.5 bg-rose-50 text-rose-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
-          <AlertTriangle size={8} /> Urg
-        </span>
-      )}
-        </div>
-      </div>
-
-      <div className="min-w-0">
-        {showObs ? (
-          <span
-            className={`block truncate text-[11px] ${
-              obs?.doPedido
-                ? isDark ? 'text-amber-300' : 'text-amber-700'
-                : isDark ? 'text-slate-500' : 'text-slate-400'
-            }`}
-            title={obs ? (obs.doPedido ? `Observa\u00e7\u00f5es do pedido ${pedidoNum ?? ''}: ${obs.texto}` : obs.texto) : undefined}
-          >
-            {obs?.texto || '\u2014'}
-          </span>
-        ) : (
-          <span className={`block truncate text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {cp.descricao || '\u2014'}
-          </span>
-        )}
-        {approvalHint && (
-          <span className={`block truncate text-[10px] font-medium ${
-            approvalHint.tone === 'rose'
-              ? isDark ? 'text-rose-300' : 'text-rose-700'
-              : approvalHint.tone === 'sky'
-                ? isDark ? 'text-sky-300' : 'text-sky-700'
-                : isDark ? 'text-amber-300' : 'text-amber-700'
-          }`}>
-            {approvalHint.text}
-          </span>
-        )}
-      </div>
-
-      <span className={`text-[11px] truncate min-w-0 flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {obraNome ? <><Building2 size={9} className="shrink-0" /> {obraNome}</> : '\u2014'}
-      </span>
-
-      <span className="min-w-0 truncate">
-        <span
-          className={`inline-block max-w-full truncate text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${
-            isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'
-          }`}
-          title={ORIGEM_CP_LABEL[cp.origem ?? 'manual']?.label ?? cp.origem ?? '\u2014'}
-        >
-          {ORIGEM_CP_LABEL[cp.origem ?? 'manual']?.curto ?? cp.origem ?? '\u2014'}
-        </span>
-      </span>
-
-      <span className={`text-[11px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {cp.centro_custo || '\u2014'}
-      </span>
-
-      {pedidoNum ? (
-        <span className="text-[10px] font-semibold text-teal-600 truncate flex items-center gap-0.5">
-          <FileText size={9} className="shrink-0" /> {pedidoNum}
-        </span>
-      ) : (
-        <span className="truncate text-[10px] text-slate-300">{'\u2014'}</span>
-      )}
-
-      <span className={`text-[11px] text-right ${
-        cp.status === 'pago'
-          ? isDark ? 'text-teal-400' : 'text-teal-600'
-          : urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
-      }`}>
-        {cp.status === 'pago' && cp.data_pagamento ? fmtData(cp.data_pagamento) : fmtData(cp.data_vencimento)}
-      </span>
-
-      <span
-        className={`text-xs font-bold text-right ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}
-        title={temAjusteCP(cp) ? `Título ${fmt(cp.valor_original)} · desconto ${fmt(cp.valor_desconto ?? 0)} · juros/multa ${fmt(cp.valor_juros_multa ?? 0)}${cp.imposto_deduzir ? ` · imposto retido ${fmt(cp.imposto_valor ?? 0)}` : ''}` : undefined}
-      >
-        {temAjusteCP(cp) ? (
-          <span className="inline-flex flex-col items-end leading-tight">
-            <span className="text-[9px] font-medium line-through text-slate-400">{fmt(cp.valor_original)}</span>
-            <span>{fmt(valorAPagarCP(cp))}</span>
-          </span>
-        ) : fmt(cp.valor_original)}
-      </span>
+      {colunas.map(k => <Fragment key={k}>{celulas[k]}</Fragment>)}
     </div>
   )
 }
@@ -4554,24 +4610,64 @@ export default function CPPipeline() {
   // sendo a descrição.
   const showObsCol = activeTab === 'previsto' || activeTab === 'confirmado'
 
-  // Resizable columns
+  // Colunas configuraveis (ordem/ocultas) — persistidas em localStorage.
+  const [cpCols, setCpCols] = useState(carregarColunasCp)
+  useEffect(() => {
+    try { localStorage.setItem(CP_COLS_LS_KEY, JSON.stringify(cpCols)) } catch { /* sem storage */ }
+  }, [cpCols])
+  const colunasVisiveis = useMemo(
+    () => cpCols.ordem.filter(k => !cpCols.ocultas.includes(k)),
+    [cpCols],
+  )
+  const colunasVisiveisRef = useRef<CpColKey[]>(colunasVisiveis)
+  useEffect(() => { colunasVisiveisRef.current = colunasVisiveis }, [colunasVisiveis])
+  const [showColMenu, setShowColMenu] = useState(false)
+  const moverColuna = (key: CpColKey, dir: -1 | 1) => {
+    setCpCols(prev => {
+      const ordem = [...prev.ordem]
+      const i = ordem.indexOf(key)
+      const j = i + dir
+      if (i < 0 || j < 0 || j >= ordem.length) return prev
+      ;[ordem[i], ordem[j]] = [ordem[j], ordem[i]]
+      return { ...prev, ordem }
+    })
+  }
+  const alternarColuna = (key: CpColKey) => {
+    if (CP_COL_DEFS.find(c => c.key === key)?.fixa) return
+    setCpCols(prev => prev.ocultas.includes(key)
+      ? { ...prev, ocultas: prev.ocultas.filter(k => k !== key) }
+      : { ...prev, ocultas: [...prev.ocultas, key] })
+  }
+
+  // Centro de custo por NOME na lista (o codigo vai no title) — pedido do
+  // Elton 06/08: "CC-104" nao diz nada, "CEMIG | Polo Patrocinio" diz.
+  const ccLookupLista = useLookupCentrosCusto()
+  const ccPorCodigo = useMemo(
+    () => new Map(ccLookupLista.map(c => [c.codigo, c.descricao])),
+    [ccLookupLista],
+  )
+
+  // Resizable columns — larguras por CHAVE de coluna, para sobreviverem a
+  // reordenacao/ocultacao. O template e recomputado a partir de ordem+larguras.
   const cpTableRef = useRef<HTMLDivElement>(null)
-  const cpColWidthsRef = useRef<number[]>([])
-  const CP_COLS_DEFAULT = '20px 2px 86px minmax(0,1.8fr) minmax(0,1.45fr) minmax(0,1fr) 84px 70px 110px 72px 96px'
-  const startCpColResize = useCallback((colIndex: number, startX: number) => {
+  const cpColWidthsRef = useRef<Partial<Record<CpColKey, number>>>({})
+  const templateColsCp = useCallback((visiveis: CpColKey[]) => {
+    const w = cpColWidthsRef.current
+    return '20px 2px ' + visiveis
+      .map(k => w[k] ? `${w[k]}px` : (CP_COL_DEFS.find(c => c.key === k)?.def ?? '100px'))
+      .join(' ')
+  }, [])
+  const startCpColResize = useCallback((colKey: string, startX: number) => {
     const container = cpTableRef.current
     if (!container) return
-    const cells = Array.from(container.querySelectorAll<HTMLElement>('[data-cph]'))
-    const startWidths = cells.length > 0
-      ? cells.map(el => el.getBoundingClientRect().width)
-      : cpColWidthsRef.current.length > 0
-        ? [...cpColWidthsRef.current]
-        : [220, 180, 120, 84, 70, 110, 72, 96]
-    cpColWidthsRef.current = startWidths
+    const cell = container.querySelector<HTMLElement>(`[data-cph="${colKey}"]`)
+    const startW = cell ? cell.getBoundingClientRect().width : (cpColWidthsRef.current[colKey as CpColKey] ?? 120)
     const onMove = (e: MouseEvent) => {
-      const next = startWidths.map((w, i) => i === colIndex ? Math.max(40, w + (e.clientX - startX)) : w)
-      cpColWidthsRef.current = next
-      container.style.setProperty('--cp-cols', `20px 2px ${next.map(w => `${w}px`).join(' ')}`)
+      cpColWidthsRef.current = {
+        ...cpColWidthsRef.current,
+        [colKey]: Math.max(40, startW + (e.clientX - startX)),
+      }
+      container.style.setProperty('--cp-cols', templateColsCp(colunasVisiveisRef.current))
     }
     const onUp = () => {
       document.removeEventListener('mousemove', onMove)
@@ -4583,7 +4679,7 @@ export default function CPPipeline() {
     document.body.style.setProperty('user-select', 'none')
     document.addEventListener('mousemove', onMove)
     document.addEventListener('mouseup', onUp)
-  }, [])
+  }, [templateColsCp])
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
   const [conciliarModalItems, setConciliarModalItems] = useState<ConciliarItem[]>([])
   const [pagModal, setPagModal] = useState<{ cpIds: string[]; pedidoId?: string } | null>(null)
@@ -5680,6 +5776,69 @@ export default function CPPipeline() {
             </button>
           </div>
 
+          {/* Colunas: reordenar / ocultar (so faz sentido na lista) */}
+          {viewMode === 'list' && (
+            <div className="relative">
+              <button
+                onClick={() => setShowColMenu(v => !v)}
+                className={`p-1.5 rounded-xl border transition-all ${
+                  showColMenu
+                    ? isDark ? 'border-white/[0.12] bg-white/[0.08] text-white' : 'border-slate-300 bg-slate-100 text-slate-700'
+                    : isDark ? 'border-white/[0.06] text-slate-500 hover:text-white' : 'border-slate-200 text-slate-400 hover:text-slate-600'
+                }`}
+                title="Configurar colunas (ordem e visibilidade)"
+              >
+                <Settings2 size={14} />
+              </button>
+              {showColMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowColMenu(false)} />
+                  <div className={`absolute right-0 top-full mt-1 z-50 w-72 rounded-xl border shadow-xl p-2 ${
+                    isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'
+                  }`}>
+                    <p className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Colunas — ordem e visibilidade
+                    </p>
+                    {cpCols.ordem.map((k, i) => {
+                      const def = CP_COL_DEFS.find(c => c.key === k)!
+                      const oculta = cpCols.ocultas.includes(k)
+                      const rotulo = k === 'obs' ? (showObsCol ? 'Observações' : 'Descrição') : def.label
+                      return (
+                        <div key={k} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                          <button
+                            onClick={() => alternarColuna(k)}
+                            disabled={def.fixa}
+                            className={def.fixa ? 'opacity-30 cursor-not-allowed' : ''}
+                            title={def.fixa ? 'Coluna fixa' : oculta ? 'Mostrar coluna' : 'Ocultar coluna'}
+                          >
+                            {oculta ? <EyeOff size={13} className="text-slate-400" /> : <Eye size={13} className="text-emerald-500" />}
+                          </button>
+                          <span className={`flex-1 text-xs ${oculta ? 'line-through opacity-50' : ''} ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                            {rotulo}
+                          </span>
+                          <button onClick={() => moverColuna(k, -1)} disabled={i === 0} className="disabled:opacity-20" title="Mover para a esquerda">
+                            <ChevronLeft size={13} />
+                          </button>
+                          <button onClick={() => moverColuna(k, 1)} disabled={i === cpCols.ordem.length - 1} className="disabled:opacity-20" title="Mover para a direita">
+                            <ChevronRight size={13} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                    <button
+                      onClick={() => { setCpCols({ ordem: CP_COL_DEFS.map(c => c.key), ocultas: [] }); cpColWidthsRef.current = {} }}
+                      className={`w-full mt-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                        isDark ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-slate-100'
+                      }`}
+                    >
+                      Restaurar padrão
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Export CSV */}
           <button
             onClick={handleExport}
@@ -5853,7 +6012,7 @@ export default function CPPipeline() {
           ) : viewMode === 'list' ? (
             <div
               ref={cpTableRef}
-              style={{ '--cp-cols': cpColWidthsRef.current.length ? `20px 2px ${cpColWidthsRef.current.map(w => `${w}px`).join(' ')}` : CP_COLS_DEFAULT } as React.CSSProperties}
+              style={{ '--cp-cols': templateColsCp(colunasVisiveis) } as React.CSSProperties}
               className="overflow-x-auto"
             >
               {/* Table header */}
@@ -5865,15 +6024,17 @@ export default function CPPipeline() {
               >
                 <span />
                 <span />
-                <span className="relative" data-cph>Empresa<CpColResizeHandle colIndex={0} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Fornecedor<CpColResizeHandle colIndex={1} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>{showObsCol ? `Observa\u00e7\u00f5es` : `Descri\u00e7\u00e3o`}<CpColResizeHandle colIndex={2} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Obra<CpColResizeHandle colIndex={3} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Origem<CpColResizeHandle colIndex={4} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>CC<CpColResizeHandle colIndex={5} onStart={startCpColResize} /></span>
-                <span className="relative" data-cph>Pedido<CpColResizeHandle colIndex={6} onStart={startCpColResize} /></span>
-                <span className="relative text-right" data-cph>Venc.<CpColResizeHandle colIndex={7} onStart={startCpColResize} /></span>
-                <span className="text-right" data-cph>Valor</span>
+                {colunasVisiveis.map((k, i) => {
+                  const def = CP_COL_DEFS.find(c => c.key === k)!
+                  const rotulo = k === 'obs' ? (showObsCol ? 'Observações' : 'Descrição') : def.label
+                  const ultima = i === colunasVisiveis.length - 1
+                  return (
+                    <span key={k} className={`relative ${def.right ? 'text-right' : ''}`} data-cph={k}>
+                      {rotulo}
+                      {!ultima && <CpColResizeHandle colIndex={k} onStart={startCpColResize} />}
+                    </span>
+                  )
+                })}
               </div>
               {activeCPs.map(cp => (
                 <CPRow
@@ -5886,6 +6047,8 @@ export default function CPPipeline() {
                   approvalHint={getApprovalHint(cp)}
                   empresaLabel={cp.empresa_id ? empresasCurtas.get(cp.empresa_id) : undefined}
                   showObs={showObsCol}
+                  colunas={colunasVisiveis}
+                  ccLabel={cp.centro_custo ? ccPorCodigo.get(cp.centro_custo) : undefined}
                 />
               ))}
             </div>
