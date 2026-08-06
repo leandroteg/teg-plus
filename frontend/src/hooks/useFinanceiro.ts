@@ -530,6 +530,47 @@ export function useAnexarDocumentosCP() {
 
 // ══ Adiantamento a fornecedor × título da nota (mig 218) ═══════════════════
 
+/**
+ * Adiantamentos pagos que ainda tem saldo a abater — pago mas NAO fechado:
+ * a NF vem depois e consome o saldo (mig 218). A lista usa para o selo
+ * "Aguardando NF"; sem isso a pendencia so aparecia abrindo titulo a titulo.
+ */
+export function useAdiantamentosAguardandoNF() {
+  return useQuery<Map<string, number>>({
+    queryKey: ['adiantamentos-aguardando-nf'],
+    queryFn: async () => {
+      // Só adiantamento a FORNECEDOR: o repasse a colaborador (origem
+      // 'despesas', número AD-…) presta contas por recibo e nunca teria NF
+      // para abater — ficava marcado "Aguardando NF" para sempre.
+      const { data: adiantamentos } = await supabase
+        .from('fin_contas_pagar')
+        .select('id, valor_original')
+        .eq('natureza', 'adiantamento')
+        .not('origem', 'in', '(despesas,rh,rh_beneficios)')
+        .in('status', ['pago', 'conciliado'])
+      if (!adiantamentos || adiantamentos.length === 0) return new Map()
+
+      const ids = adiantamentos.map(a => a.id)
+      const { data: abatimentos } = await supabase
+        .from('fin_adiantamento_abatimentos')
+        .select('adiantamento_cp_id, valor')
+        .in('adiantamento_cp_id', ids)
+
+      const abatidoPor = new Map<string, number>()
+      for (const ab of abatimentos ?? []) {
+        abatidoPor.set(ab.adiantamento_cp_id, (abatidoPor.get(ab.adiantamento_cp_id) ?? 0) + Number(ab.valor || 0))
+      }
+      const saldos = new Map<string, number>()
+      for (const a of adiantamentos) {
+        const saldo = Math.round((Number(a.valor_original) - (abatidoPor.get(a.id) ?? 0)) * 100) / 100
+        if (saldo > 0.009) saldos.set(a.id, saldo)
+      }
+      return saldos
+    },
+    staleTime: 60_000,
+  })
+}
+
 export interface AdiantamentoDisponivel {
   cp_id: string
   numero_pedido?: string | null

@@ -34,6 +34,7 @@ import {
   useObras,
   useExtratoCandidatos,
   useAplicarConciliacaoAuto,
+  useAdiantamentosAguardandoNF,
 } from '../../hooks/useFinanceiro'
 import {
   useLotesPagamento,
@@ -69,7 +70,10 @@ import { useDecisaoGenerica } from '../../hooks/useAprovacoes'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar, Fornecedor, LotePagamento, StatusCP, StatusLote, TipoPessoaFavorecido } from '../../types/financeiro'
-import { CP_PIPELINE_STAGES, ORIGEM_CP_LABEL, valorAPagarCP, temAjusteCP } from '../../types/financeiro'
+import {
+  CP_PIPELINE_STAGES, ORIGEM_CP_LABEL, valorAPagarCP, temAjusteCP,
+  ehAdiantamentoFornecedor, ehAdiantamentoColaborador,
+} from '../../types/financeiro'
 import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 // ══ Formatters ══════════════════════════════════════════════════
@@ -2307,13 +2311,17 @@ const CP_IMPOSTO_TIPOS = ['IPI', 'ISS', 'INSS', 'IRRF', 'PIS+COFINS+CSLL', 'Outr
  * no valor a pagar e some do saldo do adiantamento.
  */
 function CPAdiantamentoFornecedor({ cp, isDark }: { cp: ContaPagar; isDark: boolean }) {
-  const ehAdiantamento = cp.natureza === 'adiantamento'
+  // Repasse a colaborador (AD-…) divide a natureza 'adiantamento' com o
+  // adiantamento a fornecedor, mas se acerta por prestação de contas — abater
+  // NF aqui não faz sentido, então esta seção inteira sai de cena.
+  const ehAdiantamento = ehAdiantamentoFornecedor(cp)
+  const ehRepasseColaborador = ehAdiantamentoColaborador(cp)
   const { data: abatimentos = [] } = useAbatimentosCP(cp.id)
   const { data: disponiveis = [] } = useAdiantamentosDisponiveis({
     fornecedorNome: cp.fornecedor_nome,
     empresaId: cp.empresa_id,
     cpId: cp.id,
-    enabled: !ehAdiantamento && !['pago', 'conciliado', 'cancelado'].includes(cp.status),
+    enabled: !ehAdiantamento && !ehRepasseColaborador && !['pago', 'conciliado', 'cancelado'].includes(cp.status),
   })
   const abater = useAbaterAdiantamento()
   const desfazer = useDesfazerAbatimento()
@@ -2322,6 +2330,7 @@ function CPAdiantamentoFornecedor({ cp, isDark }: { cp: ContaPagar; isDark: bool
   const jaAbatido = Number(cp.valor_adiantamento_abatido ?? 0) || 0
   const vinculos = abatimentos.filter(a => a.papel === (ehAdiantamento ? 'origem' : 'destino'))
 
+  if (ehRepasseColaborador) return null
   // Adiantamento sem uso nenhum: nada a mostrar até alguém abater.
   if (!ehAdiantamento && disponiveis.length === 0 && vinculos.length === 0) return null
   if (ehAdiantamento && vinculos.length === 0) {
@@ -3861,7 +3870,7 @@ function carregarColunasCp(): { ordem: CpColKey[]; ocultas: CpColKey[] } {
   } catch { return padrao }
 }
 
-function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empresaLabel, showObs, colunas, ccLabel }: {
+function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empresaLabel, showObs, colunas, ccLabel, saldoAdiantamento }: {
   cp: ContaPagar
   onClick: () => void
   isDark: boolean
@@ -3876,6 +3885,8 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empres
   colunas: CpColKey[]
   /** Nome do centro de custo — a coluna mostra o nome; o codigo vai no title */
   ccLabel?: string
+  /** Adiantamento pago com saldo a abater: pago mas nao fechado, a NF vem depois */
+  saldoAdiantamento?: number
 }) {
   const urgency = getUrgency(cp)
   const isUrgentRequest = isUrgentExtraordinary(cp)
@@ -3916,6 +3927,16 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint, empres
               }`}
             >
               <Undo2 size={8} /> Devolvido
+            </span>
+          )}
+          {saldoAdiantamento !== undefined && (
+            <span
+              title={`Adiantamento pago aguardando a NF do fornecedor — saldo a abater ${saldoAdiantamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
+              className={`inline-flex items-center gap-0.5 text-[9px] font-bold rounded-full px-1.5 py-0.5 shrink-0 ${
+                isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700 border border-amber-200'
+              }`}
+            >
+              <Clock size={8} /> Aguardando NF
             </span>
           )}
           {cp.origem === 'logistica' && (
@@ -4641,6 +4662,7 @@ export default function CPPipeline() {
 
   // Centro de custo por NOME na lista (o codigo vai no title) — pedido do
   // Elton 06/08: "CC-104" nao diz nada, "CEMIG | Polo Patrocinio" diz.
+  const { data: adiantamentosAbertos } = useAdiantamentosAguardandoNF()
   const ccLookupLista = useLookupCentrosCusto()
   const ccPorCodigo = useMemo(
     () => new Map(ccLookupLista.map(c => [c.codigo, c.descricao])),
@@ -6049,6 +6071,7 @@ export default function CPPipeline() {
                   showObs={showObsCol}
                   colunas={colunasVisiveis}
                   ccLabel={cp.centro_custo ? ccPorCodigo.get(cp.centro_custo) : undefined}
+                  saldoAdiantamento={adiantamentosAbertos?.get(cp.id)}
                 />
               ))}
             </div>
