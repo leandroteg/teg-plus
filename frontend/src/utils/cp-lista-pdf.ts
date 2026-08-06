@@ -183,7 +183,13 @@ function buildDoc(
 
   // ── Linhas ──
   for (const l of linhas) {
-    if (y > H - 18) novaPagina()
+    // Descrição quebra linha em vez de cortar: observações longas (rastro de
+    // migração, instruções de pagamento) perdiam justamente o final útil.
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8)
+    const descLinhas = (doc.splitTextToSize(l.descricao || '—', COLS[2].w - 2.5) as string[]).slice(0, 5)
+    const temAjuste = Math.abs(l.valorAPagar - l.valorOriginal) > 0.001
+    const alturaLinha = Math.max(temAjuste ? 6 : 5, descLinhas.length * 2.9 + 2.1)
+    if (y + alturaLinha > H - 16) novaPagina()
 
     doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); txt(doc, LIGHT)
     doc.text(ellipsis(doc, l.empresa || '—', COLS[0].w), X.empresa, y)
@@ -193,7 +199,7 @@ function buildDoc(
     doc.text(ellipsis(doc, `${l.fornecedor}${selos}`, COLS[1].w), X.fornecedor, y)
 
     doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8); txt(doc, MID)
-    doc.text(ellipsis(doc, l.descricao || '—', COLS[2].w), X.descricao, y)
+    doc.text(descLinhas, X.descricao, y, { lineHeightFactor: 1.25 })
     doc.text(ellipsis(doc, l.obra || '—', COLS[3].w), X.obra, y)
     doc.text(ellipsis(doc, l.origem || '—', COLS[4].w), X.origem, y)
     doc.text(ellipsis(doc, l.centroCusto || '—', COLS[5].w), X.cc, y)
@@ -206,7 +212,6 @@ function buildDoc(
     doc.text(fmtData(l.vencimento), colRight('venc'), y, { align: 'right' })
 
     // Valor: com ajuste, a face do título vai riscada em cima do valor a pagar
-    const temAjuste = Math.abs(l.valorAPagar - l.valorOriginal) > 0.001
     if (temAjuste) {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5); txt(doc, LIGHT)
       const bruto = fmtMoeda(l.valorOriginal)
@@ -219,7 +224,7 @@ function buildDoc(
     txt(doc, l.urgencia === 'overdue' ? RED : DARK)
     doc.text(fmtMoeda(l.valorAPagar), colRight('valor'), y, { align: 'right' })
 
-    y += temAjuste ? 6 : 5
+    y += alturaLinha
     doc.setDrawColor(241, 245, 249); doc.setLineWidth(0.2)
     doc.line(M, y - 2, W - M, y - 2)
   }

@@ -15,6 +15,8 @@ import {
   useSalvarFaturasEsperadas, useConcessionariaSugerida,
 } from '../../hooks/useLocacao'
 import { useCadFornecedores } from '../../hooks/useCadastros'
+import { useLookupEmpresas as useLookupEmpresasLoc } from '../../hooks/useLookups'
+import { empresaCurta as empresaCurtaLoc } from '../../utils/empresaCurta'
 import SearchableSelect from '../../components/SearchableSelect'
 import type { TipoFatura, StatusFatura, LocFatura, LocImovel } from '../../types/locacao'
 import { TIPO_FATURA_LABEL, STATUS_FATURA_LABEL } from '../../types/locacao'
@@ -162,6 +164,16 @@ function InlineEditForm({
     setFornecedorId(sugestao.id)
   }, [precisaConcessionaria, fornecedorId, sugestao?.id])
 
+  // Empresa pagadora da CP gerada. Default: TEG - CG (EMP-001), regra vigente
+  // de que todo pagamento sai pela matriz; o campo permite decidir diferente.
+  const empresas = useLookupEmpresasLoc()
+  const [empresaId, setEmpresaId] = useState<string>((fatura as any)?.empresa_id ?? '')
+  useEffect(() => {
+    if (empresaId || empresas.length === 0) return
+    const padrao = empresas.find(e => e.codigo === 'EMP-001')
+    if (padrao) setEmpresaId(padrao.id)
+  }, [empresaId, empresas])
+
   // Anexo na própria linha: quem lança Energia/Água já está com o boleto na mão.
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [subindo, setSubindo] = useState(false)
@@ -187,6 +199,7 @@ function InlineEditForm({
           valor_confirmado: status === 'pago' ? parsedValor : undefined,
           status,
           fornecedor_id: fornecedorId || null,
+          empresa_id: empresaId || null,
         } as never)
         if (arquivo) {
           setSubindo(true)
@@ -205,6 +218,7 @@ function InlineEditForm({
           valor_previsto: parsedValor,
           status,
           fornecedor_id: fornecedorId || null,
+          empresa_id: empresaId || null,
         } as never)
         if (arquivo && nova?.id) {
           setSubindo(true)
@@ -257,6 +271,17 @@ function InlineEditForm({
               )}
             </div>
           )}
+
+          <div className="min-w-[150px]">
+            <label className={`text-[10px] font-semibold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Empresa pagadora
+            </label>
+            <select value={empresaId} onChange={e => setEmpresaId(e.target.value)} className={inputCls}>
+              {empresas.map(e => (
+                <option key={e.id} value={e.id}>{empresaCurtaLoc(e)}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex-1 min-w-[90px]">
             <label className={`text-[10px] font-semibold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Valor (R$)
