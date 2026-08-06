@@ -119,6 +119,9 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   // editavel antes de emitir. Lista vazia = comportamento antigo (hook resolve).
   const [parcelas, setParcelas] = useState<Array<{ numero: number; valor: number; data_vencimento: string; descricao?: string }>>([])
   const [parcelasEditadas, setParcelasEditadas] = useState(false)
+  // Edicao de VALOR e separada da de data/descricao: quem so ajusta vencimentos
+  // continua com os valores seguindo o total do pedido conforme os itens entram.
+  const [valoresEditados, setValoresEditados] = useState(false)
   const [valorFrete, setValorFrete] = useState(0)
   const [valorDespesas, setValorDespesas] = useState(0)
   const [valorDesconto, setValorDesconto] = useState(0)
@@ -213,6 +216,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
         descricao: p.descricao,
       })))
       setParcelasEditadas(true)
+      setValoresEditados(true)
     }
     // Forma de pagamento/cartão vivem na parcela do Contas a Pagar
     supabase
@@ -266,20 +270,39 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
   const parcelasSugeridas = useMemo(() => {
-    if (total <= 0) return []
+    const base = dataPrevistaEntrega || new Date().toISOString().split('T')[0]
     if (dataVencimento) {
       return [{ numero: 1, valor: total, data_vencimento: dataVencimento, descricao: condicaoPagamento || 'Vencimento informado' }]
     }
-    return gerarPreviaParcelas(total, condicaoPagamento || '', dataPrevistaEntrega || new Date().toISOString().split('T')[0])
+    if (total > 0) return gerarPreviaParcelas(total, condicaoPagamento || '', base)
+    // Itens ainda sem valor: gera a ESTRUTURA da condicao (datas editaveis, R$ 0)
+    // para quem digita "30/60" ja poder acertar os vencimentos — os valores
+    // entram sozinhos quando os itens forem valorados.
+    return gerarPreviaParcelas(1, condicaoPagamento || '', base).map(p => ({ ...p, valor: 0 }))
   }, [total, dataVencimento, condicaoPagamento, dataPrevistaEntrega])
 
   useEffect(() => {
-    if (parcelasEditadas) return
-    setParcelas(parcelasSugeridas)
-  }, [parcelasSugeridas, parcelasEditadas])
+    if (!parcelasEditadas) {
+      setParcelas(parcelasSugeridas)
+      return
+    }
+    if (valoresEditados) return
+    // Datas/descricoes sao do usuario; valores redistribuem em partes iguais
+    // (ultima absorve o arredondamento) enquanto ninguem mexer neles.
+    setParcelas(prev => {
+      if (prev.length === 0) return prev
+      const cada = Math.floor((total / prev.length) * 100) / 100
+      return prev.map((p, i) => ({
+        ...p,
+        valor: i === prev.length - 1
+          ? Math.round((total - cada * (prev.length - 1)) * 100) / 100
+          : cada,
+      }))
+    })
+  }, [parcelasSugeridas, parcelasEditadas, valoresEditados, total])
 
   const somaParcelas = parcelas.reduce((s, p) => s + (Number(p.valor) || 0), 0)
-  const parcelasDivergem = parcelas.length > 0 && Math.abs(somaParcelas - total) > 0.01
+  const parcelasDivergem = parcelas.length > 0 && total > 0 && Math.abs(somaParcelas - total) > 0.01
 
   function updateItem(idx: number, field: keyof ItemDireto, value: string | number) {
     setItens(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
@@ -798,7 +821,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                   {parcelasEditadas && (
                     <button
                       type="button"
-                      onClick={() => { setParcelasEditadas(false); setParcelas(parcelasSugeridas) }}
+                      onClick={() => { setParcelasEditadas(false); setValoresEditados(false); setParcelas(parcelasSugeridas) }}
                       className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 hover:bg-white"
                     >
                       Recalcular
@@ -828,7 +851,7 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
                       <NumericInput
                         min={0} step={0.01}
                         value={p.valor}
-                        onChange={v => { setParcelasEditadas(true); setParcelas(prev => prev.map((x, i) => i === idx ? { ...x, valor: v } : x)) }}
+                        onChange={v => { setParcelasEditadas(true); setValoresEditados(true); setParcelas(prev => prev.map((x, i) => i === idx ? { ...x, valor: v } : x)) }}
                         className="w-full border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-xs text-right outline-none focus:ring-2 focus:ring-orange-300"
                       />
                     </div>
