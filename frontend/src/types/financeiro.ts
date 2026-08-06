@@ -58,6 +58,11 @@ export interface Fornecedor {
   cnpj?: string | null
   /** Fornecedor estrangeiro: dispensa CNPJ, validação de DV e Cartão CNPJ. */
   exterior?: boolean
+  /**
+   * Marketplace (ML, Amazon...): a NF do pedido vem do vendedor do anúncio e
+   * não deste CNPJ. Faz o recebimento pedir o emitente da nota (mig 244).
+   */
+  eh_marketplace?: boolean
   telefone?: string
   email?: string
   contato_nome?: string
@@ -106,6 +111,30 @@ export function valorAPagarCP(cp: ValoresCP): number {
 /** true quando desconto/juros/imposto/adiantamento mexem no valor — vale mostrar os dois números. */
 export function temAjusteCP(cp: ValoresCP): boolean {
   return valorAPagarCP(cp) !== (Number(cp.valor_original ?? 0) || 0)
+}
+
+/**
+ * Origens em que `natureza = 'adiantamento'` significa dinheiro adiantado a um
+ * COLABORADOR (repasse/viagem, número AD-…), não a um fornecedor. Ele é quitado
+ * por prestação de contas — nunca vai chegar NF dele para abater.
+ */
+const ORIGENS_ADIANTAMENTO_COLABORADOR = ['despesas', 'rh', 'rh_beneficios']
+
+/**
+ * Adiantamento a FORNECEDOR: o que foi pago antes da nota e depois abate o
+ * título dela (mig 218). Distinguir importa porque o repasse a colaborador
+ * compartilha a mesma natureza e não pode entrar na conversa de abatimento
+ * nem ficar marcado como "Aguardando NF".
+ */
+export function ehAdiantamentoFornecedor(cp: { natureza?: string | null; origem?: string | null }): boolean {
+  return cp.natureza === 'adiantamento'
+    && !ORIGENS_ADIANTAMENTO_COLABORADOR.includes(cp.origem ?? '')
+}
+
+/** Repasse a colaborador (AD-…) que espera prestação de contas, não nota fiscal. */
+export function ehAdiantamentoColaborador(cp: { natureza?: string | null; origem?: string | null }): boolean {
+  return cp.natureza === 'adiantamento'
+    && ORIGENS_ADIANTAMENTO_COLABORADOR.includes(cp.origem ?? '')
 }
 
 /** Qual módulo gerou o lançamento — mostrado na coluna Origem do Contas a Pagar. */
