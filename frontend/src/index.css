@@ -315,3 +315,21 @@
   from { opacity: 0; transform: translateY(-6px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0)    scale(1); }
 }
+
+/* ── Flutuantes discretos ────────────────────────────────────────────────
+   O botao do SuperTEG e o convite de instalar o PWA ficam ancorados no canto
+   inferior direito — exatamente onde as telas do Financeiro colocam totais e
+   botoes de acao. Em telas com mouse eles ficam translucidos e so voltam ao
+   normal quando o ponteiro chega perto. Em toque nao existe hover, entao la
+   seguem opacos: um botao permanentemente apagado seria pior que o estorvo. */
+@media (hover: hover) and (pointer: fine) {
+  .fab-discreto {
+    opacity: 0.2;
+    transition: opacity 0.2s ease;
+  }
+  .fab-discreto:hover,
+  .fab-discreto:focus-visible,
+  .fab-discreto:focus-within {
+    opacity: 1;
+  }
+}

@@ -47,8 +47,8 @@ export default function PWAInstallPrompt() {
     return (
       <button
         onClick={handleInstall}
-        className={`fixed bottom-24 right-4 z-[60] flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg transition-all duration-300 ${
-          closing ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0 animate-fade-in-up'
+        className={`fab-discreto fixed bottom-24 right-4 z-[60] flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg transition-all duration-300 ${
+          closing ? '!opacity-0 translate-y-4' : 'translate-y-0 animate-fade-in-up'
         } ${
           isDark
             ? 'bg-teal-500/20 border border-teal-400/30 text-teal-300 hover:bg-teal-500/30 shadow-glow-sm'
@@ -99,8 +99,8 @@ export default function PWAInstallPrompt() {
 
   // ── Full banner (first sessions) ──────────────────────────────────
   return (
-    <div className={`fixed bottom-24 right-4 z-[60] w-[300px] transition-all duration-300 ${
-      closing ? 'opacity-0 translate-y-8 scale-95' : 'opacity-100 translate-y-0 scale-100 animate-fade-in-up'
+    <div className={`fab-discreto fixed bottom-24 right-4 z-[60] w-[300px] transition-all duration-300 ${
+      closing ? '!opacity-0 translate-y-8 scale-95' : 'translate-y-0 scale-100 animate-fade-in-up'
     }`}>
       <div className={`rounded-2xl p-5 shadow-2xl border backdrop-blur-xl ${
         isDark

@@ -182,7 +182,7 @@ export default function SuperTEGChat() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-[9999] group"
+          className="fab-discreto fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-[9999] group"
           aria-label="Abrir SuperTEG"
         >
           <span className={`relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg shadow-teal-500/25 group-hover:shadow-xl group-hover:shadow-teal-500/40 group-hover:scale-105 active:scale-95 transition-all duration-200 ${
