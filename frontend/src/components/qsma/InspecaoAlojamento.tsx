@@ -10,8 +10,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BedDouble, Ban, CheckCircle2, Clock, Loader2, Play, ShieldCheck, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useModelosChecklist, useSalvarInspecao, evidenciaUrl, proximoCodigo } from '../../hooks/useQsma'
-import { useCriarSolicitacaoLocacao } from '../../hooks/useLocacao'
+import { useModelosChecklist, useSalvarInspecao, evidenciaUrl } from '../../hooks/useQsma'
+import { supabase } from '../../services/supabase'
 import { useAlojamentos } from '../../hooks/useLeitos'
 import { gerarInspecaoPdf } from '../../utils/inspecao-pdf'
 import { QsmaModal, ModalFooter, FotosUpload } from './ModalBits'
@@ -161,7 +161,6 @@ function InspecaoAlojamentoModal({ isDark, modelos, alojamentos, imovelInicial, 
 
 export function ExecutarInspecaoModal({ isDark, inspecao, obraNomeStr, onClose }: { isDark: boolean; inspecao: QsmaInspecao; obraNomeStr?: string; onClose: () => void }) {
   const salvar = useSalvarInspecao()
-  const criarSolicitacao = useCriarSolicitacaoLocacao()
   const { perfil } = useAuth()
   const itens = inspecao.modelo?.itens ?? []
   const [respostas, setRespostas] = useState<RespostaItem[]>(
@@ -353,30 +352,43 @@ export function ExecutarInspecaoModal({ isDark, inspecao, obraNomeStr, onClose }
               status: 'executada',
             })
             const codigoInspecao = salvo?.codigo ?? inspecao.codigo
-            // Alojamento (nao obra) com NC: cada nao conformidade vira uma
-            // solicitacao propria (NC de Seguranca) no mesmo Kanban de
-            // Manutencoes e Servicos, com numero unico — igual a uma OS nova.
-            // Falha aqui nao derruba o fluxo: a inspecao ja esta salva.
+            // Alojamento (não obra) com NC: cada não conformidade vira uma
+            // solicitação própria (NC de Segurança) no Kanban de Manutenções e
+            // Serviços, com número único — igual a uma OS nova.
+            //
+            // Vai por RPC, não por insert: escrever em loc_solicitacoes exige o
+            // módulo Locação, e quem inspeciona é o TST do QSMA — há perfis com
+            // QSMA e sem Locação, para quem o insert seria recusado pela RLS e a
+            // NC não nasceria. A RPC é SECURITY DEFINER e gera o código NC.
             if (inspecao.imovel_id && ncs > 0) {
+              const falhas: string[] = []
               for (const item of itens) {
                 const r = respostas.find(x => x.ordem === item.ordem)
                 if (r?.resposta !== 'nc') continue
                 try {
-                  const codigoNc = await proximoCodigo('NC')
-                  await criarSolicitacao.mutateAsync({
-                    tipo: 'nc_seguranca',
-                    imovel_id: inspecao.imovel_id,
-                    titulo: `[${codigoNc ?? 'NC'}] ${item.texto}`.slice(0, 160),
-                    descricao: [
-                      `Nao conformidade identificada na inspecao ${codigoInspecao ?? ''} (${inspecao.modelo?.nome ?? 'checklist'}).`,
-                      r.obs ? `Observacao: ${r.obs}` : null,
-                      `Fotos e evidencias: ver o relatorio ${codigoInspecao ?? ''} na aba Relatorios de Inspecao.`,
-                    ].filter(Boolean).join('\n'),
-                    urgencia: 'normal',
-                  } as never)
+                  const { data, error } = await supabase.rpc('loc_nc_de_inspecao', {
+                    p_imovel_id: inspecao.imovel_id,
+                    p_item_texto: item.texto,
+                    p_inspecao_codigo: codigoInspecao ?? null,
+                    p_checklist_nome: inspecao.modelo?.nome ?? null,
+                    p_observacao: r.obs ?? null,
+                    p_executor_nome: perfil?.nome ?? null,
+                  })
+                  if (error) throw error
+                  const res = data as { ok: boolean; erro?: string }
+                  if (!res?.ok) throw new Error(res?.erro ?? 'recusado')
                 } catch (ncErr) {
-                  console.error('Falha ao gerar NC a partir da inspecao:', ncErr)
+                  falhas.push(`${item.texto}: ${String((ncErr as Error).message)}`)
                 }
+              }
+              // Falhar em silêncio aqui é o pior caso: a inspeção fica salva e
+              // todo mundo acha que a NC foi aberta.
+              if (falhas.length) {
+                const lista = falhas.join('\n')
+                alert(
+                  `A inspeção foi salva, mas ${falhas.length} não conformidade(s) NÃO viraram solicitação:` +
+                  `\n\n${lista}\n\nAbra manualmente em Manutenções e Serviços.`,
+                )
               }
             }
             if (gerarPdf) {
