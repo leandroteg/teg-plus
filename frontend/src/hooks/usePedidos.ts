@@ -722,6 +722,8 @@ export interface PedidoDiretoPayload {
   valorDesconto?: number
   /** Vencimento explícito. Quando informado, manda na frente da condição de pagamento. */
   dataVencimento?: string
+  /** Parcelas revisadas no modal. Quando presentes, mandam sobre condicao/vencimento. */
+  parcelasPreview?: Array<{ numero: number; valor: number; data_vencimento: string; descricao?: string }>
   /** Sabor do pedido sem cotação — muda a natureza do gasto, não os campos. */
   tipoPedido?: TipoPedidoDireto
 }
@@ -804,7 +806,9 @@ export function useEmitirPedidoDireto() {
       }
       const numeroPedido = `${prefix}-${String(nextSeq).padStart(5, '0')}`
 
-      const parcelasResolvidas = resolverParcelasDireto(
+      const parcelasResolvidas = (payload.parcelasPreview && payload.parcelasPreview.length > 0)
+        ? payload.parcelasPreview
+        : resolverParcelasDireto(
         payload.valorTotal,
         payload.condicaoPagamento,
         payload.dataVencimento,
@@ -951,6 +955,8 @@ export interface PedidoDiretoEdicaoPayload {
   valorDesconto?: number
   /** Vencimento explícito. Quando informado, manda na frente da condição de pagamento. */
   dataVencimento?: string
+  /** Parcelas revisadas no modal. Quando presentes, mandam sobre condicao/vencimento. */
+  parcelasPreview?: Array<{ numero: number; valor: number; data_vencimento: string; descricao?: string }>
 }
 
 /**
@@ -987,7 +993,9 @@ export function useEditarPedidoDireto() {
         throw new Error('Uma parcela deste pedido já está em lote/pagamento — ajuste pelo Financeiro.')
       }
 
-      const parcelasResolvidas = resolverParcelasDireto(
+      const parcelasResolvidas = (payload.parcelasPreview && payload.parcelasPreview.length > 0)
+        ? payload.parcelasPreview
+        : resolverParcelasDireto(
         payload.valorTotal,
         payload.condicaoPagamento,
         payload.dataVencimento,

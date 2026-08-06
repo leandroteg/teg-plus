@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import NumericInput from './NumericInput'
 import { toUpperNorm } from './UpperInput'
+import { gerarPreviaParcelas } from '../utils/pagamentos'
 
 type FormaPagamentoPedido = 'pix' | 'cartao' | 'boleto' | 'transferencia'
 const FORMA_PAGAMENTO_OPTIONS: Array<{ value: FormaPagamentoPedido; label: string }> = [
@@ -114,6 +115,10 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   // Vencimento explícito (boleto com data fechada). Preenchido, manda na frente
   // da condição de pagamento e gera uma única parcela nessa data.
   const [dataVencimento, setDataVencimento] = useState('')
+  // Parcelamento igual ao pedido normal: previa gerada da condicao/vencimento e
+  // editavel antes de emitir. Lista vazia = comportamento antigo (hook resolve).
+  const [parcelas, setParcelas] = useState<Array<{ numero: number; valor: number; data_vencimento: string; descricao?: string }>>([])
+  const [parcelasEditadas, setParcelasEditadas] = useState(false)
   const [valorFrete, setValorFrete] = useState(0)
   const [valorDespesas, setValorDespesas] = useState(0)
   const [valorDesconto, setValorDesconto] = useState(0)
@@ -197,6 +202,18 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
     // data fechada do boleto e o Financeiro recebia a parcela recalculada pela
     // condição de pagamento (ou "Revisar manualmente", quando ela não é interpretável).
     setDataVencimento(pedido.data_vencimento ?? '')
+    // Parcelas ja gravadas no pedido entram como estao (marcadas como editadas
+    // para a previa automatica nao sobrescrever a negociacao registrada).
+    const pp = (pedido as any).parcelas_preview
+    if (Array.isArray(pp) && pp.length > 0) {
+      setParcelas(pp.map((p: any, i: number) => ({
+        numero: i + 1,
+        valor: Number(p.valor) || 0,
+        data_vencimento: p.data_vencimento ?? '',
+        descricao: p.descricao,
+      })))
+      setParcelasEditadas(true)
+    }
     // Forma de pagamento/cartão vivem na parcela do Contas a Pagar
     supabase
       .from('fin_contas_pagar')
@@ -247,6 +264,22 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
   )
 
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+  const parcelasSugeridas = useMemo(() => {
+    if (total <= 0) return []
+    if (dataVencimento) {
+      return [{ numero: 1, valor: total, data_vencimento: dataVencimento, descricao: condicaoPagamento || 'Vencimento informado' }]
+    }
+    return gerarPreviaParcelas(total, condicaoPagamento || '', dataPrevistaEntrega || new Date().toISOString().split('T')[0])
+  }, [total, dataVencimento, condicaoPagamento, dataPrevistaEntrega])
+
+  useEffect(() => {
+    if (parcelasEditadas) return
+    setParcelas(parcelasSugeridas)
+  }, [parcelasSugeridas, parcelasEditadas])
+
+  const somaParcelas = parcelas.reduce((s, p) => s + (Number(p.valor) || 0), 0)
+  const parcelasDivergem = parcelas.length > 0 && Math.abs(somaParcelas - total) > 0.01
 
   function updateItem(idx: number, field: keyof ItemDireto, value: string | number) {
     setItens(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
@@ -363,6 +396,8 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
         : 'Informe a justificativa para dispensar Requisição/Cotação.'
     )
     if (formaPagamento === 'cartao' && !cartaoId) return setErro('Selecione qual cartão corporativo será usado.')
+    if (parcelas.some(p => !p.data_vencimento)) return setErro('Toda parcela precisa de data de vencimento.')
+    if (parcelasDivergem) return setErro(`A soma das parcelas (${fmt(somaParcelas)}) difere do total do pedido (${fmt(total)}). Ajuste antes de continuar.`)
 
     const itensFiltrados = itens.filter(i => i.descricao.trim())
 
@@ -380,6 +415,14 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
           condicaoPagamento: condicaoPagamento || undefined,
           dataPrevistaEntrega: dataPrevistaEntrega || undefined,
           dataVencimento: dataVencimento || undefined,
+          parcelasPreview: parcelas.length > 0
+            ? parcelas.map((p, i) => ({
+                numero: i + 1,
+                valor: Math.round((Number(p.valor) || 0) * 100) / 100,
+                data_vencimento: p.data_vencimento,
+                descricao: p.descricao,
+              }))
+            : undefined,
           justificativaSemCotacao: toUpperNorm(justificativa),
           observacoes: observacoes ? toUpperNorm(observacoes) : undefined,
           empresaId: empresaId || undefined,
@@ -431,6 +474,14 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
         condicaoPagamento: condicaoPagamento || undefined,
         dataPrevistaEntrega: dataPrevistaEntrega || undefined,
         dataVencimento: dataVencimento || undefined,
+        parcelasPreview: parcelas.length > 0
+          ? parcelas.map((p, i) => ({
+              numero: i + 1,
+              valor: Math.round((Number(p.valor) || 0) * 100) / 100,
+              data_vencimento: p.data_vencimento,
+              descricao: p.descricao,
+            }))
+          : undefined,
         justificativaSemCotacao: toUpperNorm(justificativa),
         observacoes: observacoes ? toUpperNorm(observacoes) : undefined,
         compradorId: perfil?.id,
@@ -734,6 +785,78 @@ export default function PedidoDiretoModal({ open, onClose, onSuccess, pedido, ti
               ? 'Vencimento informado: gera uma única parcela nessa data (a condição de pagamento fica só como referência).'
               : 'Sem data de vencimento, as parcelas saem da condição de pagamento contada a partir da previsão de entrega.'}
           </p>
+
+          {/* Parcelamento — mesma previa editavel do pedido normal */}
+          {parcelas.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-bold text-slate-600">Parcelas ({parcelas.length})</p>
+                  <p className="text-[11px] text-slate-400">Revise valores e vencimentos antes de {editMode ? 'salvar' : 'emitir'}.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {parcelasEditadas && (
+                    <button
+                      type="button"
+                      onClick={() => { setParcelasEditadas(false); setParcelas(parcelasSugeridas) }}
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 hover:bg-white"
+                    >
+                      Recalcular
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setParcelasEditadas(true); setParcelas(prev => [...prev, { numero: prev.length + 1, valor: 0, data_vencimento: '', descricao: `PARCELA ${prev.length + 1}` }]) }}
+                    className="px-2.5 py-1.5 rounded-lg bg-orange-50 text-[11px] font-semibold text-orange-700 border border-orange-200 hover:bg-orange-100"
+                  >
+                    + Parcela
+                  </button>
+                </div>
+              </div>
+              <div className="p-3 space-y-1.5">
+                {parcelas.map((p, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="w-6 text-[11px] font-bold text-slate-400 text-center shrink-0">{idx + 1}</span>
+                    <input
+                      type="date"
+                      value={p.data_vencimento}
+                      onChange={e => { setParcelasEditadas(true); setParcelas(prev => prev.map((x, i) => i === idx ? { ...x, data_vencimento: e.target.value } : x)) }}
+                      className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-orange-300"
+                    />
+                    <div className="relative w-32 shrink-0">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 font-semibold">R$</span>
+                      <NumericInput
+                        min={0} step={0.01}
+                        value={p.valor}
+                        onChange={v => { setParcelasEditadas(true); setParcelas(prev => prev.map((x, i) => i === idx ? { ...x, valor: v } : x)) }}
+                        className="w-full border border-slate-200 rounded-lg pl-7 pr-2 py-1.5 text-xs text-right outline-none focus:ring-2 focus:ring-orange-300"
+                      />
+                    </div>
+                    <input
+                      value={p.descricao ?? ''}
+                      placeholder="DESCRICAO"
+                      onChange={e => { setParcelasEditadas(true); setParcelas(prev => prev.map((x, i) => i === idx ? { ...x, descricao: e.target.value.toUpperCase() } : x)) }}
+                      className="flex-1 min-w-0 border border-slate-200 rounded-lg px-2 py-1.5 text-xs uppercase outline-none focus:ring-2 focus:ring-orange-300"
+                    />
+                    <button
+                      type="button"
+                      disabled={parcelas.length === 1}
+                      onClick={() => { setParcelasEditadas(true); setParcelas(prev => prev.filter((_, i) => i !== idx)) }}
+                      className="text-slate-300 hover:text-red-500 disabled:opacity-30 shrink-0"
+                      title="Remover parcela"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                <div className={`flex justify-end gap-2 text-[11px] font-semibold ${parcelasDivergem ? 'text-red-600' : 'text-slate-400'}`}>
+                  <span>Soma {fmt(somaParcelas)}</span>
+                  <span>· Total {fmt(total)}</span>
+                  {parcelasDivergem && <span>— difere do total</span>}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Meio de pagamento */}
           <div className="grid grid-cols-2 gap-3">
