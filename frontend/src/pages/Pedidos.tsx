@@ -1182,7 +1182,9 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
   }
 
   const handleSubmit = async () => {
-    if (files.length === 0 && !temNF) { setErro('Anexe a Nota Fiscal, Boleto ou Doc Financeiro para continuar.'); return }
+    // Adiantamento e pago antes do documento existir — a NF entra depois, no
+    // recebimento. Os demais pedidos continuam exigindo.
+    if (files.length === 0 && !temNF && (pedido as any).tipo_pedido !== 'adiantamento_fornecedor') { setErro('Anexe a Nota Fiscal, Boleto ou Doc Financeiro para continuar.'); return }
     for (const en of files) {
       if (!TIPOS_CONFERE_FORNECEDOR.includes(en.tipo)) continue
       if (en.validando) { setErro('Aguarde a conferência do fornecedor dos documentos.'); return }
@@ -2883,7 +2885,7 @@ function DetailModal({
               </>
             )}
             {podeReceber && (
-              <button onClick={() => (temNFAnexada ? onReceber(pedido) : setShowAvisoSemNF(true))} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-600 text-white border border-teal-700 hover:bg-teal-700 transition-all shadow-sm">
+              <button onClick={() => ((temNFAnexada || (pedido as any).tipo_pedido === 'adiantamento_fornecedor') ? onReceber(pedido) : setShowAvisoSemNF(true))} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-600 text-white border border-teal-700 hover:bg-teal-700 transition-all shadow-sm">
                 <Package size={16} /> {parcial ? 'Receber Restante' : 'Confirmar Recebimento'}
               </button>
             )}

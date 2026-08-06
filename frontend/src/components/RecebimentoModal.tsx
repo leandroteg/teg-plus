@@ -182,6 +182,10 @@ export default function RecebimentoModal({
     setItens(prev => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)))
   }
 
+  // Adiantamento paga antes da entrega: a NF so existe depois. Exigir aqui
+  // travava o pedido em Emitido para sempre (caso PC-202608-00045).
+  const isAdiantamento = (pedido as any).tipo_pedido === 'adiantamento_fornecedor'
+
   const handleSubmit = async () => {
     if (qtdComRecebimento === 0) {
       setErro('Informe a quantidade recebida em pelo menos 1 item.')
@@ -191,7 +195,7 @@ export default function RecebimentoModal({
       setErro('Selecione a Base / Almoxarifado de destino do recebimento.')
       return
     }
-    if (!nfNumero.trim()) {
+    if (!nfNumero.trim() && !isAdiantamento) {
       setErro('Informe o numero da Nota Fiscal (necessaria para liberar o pagamento).')
       return
     }
@@ -307,7 +311,8 @@ export default function RecebimentoModal({
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                     <FileText size={12} className="inline mr-1 -mt-0.5" />
-                    Nota Fiscal <span className="text-red-500">*</span>
+                    Nota Fiscal {!isAdiantamento && <span className="text-red-500">*</span>}
+                    {isAdiantamento && <span className="ml-1 text-[10px] font-normal text-amber-600">(adiantamento: a NF vem depois — informe quando chegar)</span>}
                   </label>
                   <UpperInput
                     value={nfNumero}
