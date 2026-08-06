@@ -8,7 +8,7 @@ import {
   ClipboardList, ShieldCheck, BoxIcon, ArchiveIcon,
   Building2, Link2, RefreshCw, UserPlus,
   Tag, Briefcase, Hash, Calendar, Receipt, CheckCircle2, ChevronDown, ChevronUp,
-  ShoppingCart, Pencil,
+  ShoppingCart, Pencil, Info, Store,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import jsPDF from 'jspdf'
@@ -27,6 +27,7 @@ import {
 } from '../hooks/usePedidos'
 import { useCadFornecedores } from '../hooks/useCadastros'
 import { useFornecedorById } from '../hooks/useFinanceiro'
+import { useRecebimentosPedido } from '../hooks/useRecebimento'
 import {
   DadosPagamentoFields,
   DADOS_PAGAMENTO_VAZIO,
@@ -61,6 +62,7 @@ import { AnexoReferencia } from '../components/AnexoReferencia'
 import CancelarPedidoControl from '../components/CancelarPedidoControl'
 import PedidoDiretoModal from '../components/PedidoDiretoModal'
 import { validarDocFornecedorPedido, fmtCnpj, type ValidacaoDocFornecedor } from '../utils/validarDocFornecedor'
+import { imprimirTermoAdiantamentoFornecedor } from '../utils/termoAdiantamentoFornecedor'
 import type { Cotacao, Pedido } from '../types'
 import type { Fornecedor } from '../types/financeiro'
 
@@ -997,6 +999,28 @@ function CompartilharModal({ pedido, onClose, dark }: { pedido: Pedido; onClose:
             <Download size={16} className="flex-shrink-0" />
             <span>Baixar / Imprimir PDF</span>
           </button>
+          {(pedido as any).tipo_pedido === 'adiantamento_fornecedor' && (
+            <button
+              onClick={() => imprimirTermoAdiantamentoFornecedor({
+                numero_pedido: pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase(),
+                fornecedor_nome: pedido.fornecedor_nome,
+                fornecedor_id: (pedido as any).fornecedor_id,
+                valor_total: pedido.valor_total ?? 0,
+                itens: (pedido as any).itens_direto ?? null,
+                justificativa: (pedido as any).justificativa_sem_cotacao,
+                observacoes: pedido.observacoes,
+                centro_custo: (pedido as any).centro_custo,
+                data_pedido: pedido.data_pedido,
+                data_prevista_entrega: pedido.data_prevista_entrega,
+                data_vencimento: (pedido as any).data_vencimento,
+                comprador_nome: pedido.comprador?.nome ?? pedido.criado_por_nome,
+              }, pedido.criado_por_nome)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-semibold hover:bg-amber-100 transition-colors"
+            >
+              <FileText size={16} className="flex-shrink-0" />
+              <span>Imprimir Termo de Adiantamento</span>
+            </button>
+          )}
           <button onClick={handleWhatsApp} disabled={sharing} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-semibold hover:bg-green-100 transition-colors disabled:opacity-60">
             {sharing ? <Loader2 size={16} className="flex-shrink-0 animate-spin" /> : <MessageCircle size={16} className="flex-shrink-0" />}
             <span>{sharing ? 'Gerando PDF...' : 'Compartilhar no WhatsApp'}</span>
@@ -1061,6 +1085,23 @@ function ValidacaoFornecedorBadge({ validacao, validando }: { validacao: Validac
     )
   }
   if (validacao.status === 'sem_cadastro') {
+    // Marketplace: divergir do CNPJ do pedido é o esperado — a nota é do
+    // vendedor do anúncio. Mostra os CNPJs lidos para ajudar a achar o emitente.
+    if (validacao.ehMarketplace) {
+      return (
+        <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-[11px] text-sky-700">
+          <Info size={13} className="flex-shrink-0 mt-0.5" />
+          <span>
+            Compra em marketplace (<b>{validacao.fornecedorNome}</b>) — a NF vem do vendedor, com outro CNPJ.
+            {validacao.cnpjsDocumento.length > 0 && (
+              <> CNPJs lidos no arquivo: {validacao.cnpjsDocumento.slice(0, 4).map(fmtCnpj).join(', ')}
+                {validacao.cnpjsDocumento.length > 4 ? '…' : ''}.</>
+            )}
+            {' '}Informe o emitente no recebimento para a conferência valer.
+          </span>
+        </div>
+      )
+    }
     return (
       <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5 text-slate-400" />
@@ -2115,6 +2156,7 @@ function DetailModal({
   // CNPJ/CPF do fornecedor para conferir contra a NF sem sair da tela. Pedido
   // guarda só o nome; o documento mora no cadastro mestre.
   const { data: fornecedorCadastro } = useFornecedorById(pedido.fornecedor_id)
+  const { data: recebimentosDoPedido } = useRecebimentosPedido(pedido.id)
   const [confirmando, setConfirmando] = useState(false)
   const [showEmitirModal, setShowEmitirModal] = useState(false)
   const [showFornecedorCadastroModal, setShowFornecedorCadastroModal] = useState(false)
@@ -2254,6 +2296,15 @@ function DetailModal({
     return porNome?.cnpj ? formatCpfCnpj(porNome.cnpj) : null
   }, [fornecedorCadastro, fornecedorAtivo, fornecedoresAtivos, pedido.fornecedor_nome])
 
+  // Emitentes das notas ja recebidas. So aparece quando difere do fornecedor do
+  // pedido — em compra normal repetir o mesmo nome duas vezes seria ruido.
+  const emitentesNF = useMemo(
+    () => (recebimentosDoPedido ?? [])
+      .filter(r => r.emitente_nome && r.emitente_id !== pedido.fornecedor_id)
+      .map(r => ({ nf: r.nf_numero ?? '', nome: r.emitente_nome ?? '', cnpj: r.emitente_cnpj ?? '' })),
+    [recebimentosDoPedido, pedido.fornecedor_id],
+  )
+
   // Parcelas geradas na emissao (cmp_pedidos.parcelas_preview). Ate agora so
   // apareciam no PDF/impressao — na tela ficava so o "4X", sem datas nem valores.
   const parcelasPedido = pedido.parcelas_preview ?? []
@@ -2344,6 +2395,20 @@ function DetailModal({
               <p className={`font-semibold ${txt}`}>{pedido.fornecedor_nome}</p>
               {fornecedorDoc && (
                 <p className={`font-mono text-[11px] mt-0.5 ${sub}`}>{fornecedorDoc}</p>
+              )}
+              {/* Marketplace: quem vendeu nao e quem emitiu a nota (mig 244) */}
+              {emitentesNF.length > 0 && (
+                <div className="mt-1 space-y-0.5">
+                  {emitentesNF.map((e, i) => (
+                    <p key={i} className="text-[11px] text-sky-600 flex items-start gap-1">
+                      <Store size={10} className="shrink-0 mt-0.5" />
+                      <span>
+                        NF {e.nf || 's/n'} emitida por <b>{e.nome}</b>
+                        {e.cnpj ? <span className="font-mono"> · {e.cnpj}</span> : null}
+                      </span>
+                    </p>
+                  ))}
+                </div>
               )}
             </div>
             <div>
