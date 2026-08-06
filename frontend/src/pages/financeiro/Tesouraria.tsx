@@ -473,6 +473,11 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
         descricao: item.descricao || item.numero_documento || 'Conta a pagar do sistema',
         valor: item.valor_original - (item.valor_pago || 0),
         valorOriginal: item.valor_original,
+        // O que realmente saiu do banco. Desconto, juros e multa (mig 203) fazem
+        // o debito divergir da face — comparar pela face impedia conciliar esses
+        // titulos, porque o botao so habilita quando os valores batem.
+        valorConciliacao: item.valor_pago && item.valor_pago > 0 ? item.valor_pago : item.valor_original,
+        ajuste: (item.valor_pago && item.valor_pago > 0 ? item.valor_pago : item.valor_original) - item.valor_original,
         data: item.data_vencimento,
         status: item.status,
       }))
@@ -486,6 +491,8 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
         descricao: item.descricao || item.numero_nf || 'Conta a receber do sistema',
         valor: item.valor_original - (item.valor_recebido || 0),
         valorOriginal: item.valor_original,
+        valorConciliacao: item.valor_recebido && item.valor_recebido > 0 ? item.valor_recebido : item.valor_original,
+        ajuste: (item.valor_recebido && item.valor_recebido > 0 ? item.valor_recebido : item.valor_original) - item.valor_original,
         data: item.data_vencimento,
         status: item.status,
       }))
@@ -506,7 +513,7 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
   )
 
   const somaSelecionada = useMemo(
-    () => titulosSelecionados.reduce((acc, t) => acc + t.valorOriginal, 0),
+    () => titulosSelecionados.reduce((acc, t) => acc + t.valorConciliacao, 0),
     [titulosSelecionados],
   )
 
@@ -555,7 +562,7 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
     let base = tipoEsperado
       ? sistemaPendente
           .filter((t) => t.tipo === tipoEsperado)
-          .map((t) => ({ ...t, _delta: movSelecionado ? Math.abs(t.valorOriginal - alvo) : 0 }))
+          .map((t) => ({ ...t, _delta: movSelecionado ? Math.abs(t.valorConciliacao - alvo) : 0 }))
       : sistemaPendente.map((t) => ({ ...t, _delta: 0 }))
 
     const q = buscaTitulo.trim().toLowerCase()
@@ -566,7 +573,7 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
 
     const dir = ordemAsc ? 1 : -1
     const ordenado = [...base].sort((a, b) => {
-      if (ordemTitulos === 'valor') return (a.valorOriginal - b.valorOriginal) * dir
+      if (ordemTitulos === 'valor') return (a.valorConciliacao - b.valorConciliacao) * dir
       if (ordemTitulos === 'titulo') return a.titulo.localeCompare(b.titulo, 'pt-BR') * dir
       // padrao
       if (movSelecionado) return a._delta - b._delta
@@ -809,7 +816,7 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
               const ativo = selTitulos.some((t) => t.id === item.id && t.tipo === item.tipo)
               // Destaca quem fecha o que ainda FALTA, nao o total da linha.
               const valorBate = movSelecionado && !ativo
-                ? Math.abs(item.valorOriginal - restante) < 0.01
+                ? Math.abs(item.valorConciliacao - restante) < 0.01
                 : false
               return (
                 <button
@@ -836,7 +843,16 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
                   </div>
                   <div className={`mt-2 flex items-center justify-between text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     <span>{new Date(item.data + 'T00:00:00').toLocaleDateString('pt-BR')} · {item.status}</span>
-                    <span className="font-bold">{fmtFull(item.valorOriginal)}</span>
+                    <span className="text-right">
+                      {/* Mostra o valor que saiu do banco — é ele que casa com o
+                          extrato. A face so aparece quando houve ajuste. */}
+                      <span className="font-bold">{fmtFull(item.valorConciliacao)}</span>
+                      {Math.abs(item.ajuste) >= 0.01 && (
+                        <span className={`block text-[10px] font-semibold ${item.ajuste > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                          face {fmtFull(item.valorOriginal)} {item.ajuste > 0 ? '+' : '−'} {fmtFull(Math.abs(item.ajuste))} {item.ajuste > 0 ? 'juros/multa' : 'desconto'}
+                        </span>
+                      )}
+                    </span>
                   </div>
                 </button>
               )
@@ -860,7 +876,7 @@ function ConciliacaoPanel({ movimentacoes, isDark }: {
             {movSelecionado && titulosSelecionados.length > 0 && <span className="mx-2 text-slate-400">×</span>}
             {titulosSelecionados.length === 1 && (
               <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                {titulosSelecionados[0].tipo} {titulosSelecionados[0].titulo} — {fmtFull(titulosSelecionados[0].valorOriginal)}
+                {titulosSelecionados[0].tipo} {titulosSelecionados[0].titulo} — {fmtFull(titulosSelecionados[0].valorConciliacao)}
               </span>
             )}
             {titulosSelecionados.length > 1 && (
