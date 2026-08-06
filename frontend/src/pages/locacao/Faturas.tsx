@@ -12,8 +12,10 @@ import {
   parseFaturasAnexos, uploadFaturaAnexo, faturaAnexoUrl,
   removerFaturaAnexoStorage, useExcluirFatura,
   useDescontosFatura, useCriarDescontoFatura, useRemoverDescontoFatura, uploadDescontoAnexo,
-  useSalvarFaturasEsperadas,
+  useSalvarFaturasEsperadas, useConcessionariaSugerida,
 } from '../../hooks/useLocacao'
+import { useCadFornecedores } from '../../hooks/useCadastros'
+import SearchableSelect from '../../components/SearchableSelect'
 import type { TipoFatura, StatusFatura, LocFatura, LocImovel } from '../../types/locacao'
 import { TIPO_FATURA_LABEL, STATUS_FATURA_LABEL } from '../../types/locacao'
 
@@ -147,6 +149,19 @@ function InlineEditForm({
   // nenhuma (foi o que a mig 191 teve que reparar em 9 faturas).
   const statusTravado = isEdit && ['enviado_pagamento', 'pago'].includes(fatura!.status)
 
+  // Concessionaria: agua/energia sao pagas a companhia, nao ao locador. Sem
+  // isso a CP nascia com o locador como favorecido e o dinheiro ia pro lugar
+  // errado. A RPC de envio ao financeiro barra agua/energia sem este campo.
+  const precisaConcessionaria = tipo === 'agua' || tipo === 'energia'
+  const { data: fornecedores = [] } = useCadFornecedores({ ativo: true })
+  const { data: sugestao } = useConcessionariaSugerida(imovel.id, tipo)
+  const [fornecedorId, setFornecedorId] = useState<string>((fatura as any)?.fornecedor_id ?? '')
+  // Sugere a ultima usada neste imovel+tipo, sem sobrescrever escolha do usuario.
+  useEffect(() => {
+    if (!precisaConcessionaria || fornecedorId || !sugestao?.id) return
+    setFornecedorId(sugestao.id)
+  }, [precisaConcessionaria, fornecedorId, sugestao?.id])
+
   // Anexo na própria linha: quem lança Energia/Água já está com o boleto na mão.
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [subindo, setSubindo] = useState(false)
@@ -157,6 +172,10 @@ function InlineEditForm({
 
   const handleSave = async () => {
     setErro(null)
+    if (precisaConcessionaria && !fornecedorId) {
+      setErro('Informe a concessionária: conta de água/energia é paga à companhia, não ao locador.')
+      return
+    }
     const parsedValor = valor ? parseFloat(valor) : undefined
     const comp = (vencimento ? vencimento.slice(0, 7) : competencia)
     try {
@@ -167,7 +186,8 @@ function InlineEditForm({
           valor_previsto: parsedValor,
           valor_confirmado: status === 'pago' ? parsedValor : undefined,
           status,
-        })
+          fornecedor_id: fornecedorId || null,
+        } as never)
         if (arquivo) {
           setSubindo(true)
           const path = await uploadFaturaAnexo(imovel.id, comp, arquivo)
@@ -184,7 +204,8 @@ function InlineEditForm({
           vencimento: vencimento || undefined,
           valor_previsto: parsedValor,
           status,
-        })
+          fornecedor_id: fornecedorId || null,
+        } as never)
         if (arquivo && nova?.id) {
           setSubindo(true)
           const path = await uploadFaturaAnexo(imovel.id, comp, arquivo)
@@ -213,6 +234,29 @@ function InlineEditForm({
             </label>
             <input type="date" value={vencimento} onChange={e => setVencimento(e.target.value)} className={inputCls} />
           </div>
+
+          {precisaConcessionaria && (
+            <div className="flex-1 min-w-[190px]">
+              <label className={`text-[10px] font-semibold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Concessionária *
+              </label>
+              <SearchableSelect
+                options={fornecedores.map(f => ({
+                  value: f.id,
+                  label: f.razao_social,
+                  description: f.cnpj ?? undefined,
+                }))}
+                value={fornecedorId}
+                onChange={setFornecedorId}
+                placeholder="Quem recebe o pagamento"
+              />
+              {sugestao?.id && fornecedorId === sugestao.id && (
+                <p className={`mt-1 text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Sugerido: última usada neste imóvel
+                </p>
+              )}
+            </div>
+          )}
           <div className="flex-1 min-w-[90px]">
             <label className={`text-[10px] font-semibold block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Valor (R$)

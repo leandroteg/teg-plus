@@ -407,6 +407,29 @@ export function useFaturas(filtros?: { imovel_id?: string; status?: StatusFatura
   })
 }
 
+// Concessionaria usada na ultima fatura do mesmo imovel+tipo. Serve de sugestao
+// no lancamento do mes: quem paga a agua deste imovel raramente muda.
+export function useConcessionariaSugerida(imovelId?: string, tipo?: string) {
+  return useQuery<{ id: string; razao_social: string } | null>({
+    queryKey: ['loc-concessionaria-sugerida', imovelId, tipo],
+    enabled: Boolean(imovelId && (tipo === 'agua' || tipo === 'energia')),
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('loc_faturas')
+        .select('fornecedor_id, fornecedor:cmp_fornecedores!fornecedor_id(id, razao_social)')
+        .eq('imovel_id', imovelId!)
+        .eq('tipo', tipo!)
+        .not('fornecedor_id', 'is', null)
+        .order('competencia', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const f = (data as any)?.fornecedor
+      return f ? { id: f.id, razao_social: f.razao_social } : null
+    },
+    staleTime: 60_000,
+  })
+}
+
 export function useCriarFatura() {
   const qc = useQueryClient()
   return useMutation({
