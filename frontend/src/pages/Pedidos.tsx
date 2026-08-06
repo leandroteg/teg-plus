@@ -39,6 +39,7 @@ import { useCotacoes } from '../hooks/useCotacoes'
 import {
   buildFornecedorPrefillFromCotacao,
   formatCNPJ,
+  formatCpfCnpj,
   getFornecedorPaymentMissingFields,
   hasFornecedorPaymentData,
   useFornecedorCotacaoResolver,
@@ -2109,6 +2110,9 @@ function DetailModal({
   const { perfil, isAdmin } = useAuth()
   const { data: basesLotacao = [] } = useBases()
   const { data: fornecedoresAtivos = [] } = useCadFornecedores({ ativo: true })
+  // CNPJ/CPF do fornecedor para conferir contra a NF sem sair da tela. Pedido
+  // guarda só o nome; o documento mora no cadastro mestre.
+  const { data: fornecedorCadastro } = useFornecedorById(pedido.fornecedor_id)
   const [confirmando, setConfirmando] = useState(false)
   const [showEmitirModal, setShowEmitirModal] = useState(false)
   const [showFornecedorCadastroModal, setShowFornecedorCadastroModal] = useState(false)
@@ -2236,6 +2240,27 @@ function DetailModal({
       ? 'Vincule ou cadastre o fornecedor mestre antes de emitir o pedido.'
       : null
 
+  // Documento do fornecedor. Pedido emitido resolve por fornecedor_id; pedido
+  // ainda pendente usa o fornecedor que o resolver da cotacao apontou. Sobra o
+  // caso do pedido antigo sem fornecedor_id — ai casa pelo nome no cadastro.
+  const fornecedorDoc = useMemo(() => {
+    const doCadastro = fornecedorCadastro?.cnpj ?? fornecedorAtivo?.cnpj
+    if (doCadastro) return formatCpfCnpj(doCadastro)
+    const nome = pedido.fornecedor_nome?.trim().toUpperCase()
+    if (!nome) return null
+    const porNome = fornecedoresAtivos.find(f => f.razao_social?.trim().toUpperCase() === nome)
+    return porNome?.cnpj ? formatCpfCnpj(porNome.cnpj) : null
+  }, [fornecedorCadastro, fornecedorAtivo, fornecedoresAtivos, pedido.fornecedor_nome])
+
+  // Parcelas geradas na emissao (cmp_pedidos.parcelas_preview). Ate agora so
+  // apareciam no PDF/impressao — na tela ficava so o "4X", sem datas nem valores.
+  const parcelasPedido = pedido.parcelas_preview ?? []
+  const somaParcelas = parcelasPedido.reduce((acc, p) => acc + Number(p.valor ?? 0), 0)
+  // Divergencia entre a soma das parcelas e o total do pedido significa parcela
+  // editada depois da emissao ou rateio manual — quem confere precisa ver.
+  const parcelasDivergem = parcelasPedido.length > 0
+    && Math.abs(somaParcelas - Number(pedido.valor_total ?? 0)) > 0.01
+
   const confirmarEntrega = async () => {
     setConfirmando(true)
     try {
@@ -2315,6 +2340,9 @@ function DetailModal({
             <div>
               <span className={sub}>Fornecedor</span>
               <p className={`font-semibold ${txt}`}>{pedido.fornecedor_nome}</p>
+              {fornecedorDoc && (
+                <p className={`font-mono text-[11px] mt-0.5 ${sub}`}>{fornecedorDoc}</p>
+              )}
             </div>
             <div>
               <span className={sub}>Valor Total</span>
@@ -2386,10 +2414,40 @@ function DetailModal({
                 <p className={`font-semibold font-mono ${txt}`}>{pedido.nf_numero}</p>
               </div>
             )}
-            {(pedido as any).condicao_pagamento && (
-              <div>
+            {((pedido as any).condicao_pagamento || parcelasPedido.length > 0) && (
+              <div className={parcelasPedido.length > 0 ? 'col-span-2' : ''}>
                 <span className={sub}>Condição de Pagamento</span>
-                <p className={`font-semibold ${txt}`}>{(pedido as any).condicao_pagamento}</p>
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <p className={`font-semibold ${txt}`}>
+                    {(pedido as any).condicao_pagamento || `${parcelasPedido.length}x`}
+                  </p>
+                  {parcelasPedido.length > 0 && (
+                    <span className={`text-[10px] ${sub}`}>
+                      {parcelasPedido.length} {parcelasPedido.length === 1 ? 'parcela' : 'parcelas'} · {fmt(somaParcelas)}
+                    </span>
+                  )}
+                </div>
+                {parcelasPedido.length > 0 && (
+                  <div className={`mt-1.5 rounded-lg border divide-y ${dark ? 'border-white/10 divide-white/10' : 'border-slate-200 divide-slate-100'}`}>
+                    {parcelasPedido.map((p, i) => (
+                      <div key={p.numero ?? i} className="flex items-center justify-between gap-3 px-2.5 py-1.5">
+                        <span className={`text-[11px] ${sub}`}>
+                          {p.numero ?? i + 1}/{parcelasPedido.length}
+                        </span>
+                        <span className={`text-[11px] flex-1 truncate ${txt}`}>
+                          {fmtDataISO(p.data_vencimento)}
+                        </span>
+                        <span className="text-[11px] font-semibold text-teal-500">{fmt(Number(p.valor ?? 0))}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {parcelasDivergem && (
+                  <p className="text-[10px] text-amber-500 mt-1 flex items-center gap-1">
+                    <AlertTriangle size={10} className="shrink-0" />
+                    Soma das parcelas difere do total do pedido ({fmt(pedido.valor_total)})
+                  </p>
+                )}
               </div>
             )}
             {liberadoEm && (
