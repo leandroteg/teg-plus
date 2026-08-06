@@ -418,6 +418,19 @@ const fmtDate = (d?: string) => d ? new Date(d.includes('T') ? d : d + 'T00:00:0
 // original de cada item, devolvendo o preco unitario efetivo por item. Quando a cotacao
 // negocia so o total (sem precos por item), evita que a tabela de itens exiba o preco
 // inicial enquanto o cabecalho mostra o negociado.
+// Base de comparacao dos itens: o total do pedido MENOS o que nao e produto.
+// valor_total = produtos + frete + despesas - desconto, entao para saber quanto
+// vale a linha de produtos e preciso desfazer esses tres. Sem isso o desconto
+// era rateado nos unitarios E exibido no quadro embaixo — contado duas vezes
+// (PC-202608-00035: itens gravados a 40,00 apareciam a 36,77, e ainda assim o
+// quadro dizia "Produtos 790,00 - Desconto 63,80").
+function baseProdutosDoPedido(pedido: Pedido): number {
+  return (pedido.valor_total ?? 0)
+    - (Number((pedido as any).valor_frete) || 0)
+    - (Number((pedido as any).valor_despesas) || 0)
+    + (Number((pedido as any).valor_desconto) || 0)
+}
+
 function calcUnitariosEfetivos<T extends { quantidade: number; valor_unitario_estimado: number }>(
   itens: T[],
   valorTotalNegociado?: number | null,
@@ -450,7 +463,7 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
       }))
   const parcelas = pedido.parcelas_preview ?? []
 
-  const unitariosHtml = calcUnitariosEfetivos(itens, pedido.valor_total)
+  const unitariosHtml = calcUnitariosEfetivos(itens, baseProdutosDoPedido(pedido))
   const itensHtml = itens.length > 0 ? `
     <div class="section">
       <div class="section-title">Itens do Pedido</div>
@@ -753,7 +766,7 @@ async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DARK)
-    const unitariosPdf = calcUnitariosEfetivos(itens, pedido.valor_total)
+    const unitariosPdf = calcUnitariosEfetivos(itens, baseProdutosDoPedido(pedido))
     itens.forEach((item, i) => {
       if (y > 265) { doc.addPage(); y = M }
       const unit = unitariosPdf[i]
@@ -2629,7 +2642,7 @@ function DetailModal({
                   natureza: 'produto',
                 }))
             if (todos.length === 0) return null
-            const unitariosEf = calcUnitariosEfetivos(todos, pedido.valor_total)
+            const unitariosEf = calcUnitariosEfetivos(todos, baseProdutosDoPedido(pedido))
             const todosEf = todos.map((it, i) => ({ ...it, valor_unitario_efetivo: unitariosEf[i] }))
             const produtos = todosEf.filter(i => (i.natureza ?? 'produto') === 'produto')
             const servicos = todosEf.filter(i => i.natureza === 'servico')
