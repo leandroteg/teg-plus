@@ -1304,6 +1304,9 @@ function ImovelFaturasModal({
                     status_invalido: 'Status fora de previsto/lançado',
                     sem_valor: 'Sem valor',
                     imovel_inativo: 'Imóvel inativo ou em saída',
+                    // Sem rótulo, o código cru aparecia no alerta e ninguém
+                    // entendia por que a fatura não chegou ao Financeiro.
+                    sem_concessionaria: 'Informe a concessionária: água/energia é paga à companhia, não ao locador',
                   }
                   const detalhe = r.puladas > 0 && r.motivos?.length
                     ? '\n\nMotivos das puladas:\n' + r.motivos
