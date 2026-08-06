@@ -66,7 +66,7 @@ import type { Fornecedor } from '../types/financeiro'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type PipelineTab = 'pendente' | 'emitido' | 'entregue' | 'encerrado' | 'cancelado'
-type SortField = 'data' | 'valor' | 'fornecedor'
+type SortField = 'data' | 'vencimento' | 'valor' | 'fornecedor'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
 type PedidoListItem = Pedido & {
@@ -2734,24 +2734,38 @@ function DetailModal({
             </div>
           )}
 
-          {/* Impostos (NF de Produto + NFS-e conforme natureza dos itens) */}
-          {!pending && (pedido.requisicao?.itens ?? []).length > 0 && (() => {
-            const todos = pedido.requisicao!.itens!
-            const temP = todos.some(i => (i.natureza ?? 'produto') === 'produto')
-            const temS = todos.some(i => i.natureza === 'servico')
+          {/* Impostos (NF de Produto + NFS-e conforme natureza dos itens).
+              Pedido Direto (sem RC) usa itens_direto — sem isto a seção nem
+              aparecia no Extraordinário e imposto ficava sem onde lançar. */}
+          {!pending && (() => {
+            const rcItens = pedido.requisicao?.itens ?? []
+            const todos = rcItens.length > 0
+              ? rcItens.map(i => ({
+                  requisicaoItemId: (i as any).id,
+                  descricao: i.descricao,
+                  quantidade: i.quantidade,
+                  valorUnitario: i.valor_unitario_estimado ?? 0,
+                  natureza: (i as any).natureza,
+                }))
+              : ((pedido as any).itens_direto ?? []).map((i: any) => ({
+                  requisicaoItemId: undefined,
+                  descricao: i.descricao,
+                  quantidade: i.quantidade,
+                  // Item direto não tem natureza cadastrada: serviço é inferido
+                  // pela descrição, o resto conta como produto.
+                  valorUnitario: i.valor_unitario ?? 0,
+                  natureza: /SERVIC|M[ÃA]O DE OBRA|LOCA[ÇC][ÃA]O/i.test(i.descricao ?? '') ? 'servico' as const : 'produto' as const,
+                }))
+            if (todos.length === 0) return null
+            const temP = todos.some((i: any) => (i.natureza ?? 'produto') === 'produto')
+            const temS = todos.some((i: any) => i.natureza === 'servico')
             return (
               <PedidoImpostosSection
                 pedidoId={pedido.id}
                 temProduto={temP}
                 temServico={temS}
                 dark={dark}
-                itens={todos.map(i => ({
-                  requisicaoItemId: (i as any).id,
-                  descricao: i.descricao,
-                  quantidade: i.quantidade,
-                  valorUnitario: i.valor_unitario_estimado ?? 0,
-                  natureza: i.natureza,
-                }))}
+                itens={todos}
               />
             )
           })()}
@@ -3272,6 +3286,13 @@ export default function Pedidos() {
       if (sortField === 'data') {
         return dir * ((a.data_pedido ?? '').localeCompare(b.data_pedido ?? ''))
       }
+      if (sortField === 'vencimento') {
+        // Sem vencimento vai pro fim nas duas direcoes — data vazia ordenada
+        // como string iria pro topo no asc e esconderia o que interessa.
+        const av = a.data_vencimento || '9999-12-31'
+        const bv = b.data_vencimento || '9999-12-31'
+        return dir * av.localeCompare(bv)
+      }
       if (sortField === 'valor') {
         return dir * ((a.valor_total ?? 0) - (b.valor_total ?? 0))
       }
@@ -3368,8 +3389,8 @@ export default function Pedidos() {
         </div>
 
         {/* Sort buttons */}
-        {(['data', 'valor', 'fornecedor'] as SortField[]).map(f => {
-          const labels: Record<SortField, string> = { data: 'Data', valor: 'Valor', fornecedor: 'Fornecedor' }
+        {(['data', 'vencimento', 'valor', 'fornecedor'] as SortField[]).map(f => {
+          const labels: Record<SortField, string> = { data: 'Data', vencimento: 'Venc.', valor: 'Valor', fornecedor: 'Fornecedor' }
           const active = sortField === f
           return (
             <button
