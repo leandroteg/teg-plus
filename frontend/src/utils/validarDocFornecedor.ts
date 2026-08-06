@@ -49,7 +49,9 @@ export function extrairCnpjs(texto: string): string[] {
   const achados = new Set<string>()
 
   // CNPJ com máscara (tolerante a espaços que o extrator insere entre grupos)
-  const reMask = /\b(\d{2})[.\s]?(\d{3})[.\s]?(\d{3})\s?\/\s?(\d{4})\s?-?\s?(\d{2})\b/g
+  // [-.]? no DV: ha NF impressa com ponto no lugar do hifen (34.641.393/0001.34
+  // da Gaplan) — com -? estrito o CNPJ ficava invisivel e acusava divergencia.
+  const reMask = /\b(\d{2})[.\s]?(\d{3})[.\s]?(\d{3})\s?\/\s?(\d{4})\s?[-.]?\s?(\d{2})\b/g
   let m: RegExpExecArray | null
   while ((m = reMask.exec(texto)) !== null) achados.add(m.slice(1).join(''))
 

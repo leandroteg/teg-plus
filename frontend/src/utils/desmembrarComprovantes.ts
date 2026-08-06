@@ -69,8 +69,8 @@ function documentosDoTexto(texto: string): Set<string> {
   const compacto = texto.replace(/\s+/g, '')
   const achados = new Set<string>()
   // 14 dígitos (CNPJ) e 11 (CPF), com ou sem máscara
-  for (const m of compacto.matchAll(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/g)) achados.add(soDigitos(m[0]))
-  for (const m of compacto.matchAll(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/g)) achados.add(soDigitos(m[0]))
+  for (const m of compacto.matchAll(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}[-.]?\d{2}/g)) achados.add(soDigitos(m[0]))
+  for (const m of compacto.matchAll(/\d{3}\.?\d{3}\.?\d{3}[-.]?\d{2}/g)) achados.add(soDigitos(m[0]))
   return achados
 }
 
