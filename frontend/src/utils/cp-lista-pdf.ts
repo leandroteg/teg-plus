@@ -33,6 +33,16 @@ export interface LinhaRelatorioCP {
   valorAPagar: number
 }
 
+/**
+ * Bloco com subtotal próprio. Nas abas de lote a tela mostra lotes, não
+ * títulos: o papel útil é a relação de cada lote com os seus itens.
+ */
+export interface GrupoRelatorioCP {
+  titulo: string
+  subtitulo?: string
+  linhas: LinhaRelatorioCP[]
+}
+
 export interface RelatorioCPMeta {
   /** Aba do pipeline: Previstos, Confirmados, Em Aprovação... */
   etapa: string
@@ -40,6 +50,16 @@ export interface RelatorioCPMeta {
   filtros: string[]
   /** Só quando o usuário exportou uma seleção manual. */
   selecao?: boolean
+}
+
+/** Lista corrida (abas de título) ou blocos por lote (abas de lote). */
+export type ConteudoRelatorioCP = LinhaRelatorioCP[] | GrupoRelatorioCP[]
+
+function normalizarGrupos(conteudo: ConteudoRelatorioCP): GrupoRelatorioCP[] {
+  if (conteudo.length === 0) return [{ titulo: '', linhas: [] }]
+  return 'linhas' in conteudo[0]
+    ? conteudo as GrupoRelatorioCP[]
+    : [{ titulo: '', linhas: conteudo as LinhaRelatorioCP[] }]
 }
 
 async function loadLogoBase64(url: string): Promise<string | null> {
@@ -109,7 +129,7 @@ function ellipsis(doc: jsPDF, texto: string, larguraMm: number) {
 }
 
 function buildDoc(
-  linhas: LinhaRelatorioCP[],
+  conteudo: ConteudoRelatorioCP,
   meta: RelatorioCPMeta,
   empresa: EmpresaData,
   logo: string | null,
@@ -117,6 +137,8 @@ function buildDoc(
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   let y = 0
 
+  const grupos = normalizarGrupos(conteudo)
+  const linhas = grupos.flatMap(g => g.linhas)
   const total = linhas.reduce((s, l) => s + l.valorAPagar, 0)
   const vencidos = linhas.filter(l => l.urgencia === 'overdue')
   const venceHoje = linhas.filter(l => l.urgencia === 'today')
@@ -179,54 +201,80 @@ function buildDoc(
   }
 
   y += 1
-  desenharColunas()
+  const porGrupo = grupos.some(g => g.titulo)
+  if (!porGrupo) desenharColunas()
+
+  /** Faixa de abertura do bloco — nas abas de lote, o cabeçalho de cada lote. */
+  const desenharFaixaGrupo = (g: GrupoRelatorioCP) => {
+    if (y + 20 > H - 16) { doc.addPage(); desenharCabecalho() }
+    fundo(doc, [241, 245, 249])
+    doc.roundedRect(M, y - 3.5, CW, 7, 1.5, 1.5, 'F')
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); txt(doc, DARK)
+    doc.text(ellipsis(doc, g.titulo, CW - 70), M + 2, y + 1)
+    const subtotal = g.linhas.reduce((s, l) => s + l.valorAPagar, 0)
+    doc.text(
+      `${g.linhas.length} título${g.linhas.length !== 1 ? 's' : ''} · ${fmtMoeda(subtotal)}`,
+      W - M - 2, y + 1, { align: 'right' },
+    )
+    y += 8
+    if (g.subtitulo) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); txt(doc, MID)
+      doc.text(ellipsis(doc, g.subtitulo, CW), M + 2, y)
+      y += 4
+    }
+    desenharColunas()
+  }
 
   // ── Linhas ──
-  for (const l of linhas) {
-    // Descrição quebra linha em vez de cortar: observações longas (rastro de
-    // migração, instruções de pagamento) perdiam justamente o final útil.
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8)
-    const descLinhas = (doc.splitTextToSize(l.descricao || '—', COLS[2].w - 2.5) as string[]).slice(0, 5)
-    const temAjuste = Math.abs(l.valorAPagar - l.valorOriginal) > 0.001
-    const alturaLinha = Math.max(temAjuste ? 6 : 5, descLinhas.length * 2.9 + 2.1)
-    if (y + alturaLinha > H - 16) novaPagina()
+  for (const grupo of grupos) {
+    if (porGrupo) desenharFaixaGrupo(grupo)
+    for (const l of grupo.linhas) {
+      // Descrição quebra linha em vez de cortar: observações longas (rastro de
+      // migração, instruções de pagamento) perdiam justamente o final útil.
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8)
+      const descLinhas = (doc.splitTextToSize(l.descricao || '—', COLS[2].w - 2.5) as string[]).slice(0, 5)
+      const temAjuste = Math.abs(l.valorAPagar - l.valorOriginal) > 0.001
+      const alturaLinha = Math.max(temAjuste ? 6 : 5, descLinhas.length * 2.9 + 2.1)
+      if (y + alturaLinha > H - 16) novaPagina()
 
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); txt(doc, LIGHT)
-    doc.text(ellipsis(doc, l.empresa || '—', COLS[0].w), X.empresa, y)
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); txt(doc, LIGHT)
+      doc.text(ellipsis(doc, l.empresa || '—', COLS[0].w), X.empresa, y)
 
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); txt(doc, DARK)
-    const selos = l.selos?.length ? `  [${l.selos.join(' · ')}]` : ''
-    doc.text(ellipsis(doc, `${l.fornecedor}${selos}`, COLS[1].w), X.fornecedor, y)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); txt(doc, DARK)
+      const selos = l.selos?.length ? `  [${l.selos.join(' · ')}]` : ''
+      doc.text(ellipsis(doc, `${l.fornecedor}${selos}`, COLS[1].w), X.fornecedor, y)
 
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8); txt(doc, MID)
-    doc.text(descLinhas, X.descricao, y, { lineHeightFactor: 1.25 })
-    doc.text(ellipsis(doc, l.obra || '—', COLS[3].w), X.obra, y)
-    doc.text(ellipsis(doc, l.origem || '—', COLS[4].w), X.origem, y)
-    doc.text(ellipsis(doc, l.centroCusto || '—', COLS[5].w), X.cc, y)
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8); txt(doc, MID)
+      doc.text(descLinhas, X.descricao, y, { lineHeightFactor: 1.25 })
+      doc.text(ellipsis(doc, l.obra || '—', COLS[3].w), X.obra, y)
+      doc.text(ellipsis(doc, l.origem || '—', COLS[4].w), X.origem, y)
+      doc.text(ellipsis(doc, l.centroCusto || '—', COLS[5].w), X.cc, y)
 
-    txt(doc, l.pedido ? TEAL : LIGHT)
-    doc.text(ellipsis(doc, l.pedido || '—', COLS[6].w), X.pedido, y)
+      txt(doc, l.pedido ? TEAL : LIGHT)
+      doc.text(ellipsis(doc, l.pedido || '—', COLS[6].w), X.pedido, y)
 
-    txt(doc, l.urgencia === 'overdue' ? RED : l.urgencia === 'today' ? AMBER : MID)
-    if (l.urgencia === 'overdue' || l.urgencia === 'today') doc.setFont('helvetica', 'bold')
-    doc.text(fmtData(l.vencimento), colRight('venc'), y, { align: 'right' })
+      txt(doc, l.urgencia === 'overdue' ? RED : l.urgencia === 'today' ? AMBER : MID)
+      if (l.urgencia === 'overdue' || l.urgencia === 'today') doc.setFont('helvetica', 'bold')
+      doc.text(fmtData(l.vencimento), colRight('venc'), y, { align: 'right' })
 
-    // Valor: com ajuste, a face do título vai riscada em cima do valor a pagar
-    if (temAjuste) {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5); txt(doc, LIGHT)
-      const bruto = fmtMoeda(l.valorOriginal)
-      doc.text(bruto, colRight('valor'), y - 2.4, { align: 'right' })
-      const larg = doc.getTextWidth(bruto)
-      linha(doc, LIGHT); doc.setLineWidth(0.15)
-      doc.line(colRight('valor') - larg, y - 3.2, colRight('valor'), y - 3.2)
+      // Valor: com ajuste, a face do título vai riscada em cima do valor a pagar
+      if (temAjuste) {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5); txt(doc, LIGHT)
+        const bruto = fmtMoeda(l.valorOriginal)
+        doc.text(bruto, colRight('valor'), y - 2.4, { align: 'right' })
+        const larg = doc.getTextWidth(bruto)
+        linha(doc, LIGHT); doc.setLineWidth(0.15)
+        doc.line(colRight('valor') - larg, y - 3.2, colRight('valor'), y - 3.2)
+      }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5)
+      txt(doc, l.urgencia === 'overdue' ? RED : DARK)
+      doc.text(fmtMoeda(l.valorAPagar), colRight('valor'), y, { align: 'right' })
+
+      y += alturaLinha
+      doc.setDrawColor(241, 245, 249); doc.setLineWidth(0.2)
+      doc.line(M, y - 2, W - M, y - 2)
     }
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5)
-    txt(doc, l.urgencia === 'overdue' ? RED : DARK)
-    doc.text(fmtMoeda(l.valorAPagar), colRight('valor'), y, { align: 'right' })
-
-    y += alturaLinha
-    doc.setDrawColor(241, 245, 249); doc.setLineWidth(0.2)
-    doc.line(M, y - 2, W - M, y - 2)
+    if (porGrupo) y += 4
   }
 
   // ── Total ──
@@ -253,19 +301,19 @@ function buildDoc(
 }
 
 export async function gerarRelatorioCPPdfBlob(
-  linhas: LinhaRelatorioCP[],
+  conteudo: ConteudoRelatorioCP,
   meta: RelatorioCPMeta,
 ): Promise<Blob> {
   const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
   const logo = await loadLogoBase64(empresa.logoUrl)
-  return buildDoc(linhas, meta, empresa, logo).output('blob')
+  return buildDoc(conteudo, meta, empresa, logo).output('blob')
 }
 
 export async function downloadRelatorioCPPdf(
-  linhas: LinhaRelatorioCP[],
+  conteudo: ConteudoRelatorioCP,
   meta: RelatorioCPMeta,
 ): Promise<void> {
-  const blob = await gerarRelatorioCPPdfBlob(linhas, meta)
+  const blob = await gerarRelatorioCPPdfBlob(conteudo, meta)
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

@@ -55,7 +55,7 @@ import CancelamentoDocControl from '../../components/financeiro/CancelamentoDocC
 import ImportarComprovantesModal from '../../components/financeiro/ImportarComprovantesModal'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras, useLookupEmpresas } from '../../hooks/useLookups'
 import { mapaEmpresaPagadora } from '../../utils/empresaCurta'
-import { downloadRelatorioCPPdf, type LinhaRelatorioCP } from '../../utils/cp-lista-pdf'
+import { downloadRelatorioCPPdf, type LinhaRelatorioCP, type GrupoRelatorioCP } from '../../utils/cp-lista-pdf'
 import {
   TIPOS_DOC_FINANCEIRO, rotuloCurtoDocFin,
   type TipoDocFinanceiro, type ArquivoFinanceiro,
@@ -5376,7 +5376,7 @@ export default function CPPipeline() {
     const filtros = [`Empresa: ${empresaLabel}`, `Vencimento: ${vencLabel}`, `Ordenado por: ${ordemLabel}`]
     if (busca.trim()) filtros.push(`Busca: "${busca.trim()}"`)
 
-    const linhas: LinhaRelatorioCP[] = toExport.map(cp => {
+    const linhaDoTitulo = (cp: ContaPagar): LinhaRelatorioCP => {
       const pedidoNum = cp.pedido?.numero_pedido || ''
       const selos: string[] = []
       if (cp.devolucao_motivo) selos.push('Devolvido')
@@ -5397,10 +5397,34 @@ export default function CPPipeline() {
         valorOriginal: Number(cp.valor_original ?? 0) || 0,
         valorAPagar: valorAPagarCP(cp),
       }
-    })
+    }
+
+    const linhas = toExport.map(linhaDoTitulo)
+
+    // Nas abas de lote a tela mostra lotes, não títulos: o papel sai como a
+    // relação de cada lote (número, aprovador, itens e subtotal) — é isso que
+    // se leva para assinatura/banco.
+    const porLote: LinhaRelatorioCP[] | GrupoRelatorioCP[] = isLoteStageTab
+      ? activeLotes
+        .map(sumario => ({
+          titulo: `${sumario.lote.numero_lote} · ${sumario.progressLabel}`,
+          subtitulo: [
+            `Criado por ${sumario.lote.criado_por}`,
+            sumario.lote.aprovador_nome ? `Aprovador: ${sumario.lote.aprovador_nome}` : null,
+            `${sumario.totalItems} item(ns) no lote · ${fmt(sumario.totalValue)}`,
+            sumario.excludedItems > 0 ? `${sumario.excludedItems} cancelado(s)` : null,
+          ].filter(Boolean).join('   ·   '),
+          linhas: sumario.currentItems
+            .filter(cp => selectedIds.size === 0 || selectedIds.has(cp.id))
+            .map(linhaDoTitulo),
+        }))
+        .filter(g => g.linhas.length > 0)
+      : linhas
+
+    if (porLote.length === 0) return
 
     try {
-      await downloadRelatorioCPPdf(linhas, {
+      await downloadRelatorioCPPdf(porLote, {
         etapa: stage?.label || activeTab,
         filtros,
         selecao: selectedIds.size > 0,
@@ -5887,7 +5911,9 @@ export default function CPPipeline() {
             }`}
             title={selectedIds.size > 0
               ? `Relatório PDF dos ${selectedIds.size} título(s) selecionado(s)`
-              : 'Relatório PDF desta lista (com os filtros aplicados)'}
+              : isLoteStageTab
+                ? 'Relatório PDF com a relação de cada lote desta aba'
+                : 'Relatório PDF desta lista (com os filtros aplicados)'}
           >
             <FileText size={13} />
             PDF
