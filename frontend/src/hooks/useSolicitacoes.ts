@@ -570,6 +570,36 @@ export function useMinutas(solicitacaoId: string | undefined) {
   })
 }
 
+/** Remove uma minuta anexada por engano. Só rascunho: a partir do momento em que
+ *  entra em revisão ou aprovação, virou peça do processo e não se apaga. */
+export function useExcluirMinuta() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (m: { id: string; solicitacao_id: string; arquivo_url?: string | null; status?: string | null }) => {
+      if (m.status && m.status !== 'rascunho') {
+        throw new Error('Só é possível excluir minuta em rascunho.')
+      }
+      const { error } = await supabase.from('con_minutas').delete().eq('id', m.id)
+      if (error) throw error
+      // o arquivo sai junto: minuta apagada sem remover o anexo deixa lixo no bucket.
+      // arquivo_url é a URL pública — o path do storage vem depois de /contratos-anexos/
+      if (m.arquivo_url) {
+        const marca = '/contratos-anexos/'
+        const i = m.arquivo_url.indexOf(marca)
+        if (i >= 0) {
+          const path = decodeURIComponent(m.arquivo_url.slice(i + marca.length).split('?')[0])
+          try { await supabase.storage.from('contratos-anexos').remove([path]) } catch { /* anexo já ausente */ }
+        }
+      }
+      return true
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['con-minutas', v.solicitacao_id] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacao', v.solicitacao_id] })
+    },
+  })
+}
+
 export function useCriarMinuta() {
   const qc = useQueryClient()
   return useMutation({

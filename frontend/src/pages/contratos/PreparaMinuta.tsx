@@ -6,7 +6,7 @@ import {
   ChevronRight, Clock, Tag, Building2, DollarSign, Calendar,
   Sparkles, ShieldAlert, Lightbulb, CheckCircle2, XCircle,
   AlertTriangle, ChevronDown, ChevronUp, Settings2, ToggleLeft, ToggleRight,
-  Loader2, Brain, Scale, FileSearch, FileUp, X, Wand2,
+  Loader2, Brain, Scale, FileSearch, FileUp, X, Wand2, Trash2,
   TrendingUp, ArrowRight, Shield, Edit3, FileDown, Target, Crown, Zap, RefreshCw,
   FileStack,
 } from 'lucide-react'
@@ -14,6 +14,7 @@ import {
   useSolicitacao,
   useMinutas,
   useCriarMinuta,
+  useExcluirMinuta,
   useAvancarEtapa,
   useAnalisarMinuta,
   useMelhorarMinuta,
@@ -1122,7 +1123,7 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
 
 // ── MinutaCard ───────────────────────────────────────────────────────────────
 
-function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando, melhorando, gerandoMinuta, melhorias, analiseLocal, autoExpand, onMelhoriasChange, pdfUrl, onEnviarAprovacao, enviandoAprovacao }: {
+function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando, melhorando, gerandoMinuta, melhorias, analiseLocal, autoExpand, onMelhoriasChange, pdfUrl, onEnviarAprovacao, enviandoAprovacao, onExcluir, excluindo }: {
   minuta: Minuta
   onAnalisar: (m: Minuta) => void
   onMelhorar: (m: Minuta) => void
@@ -1137,6 +1138,9 @@ function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando,
   pdfUrl?: string | null
   onEnviarAprovacao?: () => void
   enviandoAprovacao?: boolean
+  /** só vem preenchido quando a minuta ainda é rascunho */
+  onExcluir?: (m: Minuta) => void
+  excluindo?: boolean
 }) {
   const [showAnalise, setShowAnalise] = useState(false)
   const [showMelhorias, setShowMelhorias] = useState(false)
@@ -1174,9 +1178,22 @@ function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando,
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-bold text-slate-800 truncate">{minuta.titulo}</p>
-              <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 rounded-full px-2 py-0.5 shrink-0">
-                v{minuta.versao}
-              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 rounded-full px-2 py-0.5">
+                  v{minuta.versao}
+                </span>
+                {onExcluir && (
+                  <button
+                    onClick={() => onExcluir(minuta)}
+                    disabled={excluindo}
+                    title="Excluir esta minuta (anexada por engano)"
+                    className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-300
+                      hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-40"
+                  >
+                    {excluindo ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
@@ -1418,6 +1435,20 @@ export default function PreparaMinuta() {
   const qc = useQueryClient()
   const atualizarConfig = useAtualizarConfigAnalise()
   const uploadFile = useUploadMinutaFile()
+  const excluirMinuta = useExcluirMinuta()
+  const [excluindoId, setExcluindoId] = useState<string | null>(null)
+
+  // Trocar de modelo = apagar o rascunho errado e anexar o certo. Só rascunho:
+  // depois que entra em revisão a minuta virou peça do processo.
+  const handleExcluirMinuta = async (m: Minuta) => {
+    if (!window.confirm(`Excluir a minuta "${m.titulo}" (v${m.versao})? O arquivo anexado também será removido.`)) return
+    setExcluindoId(m.id)
+    try {
+      await excluirMinuta.mutateAsync({ id: m.id, solicitacao_id: id!, arquivo_url: m.arquivo_url, status: m.status })
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Não foi possível excluir a minuta.')
+    } finally { setExcluindoId(null) }
+  }
   const melhorarMinuta = useMelhorarMinuta()
   const gerarMinutaPDF = useGerarMinutaPDF()
   const gerarResumoAI = useGerarResumoAI()
@@ -2185,11 +2216,14 @@ export default function PreparaMinuta() {
         <div className="lg:col-span-2 space-y-4">
 
           {/* Biblioteca de Modelos */}
-          {modelosDisponiveis.length > 0 && !minutas?.length && (
+          {/* A biblioteca sumia assim que a 1a minuta era criada, e nao havia como trocar
+              de modelo. Fica visivel enquanto TUDO for rascunho: escolher outro e o
+              caminho normal de correcao, junto com o botao de excluir no card. */}
+          {modelosDisponiveis.length > 0 && (minutas ?? []).every(m => m.status === 'rascunho') && (
             <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-2xl p-5 border border-violet-100">
               <h3 className="text-sm font-bold text-violet-900 mb-3 flex items-center gap-2">
                 <FileStack size={16} className="text-violet-600" />
-                Biblioteca de Modelos — {GRUPO_CONTRATO_LABEL[solicitacao?.grupo_contrato as GrupoContrato] ?? ''}
+                {(minutas?.length ?? 0) > 0 ? 'Trocar modelo' : 'Biblioteca de Modelos'} — {GRUPO_CONTRATO_LABEL[solicitacao?.grupo_contrato as GrupoContrato] ?? ''}
               </h3>
               <div className="space-y-2">
                 {modelosDisponiveis.map(modelo => (
@@ -2476,6 +2510,8 @@ export default function PreparaMinuta() {
                   melhorias={melhoriasMap[m.id]}
                   analiseLocal={analiseMap[m.id]}
                   autoExpand={autoExpandId === m.id}
+                  onExcluir={m.status === 'rascunho' ? handleExcluirMinuta : undefined}
+                  excluindo={excluindoId === m.id}
                   onMelhoriasChange={handleMelhoriasChange}
                   pdfUrl={pdfUrlMap[m.id]}
                   onEnviarAprovacao={pdfUrlMap[m.id] ? handleAvancarResumo : undefined}
