@@ -32,7 +32,7 @@ import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise, 
 import { useModelosContrato } from '../../hooks/useContratos'
 import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 import { supabase } from '../../services/supabase'
-import { getEmpresa } from '../../services/empresa'
+import { getEmpresaById } from '../../services/empresa'
 import { jsPDF } from 'jspdf'
 import {
   buildResumoPayloadFromAnalise,
@@ -1419,6 +1419,23 @@ function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando,
 
 // ── Main Component ──────────────────────────────────────────────────────────────
 
+/** Baixa o logo da empresa e devolve data-URL pro jsPDF. Bucket publico; se
+ *  falhar (rede/CORS/empresa sem logo) o timbre sai so com o texto. */
+async function loadLogoBase64(url?: string): Promise<string | null> {
+  if (!url) return null
+  try {
+    const resp = await fetch(url)
+    if (!resp.ok) return null
+    const blob = await resp.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch { return null }
+}
+
 export default function PreparaMinuta() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
@@ -1714,7 +1731,7 @@ export default function PreparaMinuta() {
 
     setAvancando(true)
     try {
-    const empresaResumo = await getEmpresa()
+    const empresaResumo = await getEmpresaById(solicitacao.empresa_contratante_id)
 
     // Use the most recent minuta (final version) for the resumo
     const minutaFinal = [...minutas].sort((a, b) => b.versao - a.versao)[0]
@@ -1803,7 +1820,7 @@ export default function PreparaMinuta() {
     try {
       // ── Helper: build PDF from AI-generated structured text ──────────
       const buildPdfFromAi = async (mtRaw: MinutaTextoGerado) => {
-        const empresa = await getEmpresa()
+        const empresa = await getEmpresaById(solicitacao.empresa_contratante_id)
 
         // Portuguese ordinals for clause numbers (matches company template style)
         const ORDINALS = ['PRIMEIRA','SEGUNDA','TERCEIRA','QUARTA','QUINTA','SEXTA','SÉTIMA','OITAVA','NONA','DÉCIMA',
@@ -1841,25 +1858,41 @@ export default function PreparaMinuta() {
           if (y + need > ph - 22) { pdf.addPage(); y = 20 }
         }
 
-        // printText with word-wrap
+        // Texto corrido: quebra por paragrafo e justifica (menos a ultima linha
+        // de cada paragrafo, que justificada fica com buracos entre as palavras).
+        const gapPar = 3
         const printText = (text: string, fontSize: number, opts?: {
-          bold?: boolean; color?: [number,number,number]; indent?: number; align?: 'left'|'center'
+          bold?: boolean; color?: [number,number,number]; indent?: number
+          align?: 'left'|'center'; justify?: boolean
         }) => {
           pdf.setFont('helvetica', opts?.bold ? 'bold' : 'normal')
           pdf.setFontSize(fontSize)
           const col = opts?.color ?? [20, 20, 20]
           pdf.setTextColor(col[0], col[1], col[2])
           const ind = opts?.indent ?? 0
-          const lines = pdf.splitTextToSize(text, usable - ind)
-          for (const line of lines) {
-            ensureSpace(lineH + 1)
-            if (opts?.align === 'center') {
-              pdf.text(line, pw / 2, y, { align: 'center' })
-            } else {
-              pdf.text(line, mx + ind, y)
-            }
-            y += lineH
-          }
+          const larg = usable - ind
+
+          // A IA devolve o paragrafo ora com \n\n, ora com \n solto — normaliza
+          // pra nao virar uma linha por quebra do modelo.
+          const paragrafos = text.split(/\n\s*\n/)
+            .map(p => p.replace(/\s*\n\s*/g, ' ').trim())
+            .filter(Boolean)
+
+          paragrafos.forEach((par, pi) => {
+            if (pi > 0) y += gapPar
+            const lines: string[] = pdf.splitTextToSize(par, larg)
+            lines.forEach((line, li) => {
+              ensureSpace(lineH + 1)
+              if (opts?.align === 'center') {
+                pdf.text(line, pw / 2, y, { align: 'center' })
+              } else if (opts?.justify && li < lines.length - 1 && line.trim().includes(' ')) {
+                pdf.text(line, mx + ind, y, { align: 'justify', maxWidth: larg })
+              } else {
+                pdf.text(line, mx + ind, y)
+              }
+              y += lineH
+            })
+          })
         }
 
         const hr = (thick = false) => {
@@ -1870,28 +1903,49 @@ export default function PreparaMinuta() {
           y += thick ? 4 : 3
         }
 
-        // ── LETTERHEAD ────────────────────────────────────────────────
-        // Company name top-right (small, subtle)
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7); pdf.setTextColor(100, 100, 100)
-        pdf.text(empresa.razao ?? 'TEG UNIÃO', pw - mx, 14, { align: 'right' })
-        if (empresa.cnpj) {
-          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6.5); pdf.setTextColor(140, 140, 140)
-          pdf.text(`CNPJ: ${empresa.cnpj}`, pw - mx, 18, { align: 'right' })
+        // ── TIMBRE ────────────────────────────────────────────────────
+        // Logo da empresa CONTRATANTE a esquerda, identificacao a direita.
+        // Sem logo (ou se o download falhar), o bloco de texto sobe pro topo.
+        const topoTexto = 12
+        const logoB64 = await loadLogoBase64(empresa.logoUrl)
+        if (logoB64) {
+          try {
+            // encaixa o logo numa caixa de 34x15mm sem distorcer
+            const props = pdf.getImageProperties(logoB64)
+            const esc = Math.min(34 / props.width, 15 / props.height)
+            pdf.addImage(logoB64, 'PNG', mx, 10, props.width * esc, props.height * esc)
+          } catch { /* logo invalido: segue so com o texto */ }
         }
 
-        // ── TITLE ─────────────────────────────────────────────────────
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7.5); pdf.setTextColor(70, 70, 70)
+        pdf.text(empresa.razao ?? 'TEG UNIÃO', pw - mx, topoTexto, { align: 'right' })
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6.5); pdf.setTextColor(140, 140, 140)
+        let yTimbre = topoTexto + 3.6
+        if (empresa.cnpj) { pdf.text(`CNPJ: ${empresa.cnpj}`, pw - mx, yTimbre, { align: 'right' }); yTimbre += 3.2 }
+        const endTimbre = [empresa.endereco, empresa.cidade ? `${empresa.cidade}/${empresa.uf ?? ''}` : '']
+          .filter(Boolean).join(' – ')
+        if (endTimbre) {
+          for (const ln of pdf.splitTextToSize(endTimbre, usable * 0.55)) {
+            pdf.text(ln, pw - mx, yTimbre, { align: 'right' }); yTimbre += 3.2
+          }
+        }
+        const yRegua = Math.max(yTimbre + 1, 28)
+        pdf.setDrawColor(190, 190, 190); pdf.setLineWidth(0.2)
+        pdf.line(mx, yRegua, pw - mx, yRegua)
+
+        // ── TITULO ────────────────────────────────────────────────────
         const tipoLabel = GRUPO_CONTRATO_LABEL[solicitacao.grupo_contrato as GrupoContrato] ?? solicitacao.categoria_contrato ?? ''
         const tituloContrato = tipoLabel ? `CONTRATO DE ${tipoLabel.toUpperCase()}` : 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS'
+        const yTitulo = yRegua + 9
         pdf.setFont('helvetica', 'bold'); pdf.setFontSize(13); pdf.setTextColor(0, 0, 0)
-        pdf.text(tituloContrato, pw / 2, 26, { align: 'center' })
-        // Double underline (matches company template thick border)
-        pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.6); pdf.line(mx, 29, pw - mx, 29)
-        pdf.setLineWidth(0.2); pdf.line(mx, 31, pw - mx, 31)
-        y = 38
+        pdf.text(tituloContrato, pw / 2, yTitulo, { align: 'center' })
+        pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.6); pdf.line(mx, yTitulo + 3, pw - mx, yTitulo + 3)
+        pdf.setLineWidth(0.2); pdf.line(mx, yTitulo + 5, pw - mx, yTitulo + 5)
+        y = yTitulo + 12
 
         // ── PREÂMBULO ─────────────────────────────────────────────────
         if (mtRaw.preambulo) {
-          printText(mtRaw.preambulo, 9.5)
+          printText(mtRaw.preambulo, 9.5, { justify: true })
           y += gapLg
         }
 
@@ -1901,7 +1955,7 @@ export default function PreparaMinuta() {
           const heading = `CLÁUSULA ${toOrdinal(cl.ordem)} – ${cl.titulo.toUpperCase()}`
           printText(heading, 10, { bold: true, color: [0, 0, 0] })
           y += gapSm
-          printText(cl.conteudo, 9.5, { indent: 5 })
+          printText(cl.conteudo, 9.5, { indent: 5, justify: true })
           y += gapLg
         }
 
@@ -1911,7 +1965,7 @@ export default function PreparaMinuta() {
           y += gapSm
           printText('DISPOSIÇÕES FINAIS', 10, { bold: true, color: [0, 0, 0] })
           y += gapSm
-          printText(disposicoes, 9.5, { indent: 5 })
+          printText(disposicoes, 9.5, { indent: 5, justify: true })
           y += gapLg
         }
 
@@ -1993,7 +2047,7 @@ export default function PreparaMinuta() {
 
       // ── Helper: fallback PDF — formal contract from melhorias (when AI unavailable) ──
       const buildPdfFallback = async () => {
-        const empresa = await getEmpresa()
+        const empresa = await getEmpresaById(solicitacao.empresa_contratante_id)
         // Build a MinutaTextoGerado-like structure from the melhorias data
         const dataStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
         const valorStr = solicitacao.valor_estimado ? fmt(solicitacao.valor_estimado) : 'conforme proposta'
@@ -2042,7 +2096,7 @@ export default function PreparaMinuta() {
       }
 
       // ── Step 1: Try n8n AI, fallback to local ───────────────────────
-      const empresaData = await getEmpresa()
+      const empresaData = await getEmpresaById(solicitacao.empresa_contratante_id)
       let pdf: jsPDF | null = null
       try {
         const aiResult = await gerarMinutaPDF.mutateAsync({

@@ -451,6 +451,10 @@ export interface Solicitacao {
   motivo_cancelamento?: string
   responsavel_id?: string
   responsavel_nome?: string
+  /** Qual empresa do grupo assina como CONTRATANTE (sys_empresas). Sem valor,
+      cai na matriz EMP-001 — ver getEmpresaById. */
+  empresa_contratante_id?: string
+  empresa_contratante_nome?: string
   esclarecimento_msg?: string
   esclarecimento_por?: string
   esclarecimento_em?: string
