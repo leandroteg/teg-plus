@@ -570,14 +570,14 @@ export function useMinutas(solicitacaoId: string | undefined) {
   })
 }
 
-/** Remove uma minuta anexada por engano. Só rascunho: a partir do momento em que
- *  entra em revisão ou aprovação, virou peça do processo e não se apaga. */
+/** Remove uma minuta escolhida por engano. Vale enquanto não estiver aprovada:
+ *  'em_revisao' só indica que a IA gerou a versão melhorada, ainda é preparação. */
 export function useExcluirMinuta() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (m: { id: string; solicitacao_id: string; arquivo_url?: string | null; status?: string | null }) => {
-      if (m.status && m.status !== 'rascunho') {
-        throw new Error('Só é possível excluir minuta em rascunho.')
+      if (m.status === 'aprovado') {
+        throw new Error('Minuta aprovada não pode ser excluída.')
       }
       const { error } = await supabase.from('con_minutas').delete().eq('id', m.id)
       if (error) throw error

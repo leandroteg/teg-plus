@@ -1438,8 +1438,8 @@ export default function PreparaMinuta() {
   const excluirMinuta = useExcluirMinuta()
   const [excluindoId, setExcluindoId] = useState<string | null>(null)
 
-  // Trocar de modelo = apagar o rascunho errado e anexar o certo. Só rascunho:
-  // depois que entra em revisão a minuta virou peça do processo.
+  // Trocar de modelo = apagar a minuta errada e escolher outra. Vale até
+  // 'em_revisao'; a partir de 'aprovado' a minuta virou peça do processo.
   const handleExcluirMinuta = async (m: Minuta) => {
     if (!window.confirm(`Excluir a minuta "${m.titulo}" (v${m.versao})? O arquivo anexado também será removido.`)) return
     setExcluindoId(m.id)
@@ -2216,10 +2216,10 @@ export default function PreparaMinuta() {
         <div className="lg:col-span-2 space-y-4">
 
           {/* Biblioteca de Modelos */}
-          {/* A biblioteca sumia assim que a 1a minuta era criada, e nao havia como trocar
-              de modelo. Fica visivel enquanto TUDO for rascunho: escolher outro e o
-              caminho normal de correcao, junto com o botao de excluir no card. */}
-          {modelosDisponiveis.length > 0 && (minutas ?? []).every(m => m.status === 'rascunho') && (
+          {/* A biblioteca sumia assim que a 1a minuta era criada, e nao havia como trocar de
+              modelo. O corte e 'aprovado', nao 'rascunho': em_revisao so quer dizer que a
+              IA gerou a versao melhorada — ainda e etapa de preparacao e trocar e legitimo. */}
+          {modelosDisponiveis.length > 0 && (minutas ?? []).every(m => m.status !== 'aprovado') && (
             <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-2xl p-5 border border-violet-100">
               <h3 className="text-sm font-bold text-violet-900 mb-3 flex items-center gap-2">
                 <FileStack size={16} className="text-violet-600" />
@@ -2510,7 +2510,7 @@ export default function PreparaMinuta() {
                   melhorias={melhoriasMap[m.id]}
                   analiseLocal={analiseMap[m.id]}
                   autoExpand={autoExpandId === m.id}
-                  onExcluir={m.status === 'rascunho' ? handleExcluirMinuta : undefined}
+                  onExcluir={m.status !== 'aprovado' ? handleExcluirMinuta : undefined}
                   excluindo={excluindoId === m.id}
                   onMelhoriasChange={handleMelhoriasChange}
                   pdfUrl={pdfUrlMap[m.id]}
