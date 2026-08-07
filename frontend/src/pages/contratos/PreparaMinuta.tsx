@@ -1682,8 +1682,32 @@ export default function PreparaMinuta() {
     atualizarConfig.mutate({ id: ruleId, valor, ativo })
   }
 
-  const handleAvancarResumo = async () => {
+  const handleAvancarResumo = async (opts?: { promoverFinal?: boolean }) => {
     if (!solicitacao) return
+
+    // "Prosseguir sem Analise IA": a RPC exige uma minuta marcada como final e,
+    // sem isso, o avanco era recusado em silencio (o erro so ia pro console e a
+    // tela navegava assim mesmo). Em vez de burlar a regra, promove a minuta mais
+    // recente a final — que e exatamente o que o usuario esta declarando ao pular
+    // a analise.
+    if (opts?.promoverFinal && !hasFinalMinuta) {
+      const ultima = [...minutas].sort((a, b) => b.versao - a.versao)[0]
+      if (!ultima) {
+        window.alert('Anexe ao menos uma minuta antes de prosseguir.')
+        return
+      }
+      const ok = window.confirm(
+        `Marcar "${ultima.titulo}" (v${ultima.versao}) como minuta FINAL e avancar sem analise de IA?`)
+      if (!ok) return
+      const { error: errFinal } = await supabase.from('con_minutas')
+        .update({ tipo: 'final' }).eq('id', ultima.id)
+      if (errFinal) {
+        window.alert('Nao foi possivel marcar a minuta como final: ' + errFinal.message)
+        return
+      }
+      await qc.invalidateQueries({ queryKey: ['con-minutas', id] })
+    }
+
     const empresaResumo = await getEmpresa()
 
     // Use the most recent minuta (final version) for the resumo
@@ -1748,10 +1772,16 @@ export default function PreparaMinuta() {
         solicitacaoId: solicitacao.id,
         etapaDe: 'preparar_minuta',
         etapaPara: 'resumo_executivo',
-        observacao: 'Minuta final registrada, avançando para resumo executivo',
+        observacao: opts?.promoverFinal
+          ? 'Avanco sem analise de IA — minuta marcada como final pelo usuario'
+          : 'Minuta final registrada, avançando para resumo executivo',
       })
     } catch (e) {
+      // navegar mesmo com falha escondia o bloqueio da RPC e dava a impressao de
+      // que o botao nao fazia nada
       console.error('Erro ao avancar etapa:', e)
+      window.alert(e instanceof Error ? e.message : 'Nao foi possivel avancar de etapa.')
+      return
     }
     nav(`/contratos/solicitacoes/${id}`)
   }
@@ -2176,7 +2206,7 @@ export default function PreparaMinuta() {
           {/* Advance button */}
           {hasFinalMinuta && (
             <button
-              onClick={handleAvancarResumo}
+              onClick={() => handleAvancarResumo()}
               disabled={avancarEtapa.isPending}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600
                 text-white text-xs font-bold hover:bg-emerald-700 transition-all shadow-sm
@@ -2197,7 +2227,7 @@ export default function PreparaMinuta() {
                 </p>
               </div>
               <button
-                onClick={handleAvancarResumo}
+                onClick={() => handleAvancarResumo({ promoverFinal: true })}
                 disabled={avancarEtapa.isPending}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
                   border border-slate-200 text-slate-600 text-xs font-semibold
