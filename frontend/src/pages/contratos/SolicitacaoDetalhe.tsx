@@ -7,7 +7,7 @@ import {
   XCircle, AlertTriangle, ChevronRight, Send,
   Archive, Unlock, Ban, Eye, Pencil, Building2, Calendar,
   DollarSign, User, Briefcase, Tag, ShieldCheck, Info, PenTool, X,
-  Plus, Trash2, Users, Upload, FileCheck2,
+  Plus, Trash2, Users, Upload, FileCheck2, Edit3, Loader2,
 } from 'lucide-react'
 import {
   useSolicitacao,
@@ -20,8 +20,9 @@ import {
   useResumoExecutivo,
   useAssinaturas,
   useReenviarEsclarecimentoContrato,
+  useAtualizarSolicitacao,
 } from '../../hooks/useSolicitacoes'
-import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
+import { GRUPO_CONTRATO_LABEL, GRUPO_CONTRATO_OPTIONS } from '../../constants/contratos'
 import type { GrupoContrato } from '../../types/contratos'
 import type { EtapaSolicitacao, ParcelaPlanejada, Solicitacao, TipoAssinatura } from '../../types/contratos'
 import { calcularDiferencaParcelas, normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../../utils/contratosParcelas'
@@ -1041,6 +1042,47 @@ export default function SolicitacaoDetalhe() {
   }
 
   const s = solicitacao as Solicitacao
+
+  // ── Correcao dos dados da solicitacao ────────────────────────────────────
+  // A classificacao errada na abertura trava o fluxo adiante: e o grupo que
+  // filtra os modelos de minuta. Editavel ate a assinatura; depois disso o
+  // contrato ja existe e o dado vira historico.
+  const atualizarSolicitacao = useAtualizarSolicitacao()
+  const [editandoDados, setEditandoDados] = useState(false)
+  const podeEditarDados = !['assinado', 'concluido', 'cancelado'].includes(s?.etapa_atual ?? '')
+  const dadosIniciais = () => ({
+    tipo_contrato: (s?.tipo_contrato ?? 'despesa') as string,
+    grupo_contrato: (s?.grupo_contrato as string) ?? 'outro',
+    subtipo_contrato: s?.subtipo_contrato ?? '',
+    valor_estimado: s?.valor_estimado != null ? String(s.valor_estimado) : '',
+    forma_pagamento: s?.forma_pagamento ?? '',
+    prazo_meses: s?.prazo_meses != null ? String(s.prazo_meses) : '',
+    data_inicio: (s?.data_inicio_prevista ?? '').slice(0, 10),
+    data_fim: (s?.data_fim_prevista ?? '').slice(0, 10),
+  })
+  const [formDados, setFormDados] = useState(dadosIniciais)
+  const subtiposDoGrupo = GRUPO_CONTRATO_OPTIONS.find(o => o.value === formDados.grupo_contrato)?.subtipos ?? []
+  const lblEdit = 'block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1'
+  const inpEdit = 'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none'
+
+  const handleSalvarDados = async () => {
+    try {
+      await atualizarSolicitacao.mutateAsync({
+        id: s.id,
+        tipo_contrato: formDados.tipo_contrato,
+        grupo_contrato: formDados.grupo_contrato,
+        subtipo_contrato: formDados.subtipo_contrato || null,
+        valor_estimado: formDados.valor_estimado ? Number(formDados.valor_estimado) : null,
+        forma_pagamento: formDados.forma_pagamento || null,
+        prazo_meses: formDados.prazo_meses ? Number(formDados.prazo_meses) : null,
+        data_inicio_prevista: formDados.data_inicio || null,
+        data_fim_prevista: formDados.data_fim || null,
+      } as never)
+      setEditandoDados(false)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Nao foi possivel salvar as correcoes.')
+    }
+  }
   const etapa = s.etapa_atual
   const valorContrato = Number(resumoExecutivo?.valor_total ?? s.valor_estimado ?? 0)
   const destinoFinanceiro = s.tipo_contrato === 'receita' ? 'cr' : 'cp'
@@ -1269,7 +1311,110 @@ export default function SolicitacaoDetalhe() {
                 <Info size={13} className="text-indigo-600" />
               </div>
               <h2 className="text-sm font-extrabold text-slate-800">Dados da Solicitação</h2>
+              {/* Classificação errada na abertura trava o resto do fluxo: é ela que
+                  filtra os modelos de minuta. Enquanto a solicitação não está
+                  assinada nem cancelada, o time de contratos pode corrigir. */}
+              {podeEditarDados && !editandoDados && (
+                <button
+                  onClick={() => { setFormDados(dadosIniciais()); setEditandoDados(true) }}
+                  className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px]
+                    font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                >
+                  <Edit3 size={12} /> Corrigir dados
+                </button>
+              )}
             </div>
+
+            {editandoDados ? (
+              <div className="px-5 py-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={lblEdit}>Tipo de Contrato</label>
+                    <select value={formDados.tipo_contrato} className={inpEdit}
+                      onChange={e => setFormDados(f => ({ ...f, tipo_contrato: e.target.value as typeof f.tipo_contrato }))}>
+                      <option value="despesa">Despesa</option>
+                      <option value="receita">Receita</option>
+                      <option value="pj">PJ</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={lblEdit}>Categoria</label>
+                    <select value={formDados.grupo_contrato} className={inpEdit}
+                      onChange={e => setFormDados(f => ({ ...f, grupo_contrato: e.target.value, subtipo_contrato: '' }))}>
+                      {GRUPO_CONTRATO_OPTIONS.map(o => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {subtiposDoGrupo.length > 0 && (
+                    <div>
+                      <label className={lblEdit}>Subtipo</label>
+                      <select value={formDados.subtipo_contrato} className={inpEdit}
+                        onChange={e => setFormDados(f => ({ ...f, subtipo_contrato: e.target.value }))}>
+                        <option value="">—</option>
+                        {subtiposDoGrupo.map(st => (
+                          <option key={st.value} value={st.value}>{st.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div>
+                    <label className={lblEdit}>Valor Estimado (R$)</label>
+                    <input type="number" step="0.01" value={formDados.valor_estimado} className={inpEdit}
+                      onChange={e => setFormDados(f => ({ ...f, valor_estimado: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className={lblEdit}>Forma de Pagamento</label>
+                    <input value={formDados.forma_pagamento} className={inpEdit}
+                      onChange={e => setFormDados(f => ({ ...f, forma_pagamento: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className={lblEdit}>Prazo (meses)</label>
+                    <input type="number" value={formDados.prazo_meses} className={inpEdit}
+                      onChange={e => setFormDados(f => ({ ...f, prazo_meses: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className={lblEdit}>Início da Vigência</label>
+                    <input type="date" value={formDados.data_inicio} className={inpEdit}
+                      onChange={e => setFormDados(f => ({ ...f, data_inicio: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className={lblEdit}>Fim da Vigência</label>
+                    <input type="date" value={formDados.data_fim} className={inpEdit}
+                      onChange={e => setFormDados(f => ({ ...f, data_fim: e.target.value }))} />
+                  </div>
+                </div>
+
+                {(s.grupo_contrato !== formDados.grupo_contrato) && (
+                  <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
+                    <p className="text-[11px] text-amber-800">
+                      Mudar a categoria troca os modelos de minuta oferecidos. Se já houver minuta
+                      anexada a partir do modelo antigo, exclua e escolha o modelo da nova categoria.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setEditandoDados(false)}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSalvarDados}
+                    disabled={atualizarSolicitacao.isPending}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold
+                      bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40"
+                  >
+                    {atualizarSolicitacao.isPending
+                      ? <><Loader2 size={12} className="animate-spin" /> Salvando...</>
+                      : <>Salvar correções</>}
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div className="px-5 py-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
                 <InfoItem label="Solicitante" value={s.solicitante_nome} icon={User} />
@@ -1299,6 +1444,7 @@ export default function SolicitacaoDetalhe() {
                 <InfoItem label="Responsavel" value={s.responsavel_nome} icon={User} />
               </div>
             </div>
+            )}
           </div>
 
           {/* Escopo e Justificativa */}
