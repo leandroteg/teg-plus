@@ -6,6 +6,7 @@ import {
   Plus, Upload, Wallet, Building2, CircleDollarSign, Search,
   Filter, X, Calendar, ChevronDown, Eye, FileText, Check,
   AlertTriangle, Zap, RefreshCw, ArrowDownUp, Link2, CreditCard, Download, Pencil,
+  ArrowUp, ArrowDown,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -1231,12 +1232,19 @@ function MovimentacoesTable({ movimentacoes, isDark, onNovaMovimentacao }: {
   onNovaMovimentacao: () => void
 }) {
   const [filtroTipo, setFiltroTipo] = useState<'all' | 'entrada' | 'saida'>('all')
+  const [filtroStatus, setFiltroStatus] = useState<'all' | 'pendente' | 'conciliado'>('all')
+  const [ordem, setOrdem] = useState<{ campo: 'data' | 'valor'; dir: 'asc' | 'desc' }>({ campo: 'data', dir: 'desc' })
   const [busca, setBusca] = useState('')
   const [detalheItem, setDetalheItem] = useState<MovimentacaoTesouraria | null>(null)
+
+  const toggleOrdem = (campo: 'data' | 'valor') => {
+    setOrdem(o => o.campo === campo ? { campo, dir: o.dir === 'desc' ? 'asc' : 'desc' } : { campo, dir: 'desc' })
+  }
 
   const filtered = useMemo(() => {
     let items = [...movimentacoes]
     if (filtroTipo !== 'all') items = items.filter(m => m.tipo === filtroTipo)
+    if (filtroStatus !== 'all') items = items.filter(m => (filtroStatus === 'conciliado') === !!m.conciliado)
     if (busca.trim()) {
       const q = busca.toLowerCase()
       items = items.filter(m =>
@@ -1245,8 +1253,14 @@ function MovimentacoesTable({ movimentacoes, isDark, onNovaMovimentacao }: {
         (m.categoria ?? '').toLowerCase().includes(q)
       )
     }
+    items.sort((a, b) => {
+      const cmp = ordem.campo === 'data'
+        ? (a.data_movimentacao ?? '').localeCompare(b.data_movimentacao ?? '')
+        : (a.valor ?? 0) - (b.valor ?? 0)
+      return ordem.dir === 'asc' ? cmp : -cmp
+    })
     return items.slice(0, 50)
-  }, [movimentacoes, filtroTipo, busca])
+  }, [movimentacoes, filtroTipo, filtroStatus, busca, ordem])
 
   return (
     <div className={`rounded-2xl overflow-hidden ${
@@ -1284,6 +1298,27 @@ function MovimentacoesTable({ movimentacoes, isDark, onNovaMovimentacao }: {
           ))}
         </div>
 
+        {/* Status filter */}
+        <div className={`flex rounded-lg overflow-hidden text-[10px] font-bold ${
+          isDark ? 'border border-white/[0.08]' : 'border border-slate-200'
+        }`}>
+          {(['all', 'pendente', 'conciliado'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setFiltroStatus(s)}
+              className={`px-2.5 py-1 transition-colors ${
+                filtroStatus === s
+                  ? 'bg-teal-600 text-white'
+                  : isDark
+                    ? 'bg-white/[0.02] text-slate-400 hover:bg-white/[0.06]'
+                    : 'bg-white text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              {s === 'all' ? 'Todos' : s === 'pendente' ? 'Pendentes' : 'Conciliados'}
+            </button>
+          ))}
+        </div>
+
         {/* Search */}
         <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs ${
           isDark
@@ -1309,14 +1344,15 @@ function MovimentacoesTable({ movimentacoes, isDark, onNovaMovimentacao }: {
 
         <button
           onClick={() => {
-            const headers = ['Data', 'Tipo', 'Conta', 'Categoria', `Descri\u00e7\u00e3o`, 'Valor']
+            const headers = ['Data', 'Tipo', 'Conta', 'Categoria', `Descri\u00e7\u00e3o`, 'Valor', 'Status']
             const rows = filtered.map(m => [
-              m.data ? new Date(m.data).toLocaleDateString('pt-BR') : '',
+              m.data_movimentacao ? new Date(m.data_movimentacao + 'T00:00:00').toLocaleDateString('pt-BR') : '',
               m.tipo === 'entrada' ? 'Entrada' : `Sa\u00edda`,
               m.conta_nome ?? '',
               m.categoria ?? '',
               (m.descricao ?? '').replace(/"/g, '""'),
               (m.valor ?? 0).toFixed(2),
+              m.conciliado ? 'Conciliado' : 'Pendente',
             ])
             const csv = [headers.join(';'), ...rows.map(r => r.map(c => `"${c}"`).join(';'))].join('\n')
             const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
@@ -1350,11 +1386,32 @@ function MovimentacoesTable({ movimentacoes, isDark, onNovaMovimentacao }: {
         <table className="w-full text-xs">
           <thead>
             <tr className={isDark ? 'border-b border-white/[0.04]' : 'border-b border-slate-50'}>
-              {['Data', 'Descricao', 'Valor', 'Conta', 'Status'].map(h => (
-                <th key={h} className={`px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest ${
+              {([
+                { label: 'Data', campo: 'data' as const },
+                { label: 'Descricao', campo: null },
+                { label: 'Valor', campo: 'valor' as const },
+                { label: 'Conta', campo: null },
+                { label: 'Status', campo: null },
+              ]).map(h => (
+                <th key={h.label} className={`px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest ${
                   isDark ? 'text-slate-500' : 'text-slate-400'
                 }`}>
-                  {h}
+                  {h.campo ? (
+                    <button
+                      onClick={() => toggleOrdem(h.campo)}
+                      className={`inline-flex items-center gap-1 uppercase tracking-widest transition-colors ${
+                        ordem.campo === h.campo
+                          ? 'text-teal-500'
+                          : isDark ? 'hover:text-slate-300' : 'hover:text-slate-600'
+                      }`}
+                      title={`Ordenar por ${h.label.toLowerCase()}`}
+                    >
+                      {h.label}
+                      {ordem.campo === h.campo
+                        ? (ordem.dir === 'desc' ? <ArrowDown size={11} /> : <ArrowUp size={11} />)
+                        : <ArrowDownUp size={11} className="opacity-40" />}
+                    </button>
+                  ) : h.label}
                 </th>
               ))}
             </tr>
@@ -1970,27 +2027,33 @@ function NovaMovimentacaoModal({ isDark, contas, onClose }: {
         </div>
 
         {/* Footer */}
-        <div className={`px-5 py-4 flex justify-end gap-2 ${
-          isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'
-        }`}>
-          <button
-            onClick={onClose}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
-              isDark
-                ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit || criar.isPending}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-teal-600 text-white hover:bg-teal-700 transition-colors
-              disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-            {criar.isPending ? 'Salvando...' : 'Criar Lancamento'}
-          </button>
+        <div className={`px-5 py-4 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+          {criar.isError && (
+            <p className="mb-3 flex items-center gap-1.5 rounded-xl bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-500">
+              <AlertTriangle size={12} className="shrink-0" />
+              {(criar.error as Error)?.message || 'Erro ao criar lançamento'}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+                isDark
+                  ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!canSubmit || criar.isPending}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-teal-600 text-white hover:bg-teal-700 transition-colors
+                disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            >
+              {criar.isPending ? 'Salvando...' : 'Criar Lancamento'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
