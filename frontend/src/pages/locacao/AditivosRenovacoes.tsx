@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { RefreshCw, Search, List, LayoutGrid, Plus, X, Loader2, Send, CheckCircle2 } from 'lucide-react'
+import { RefreshCw, Search, List, LayoutGrid, Plus, Send, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useAditivos, useCriarAditivo, useImoveis, useAtualizarStatusAditivo } from '../../hooks/useLocacao'
+import { useAditivos, useAtualizarStatusAditivo } from '../../hooks/useLocacao'
+import NovoAditivoModal from '../../components/locacao/NovoAditivoModal'
 import { STATUS_ADITIVO_LABEL, fmtEndereco } from '../../types/locacao'
 import type { StatusAditivo, TipoAditivo, LocAditivo } from '../../types/locacao'
 
@@ -45,105 +46,6 @@ function TipoBadge({ tipo }: { tipo?: TipoAditivo }) {
     <span className={`inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
       {TIPO_LABEL[tipo]}
     </span>
-  )
-}
-
-// ── Modal ─────────────────────────────────────────────────────────────────────
-function NovoAditivoModal({ onClose }: { onClose: () => void }) {
-  const { isDark } = useTheme()
-  const { data: imoveis = [] } = useImoveis({ status: 'ativo' })
-  const criar = useCriarAditivo()
-
-  const [imovelId, setImovelId] = useState('')
-  const [tipo, setTipo] = useState<TipoAditivo>('renovacao')
-  const [descricao, setDescricao] = useState('')
-  const [dataInicio, setDataInicio] = useState('')
-  const [dataFim, setDataFim] = useState('')
-  const [valorAnterior, setValorAnterior] = useState('')
-  const [valorNovo, setValorNovo] = useState('')
-
-  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
-  const inputCls = isDark
-    ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:border-indigo-500'
-    : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-indigo-400'
-  const txt = isDark ? 'text-white' : 'text-slate-900'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    await criar.mutateAsync({
-      imovel_id: imovelId || undefined,
-      tipo,
-      descricao: descricao || undefined,
-      data_inicio: dataInicio || undefined,
-      data_fim: dataFim || undefined,
-      valor_anterior: valorAnterior ? parseFloat(valorAnterior) : undefined,
-      valor_novo: valorNovo ? parseFloat(valorNovo) : undefined,
-      status: 'rascunho',
-    })
-    onClose()
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
-        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
-          <h3 className={`text-base font-bold ${txt}`}>Novo Aditivo / Renovação</h3>
-          <button onClick={onClose}><X size={18} className="text-slate-400 hover:text-slate-600" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div>
-            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Imóvel</label>
-            <select value={imovelId} onChange={e => setImovelId(e.target.value)}
-              className={`w-full text-sm rounded-xl px-3 py-2 border outline-none ${inputCls}`}>
-              <option value="">Selecionar imóvel...</option>
-              {imoveis.map(im => <option key={im.id} value={im.id}>{im.descricao}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Tipo</label>
-            <select value={tipo} onChange={e => setTipo(e.target.value as TipoAditivo)}
-              className={`w-full text-sm rounded-xl px-3 py-2 border outline-none ${inputCls}`}>
-              {Object.entries(TIPO_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Data Início</label>
-              <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)}
-                className={`w-full text-sm rounded-xl px-3 py-2 border outline-none ${inputCls}`} />
-            </div>
-            <div>
-              <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Data Fim</label>
-              <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)}
-                className={`w-full text-sm rounded-xl px-3 py-2 border outline-none ${inputCls}`} />
-            </div>
-            <div>
-              <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Valor Anterior (R$)</label>
-              <input type="number" placeholder="0,00" value={valorAnterior} onChange={e => setValorAnterior(e.target.value)}
-                className={`w-full text-sm rounded-xl px-3 py-2 border outline-none ${inputCls}`} />
-            </div>
-            <div>
-              <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Novo Valor (R$)</label>
-              <input type="number" placeholder="0,00" value={valorNovo} onChange={e => setValorNovo(e.target.value)}
-                className={`w-full text-sm rounded-xl px-3 py-2 border outline-none ${inputCls}`} />
-            </div>
-          </div>
-          <div>
-            <label className={`block text-xs font-semibold mb-1 ${txtMuted}`}>Descrição</label>
-            <textarea rows={3} placeholder="Detalhes do aditivo..." value={descricao} onChange={e => setDescricao(e.target.value)}
-              className={`w-full text-sm rounded-xl px-3 py-2 border outline-none resize-none ${inputCls}`} />
-          </div>
-          <div className="flex gap-2 pt-2">
-            <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl text-sm font-semibold border ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>Cancelar</button>
-            <button type="submit" disabled={criar.isPending} className="flex-1 py-2 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2">
-              {criar.isPending && <Loader2 size={14} className="animate-spin" />}
-              Criar Aditivo
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
   )
 }
 
@@ -194,8 +96,10 @@ function TableRow({ ad, isDark, onStatus, isBusy }: {
         <TipoBadge tipo={ad.tipo} />
       </td>
       <td className={`px-4 py-3 text-sm ${txtMuted}`}>
-        {ad.data_inicio || ad.data_fim
-          ? `${fmtDate(ad.data_inicio)} – ${fmtDate(ad.data_fim)}`
+        {/* aditivo novo grava termino anterior -> novo; os antigos gravavam
+             inicio -> fim do periodo. Mesma coluna, as duas leituras. */}
+        {ad.data_inicio || ad.data_fim_anterior || ad.data_fim
+          ? `${fmtDate(ad.data_inicio ?? ad.data_fim_anterior)} – ${fmtDate(ad.data_fim)}`
           : '—'}
       </td>
       <td className={`px-4 py-3 text-sm ${txtMuted}`}>

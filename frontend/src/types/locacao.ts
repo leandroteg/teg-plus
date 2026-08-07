@@ -399,6 +399,9 @@ export interface LocAditivo {
   descricao?: string
   data_inicio?: string
   data_fim?: string
+  /** Termino do contrato ANTES do aditivo. Coluna nova (08/2026): nos registros
+   *  antigos e nula, porque la o periodo vinha em data_inicio/data_fim. */
+  data_fim_anterior?: string
   valor_anterior?: number
   valor_novo?: number
   indice_reajuste?: string

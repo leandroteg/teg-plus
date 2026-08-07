@@ -9,6 +9,7 @@ import type { NavItem } from './ModuleLayout'
 import NovaSolicitacaoModal from './locacao/NovaSolicitacaoModal'
 import NovoImovelModal from './locacao/NovoImovelModal'
 import { InspecaoAlojamentoFluxo } from './qsma/InspecaoAlojamento'
+import NovoAditivoModal from './locacao/NovoAditivoModal'
 import type { TipoSolicitacao } from '../types/locacao'
 import { useVistoriaSync } from '../hooks/useVistoriaSync'
 import { useTheme } from '../contexts/ThemeContext'
@@ -124,6 +125,7 @@ export default function LocacaoLayout() {
   const [novoImovel, setNovoImovel] = useState<null | 'fluxo' | 'direto'>(null)
   // A inspeção usa o checklist do QSMA, mas roda aqui dentro — sem trocar de módulo.
   const [showInspecao, setShowInspecao] = useState(false)
+  const [showAditivo, setShowAditivo] = useState(false)
   const { isDark } = useTheme()
 
   const abrirSolic = (t: TipoSolicitacao) => { setSolicTipo(t); setShowSolic(true) }
@@ -167,7 +169,10 @@ export default function LocacaoLayout() {
           {
             icon: RefreshCw, label: 'Aditivo / Renovação', tone: 'violet',
             description: 'Renovar ou aditivar contrato de locação.',
-            action: () => abrirSolic('renovacao'),
+            // grava em loc_aditivos, o mesmo destino do botao da aba. Antes
+            // abria o NovaSolicitacaoModal, que criava uma solicitacao que
+            // nunca virava aditivo nem chegava ao contrato.
+            action: () => setShowAditivo(true),
           },
         ],
       },
@@ -194,6 +199,7 @@ export default function LocacaoLayout() {
         <NovoImovelModal viaFluxo={novoImovel === 'fluxo'} onClose={() => setNovoImovel(null)} />
       )}
       {showInspecao && <InspecaoAlojamentoFluxo isDark={isDark} onClose={() => setShowInspecao(false)} />}
+      {showAditivo && <NovoAditivoModal onClose={() => setShowAditivo(false)} />}
     </>
   )
 }
