@@ -1437,6 +1437,10 @@ export default function PreparaMinuta() {
   const uploadFile = useUploadMinutaFile()
   const excluirMinuta = useExcluirMinuta()
   const [excluindoId, setExcluindoId] = useState<string | null>(null)
+  // Cobre o handler inteiro. `avancarEtapa.isPending` so acende no ultimo passo:
+  // a geracao do resumo pela IA vem antes e leva dezenas de segundos, entao o botao
+  // parecia ocioso e era clicado de novo — 6 avancos em 20s no historico da 0014.
+  const [avancando, setAvancando] = useState(false)
 
   // Trocar de modelo = apagar a minuta errada e escolher outra. Vale até
   // 'em_revisao'; a partir de 'aprovado' a minuta virou peça do processo.
@@ -1683,7 +1687,7 @@ export default function PreparaMinuta() {
   }
 
   const handleAvancarResumo = async (opts?: { promoverFinal?: boolean }) => {
-    if (!solicitacao) return
+    if (!solicitacao || avancando) return
 
     // "Prosseguir sem Analise IA": a RPC exige uma minuta marcada como final e,
     // sem isso, o avanco era recusado em silencio (o erro so ia pro console e a
@@ -1708,6 +1712,8 @@ export default function PreparaMinuta() {
       await qc.invalidateQueries({ queryKey: ['con-minutas', id] })
     }
 
+    setAvancando(true)
+    try {
     const empresaResumo = await getEmpresa()
 
     // Use the most recent minuta (final version) for the resumo
@@ -1784,6 +1790,9 @@ export default function PreparaMinuta() {
       return
     }
     nav(`/contratos/solicitacoes/${id}`)
+    } finally {
+      setAvancando(false)
+    }
   }
 
   const handleGerarNovaMinuta = async (minuta: Minuta) => {
@@ -2207,15 +2216,15 @@ export default function PreparaMinuta() {
           {hasFinalMinuta && (
             <button
               onClick={() => handleAvancarResumo()}
-              disabled={avancarEtapa.isPending}
+              disabled={avancando}
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600
                 text-white text-xs font-bold hover:bg-emerald-700 transition-all shadow-sm
                 disabled:opacity-50"
             >
-              {avancarEtapa.isPending
+              {avancando
                 ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                 : <ChevronRight size={14} />}
-              Avançar para Resumo Executivo
+              {avancando ? 'Preparando resumo executivo...' : 'Avançar para Resumo Executivo'}
             </button>
           )}
 
@@ -2228,15 +2237,15 @@ export default function PreparaMinuta() {
               </div>
               <button
                 onClick={() => handleAvancarResumo({ promoverFinal: true })}
-                disabled={avancarEtapa.isPending}
+                disabled={avancando}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
                   border border-slate-200 text-slate-600 text-xs font-semibold
                   hover:bg-slate-50 transition-all disabled:opacity-50"
               >
-                {avancarEtapa.isPending
+                {avancando
                   ? <div className="w-3.5 h-3.5 border-2 border-slate-300/40 border-t-slate-500 rounded-full animate-spin" />
                   : <ChevronRight size={13} />}
-                Prosseguir sem Análise IA
+                {avancando ? 'Preparando resumo...' : 'Prosseguir sem Análise IA'}
               </button>
             </div>
           )}
