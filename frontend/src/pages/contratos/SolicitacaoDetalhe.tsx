@@ -1007,6 +1007,10 @@ export default function SolicitacaoDetalhe() {
     data_fim: (solicitacao?.data_fim_prevista ?? '').slice(0, 10),
     contraparte_nome: solicitacao?.contraparte_nome ?? '',
     contraparte_cnpj: solicitacao?.contraparte_cnpj ?? '',
+    contraparte_endereco: (solicitacao as { contraparte_endereco?: string } | null)?.contraparte_endereco ?? '',
+    contraparte_representante_nome: (solicitacao as { contraparte_representante_nome?: string } | null)?.contraparte_representante_nome ?? '',
+    contraparte_representante_cargo: (solicitacao as { contraparte_representante_cargo?: string } | null)?.contraparte_representante_cargo ?? '',
+    contraparte_representante_cpf: (solicitacao as { contraparte_representante_cpf?: string } | null)?.contraparte_representante_cpf ?? '',
     centro_custo: solicitacao?.centro_custo ?? '',
     empresa_contratante_id: (solicitacao as { empresa_contratante_id?: string } | null)?.empresa_contratante_id ?? '',
   })
@@ -1085,6 +1089,10 @@ export default function SolicitacaoDetalhe() {
         data_fim_prevista: formDados.data_fim || null,
         contraparte_nome: formDados.contraparte_nome.trim() || null,
         contraparte_cnpj: formDados.contraparte_cnpj.trim() || null,
+        contraparte_endereco: formDados.contraparte_endereco.trim() || null,
+        contraparte_representante_nome: formDados.contraparte_representante_nome.trim() || null,
+        contraparte_representante_cargo: formDados.contraparte_representante_cargo.trim() || null,
+        contraparte_representante_cpf: formDados.contraparte_representante_cpf.trim() || null,
         centro_custo: formDados.centro_custo || null,
         empresa_contratante_id: formDados.empresa_contratante_id || null,
         empresa_contratante_nome: formDados.empresa_contratante_id
@@ -1398,6 +1406,33 @@ export default function SolicitacaoDetalhe() {
                     <input value={formDados.contraparte_cnpj} className={inpEdit}
                       placeholder="somente números"
                       onChange={e => setFormDados(f => ({ ...f, contraparte_cnpj: e.target.value }))} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className={lblEdit}>Endereço da Contraparte</label>
+                    <input value={formDados.contraparte_endereco} className={inpEdit}
+                      placeholder="rua, número, bairro - cidade/UF - CEP"
+                      onChange={e => setFormDados(f => ({ ...f, contraparte_endereco: e.target.value }))} />
+                  </div>
+                  {/* Endereço e representante entram no corpo e no bloco de
+                      assinatura do contrato. A consulta de CNPJ acerta na maior
+                      parte dos casos, mas empresa sem quadro societário público
+                      (MEI) volta vazia — e o dado precisa ser corrigível aqui. */}
+                  <div>
+                    <label className={lblEdit}>Representante que assina</label>
+                    <input value={formDados.contraparte_representante_nome} className={inpEdit}
+                      onChange={e => setFormDados(f => ({ ...f, contraparte_representante_nome: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className={lblEdit}>Cargo do representante</label>
+                    <input value={formDados.contraparte_representante_cargo} className={inpEdit}
+                      placeholder="Sócio-Administrador"
+                      onChange={e => setFormDados(f => ({ ...f, contraparte_representante_cargo: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className={lblEdit}>CPF do representante</label>
+                    <input value={formDados.contraparte_representante_cpf} className={inpEdit}
+                      placeholder="000.000.000-00"
+                      onChange={e => setFormDados(f => ({ ...f, contraparte_representante_cpf: e.target.value }))} />
                   </div>
                   <div>
                     <label className={lblEdit}>Centro de Custo</label>

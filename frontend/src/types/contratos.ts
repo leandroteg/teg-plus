@@ -424,6 +424,11 @@ export interface Solicitacao {
   contraparte_telefone?: string
   contraparte_email?: string
   contraparte_id?: string
+  contraparte_endereco?: string
+  /** Quem assina pela contraparte — vai para o bloco de assinatura da minuta. */
+  contraparte_representante_nome?: string
+  contraparte_representante_cargo?: string
+  contraparte_representante_cpf?: string
   fornecedor_cadastrado?: string
   contrato_vigente_fornecedor?: string
   responsavel_aprovacao?: string

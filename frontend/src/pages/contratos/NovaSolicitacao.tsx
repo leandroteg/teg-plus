@@ -358,20 +358,48 @@ export default function NovaSolicitacao({ selfService = false }: { selfService?:
             autofillRef.current[campo] = novo
           }
         }
+        // Mesma regra do setAuto, mas para LIMPAR: quando a nova consulta não tem
+        // o dado, o que a consulta anterior preencheu tem de sair. Sem isso, trocar
+        // o CNPJ deixava o endereço e o representante legal da empresa ANTERIOR no
+        // formulário — foi assim que a CONTRATADA saiu com o sócio da TEG assinando.
+        const limparSeAutofill = (campo: string, atual: string, setter: (v: string) => void) => {
+          const prev = autofillRef.current[campo] ?? ''
+          if (!atual.trim()) return
+          if (atual !== prev) return           // digitado à mão: não mexe
+          setter('')
+          autofillRef.current[campo] = ''
+        }
         setAuto('nome', contraparteNome, result.nome_fantasia || result.razao_social, setContraparteNome)
         setAuto('telefone', contraparteTelefone, result.telefone, setContraparteTelefone)
         setAuto('email', contraparteEmail, result.email, setContraparteEmail)
-        if (result.endereco) {
-          const e = result.endereco
-          const parts = [e.logradouro, e.numero, e.complemento, e.bairro].filter(Boolean).join(', ')
-          const cidadeUf = [e.cidade, e.uf].filter(Boolean).join('/')
-          const cepStr = e.cep ? `CEP ${e.cep.replace(/^(\d{5})(\d{3})$/, '$1-$2')}` : ''
-          setAuto('endereco', contraparteEndereco, [parts, cidadeUf, cepStr].filter(Boolean).join(' - '), setContraparteEndereco)
-        }
+        const e = result.endereco
+        const enderecoNovo = e
+          ? [
+              [e.logradouro, e.numero, e.complemento, e.bairro].filter(Boolean).join(', '),
+              [e.cidade, e.uf].filter(Boolean).join('/'),
+              e.cep ? `CEP ${e.cep.replace(/^(\d{5})(\d{3})$/, '$1-$2')}` : '',
+            ].filter(Boolean).join(' - ')
+          : ''
+        if (enderecoNovo) setAuto('endereco', contraparteEndereco, enderecoNovo, setContraparteEndereco)
+        else limparSeAutofill('endereco', contraparteEndereco, setContraparteEndereco)
+
+        // A Receita devolve o CPF do representante mascarado ("***303131**").
+        // Reduzido a dígitos vira "303131" e ia parar no contrato como se fosse
+        // um CPF. Só aceita se sobrar um CPF inteiro.
+        const cpfRep = (result.representante_cpf || '').replace(/\D/g, '')
+        const cpfValido = cpfRep.length === 11 ? result.representante_cpf || '' : ''
+
         if (result.representante_nome) {
           setAuto('repNome', contraparteRepNome, result.representante_nome, setContraparteRepNome)
-          setAuto('repCpf', contraparteRepCpf, result.representante_cpf || '', setContraparteRepCpf)
           setAuto('repCargo', contraparteRepCargo, result.representante_cargo || 'Socio Administrador', setContraparteRepCargo)
+          if (cpfValido) setAuto('repCpf', contraparteRepCpf, cpfValido, setContraparteRepCpf)
+          else limparSeAutofill('repCpf', contraparteRepCpf, setContraparteRepCpf)
+        } else {
+          // CNPJ sem quadro societário público (MEI, por exemplo): apaga o que
+          // veio da consulta anterior em vez de herdar o sócio da outra empresa.
+          limparSeAutofill('repNome', contraparteRepNome, setContraparteRepNome)
+          limparSeAutofill('repCpf', contraparteRepCpf, setContraparteRepCpf)
+          limparSeAutofill('repCargo', contraparteRepCargo, setContraparteRepCargo)
         }
       }
     } catch {
