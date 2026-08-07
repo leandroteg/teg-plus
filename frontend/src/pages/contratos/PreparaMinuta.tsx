@@ -33,6 +33,7 @@ import { useModelosContrato } from '../../hooks/useContratos'
 import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 import { supabase } from '../../services/supabase'
 import { getEmpresaById } from '../../services/empresa'
+import { normalizarCaixaAlta } from '../../utils/texto'
 import { jsPDF } from 'jspdf'
 import {
   buildResumoPayloadFromAnalise,
@@ -1420,19 +1421,26 @@ function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando,
 // ── Main Component ──────────────────────────────────────────────────────────────
 
 /** Baixa o logo da empresa e devolve data-URL pro jsPDF. Bucket publico; se
- *  falhar (rede/CORS/empresa sem logo) o timbre sai so com o texto. */
+ *  falhar (rede/CORS/empresa sem logo) o timbre sai so com o texto.
+ *  Reduz o bitmap antes de embutir: o logo cadastrado tem 2571px de largura e
+ *  ia cru pro PDF — 5MB de imagem num contrato de 4 paginas. No papel ele ocupa
+ *  34mm, entao 600px ja e mais resolucao do que qualquer impressora usa. */
 async function loadLogoBase64(url?: string): Promise<string | null> {
   if (!url) return null
   try {
     const resp = await fetch(url)
     if (!resp.ok) return null
     const blob = await resp.blob()
-    return new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string)
-      reader.onerror = () => resolve(null)
-      reader.readAsDataURL(blob)
-    })
+    const bmp = await createImageBitmap(blob)
+    const esc = Math.min(1, 600 / Math.max(bmp.width, bmp.height))
+    const cv = document.createElement('canvas')
+    cv.width = Math.max(1, Math.round(bmp.width * esc))
+    cv.height = Math.max(1, Math.round(bmp.height * esc))
+    const ctx = cv.getContext('2d')
+    if (!ctx) { bmp.close(); return null }
+    ctx.drawImage(bmp, 0, 0, cv.width, cv.height)
+    bmp.close()
+    return cv.toDataURL('image/png')
   } catch { return null }
 }
 
@@ -1703,7 +1711,7 @@ export default function PreparaMinuta() {
     atualizarConfig.mutate({ id: ruleId, valor, ativo })
   }
 
-  const handleAvancarResumo = async (opts?: { promoverFinal?: boolean }) => {
+  const handleAvancarResumo = async (opts?: { promoverFinal?: boolean; confirmar?: boolean }) => {
     if (!solicitacao || avancando) return
 
     // "Prosseguir sem Analise IA": a RPC exige uma minuta marcada como final e,
@@ -1717,9 +1725,11 @@ export default function PreparaMinuta() {
         window.alert('Anexe ao menos uma minuta antes de prosseguir.')
         return
       }
-      const ok = window.confirm(
-        `Marcar "${ultima.titulo}" (v${ultima.versao}) como minuta FINAL e avancar sem analise de IA?`)
-      if (!ok) return
+      if (opts.confirmar) {
+        const ok = window.confirm(
+          `Marcar "${ultima.titulo}" (v${ultima.versao}) como minuta FINAL e avançar sem análise de IA?`)
+        if (!ok) return
+      }
       const { error: errFinal } = await supabase.from('con_minutas')
         .update({ tipo: 'final' }).eq('id', ultima.id)
       if (errFinal) {
@@ -1858,6 +1868,22 @@ export default function PreparaMinuta() {
           if (y + need > ph - 22) { pdf.addPage(); y = 20 }
         }
 
+        // Justificacao na unha. O align:'justify' do jsPDF so estica as linhas
+        // que NAO sao a ultima do array recebido — mandando uma linha por
+        // chamada, toda linha era "a ultima" e o PDF saia com word-spacing 0.
+        // Aqui a folga e distribuida entre as palavras da propria linha.
+        const escreverJustificado = (line: string, x: number, larg: number) => {
+          const palavras = line.split(' ').filter(Boolean)
+          if (palavras.length < 2) { pdf.text(line, x, y); return }
+          const larguraTexto = palavras.reduce((acc, p) => acc + pdf.getTextWidth(p), 0)
+          const folga = larg - larguraTexto
+          const vao = folga / (palavras.length - 1)
+          // linha curta demais esticada vira rio de espacos: deixa alinhada a esquerda
+          if (folga <= 0 || vao > pdf.getTextWidth(' ') * 5) { pdf.text(line, x, y); return }
+          let cx = x
+          for (const p of palavras) { pdf.text(p, cx, y); cx += pdf.getTextWidth(p) + vao }
+        }
+
         // Texto corrido: quebra por paragrafo e justifica (menos a ultima linha
         // de cada paragrafo, que justificada fica com buracos entre as palavras).
         const gapPar = 3
@@ -1885,8 +1911,8 @@ export default function PreparaMinuta() {
               ensureSpace(lineH + 1)
               if (opts?.align === 'center') {
                 pdf.text(line, pw / 2, y, { align: 'center' })
-              } else if (opts?.justify && li < lines.length - 1 && line.trim().includes(' ')) {
-                pdf.text(line, mx + ind, y, { align: 'justify', maxWidth: larg })
+              } else if (opts?.justify && li < lines.length - 1) {
+                escreverJustificado(line, mx + ind, larg)
               } else {
                 pdf.text(line, mx + ind, y)
               }
@@ -1945,7 +1971,7 @@ export default function PreparaMinuta() {
 
         // ── PREÂMBULO ─────────────────────────────────────────────────
         if (mtRaw.preambulo) {
-          printText(mtRaw.preambulo, 9.5, { justify: true })
+          printText(normalizarCaixaAlta(mtRaw.preambulo), 9.5, { justify: true })
           y += gapLg
         }
 
@@ -1955,7 +1981,7 @@ export default function PreparaMinuta() {
           const heading = `CLÁUSULA ${toOrdinal(cl.ordem)} – ${cl.titulo.toUpperCase()}`
           printText(heading, 10, { bold: true, color: [0, 0, 0] })
           y += gapSm
-          printText(cl.conteudo, 9.5, { indent: 5, justify: true })
+          printText(normalizarCaixaAlta(cl.conteudo), 9.5, { indent: 5, justify: true })
           y += gapLg
         }
 
@@ -1965,7 +1991,7 @@ export default function PreparaMinuta() {
           y += gapSm
           printText('DISPOSIÇÕES FINAIS', 10, { bold: true, color: [0, 0, 0] })
           y += gapSm
-          printText(disposicoes, 9.5, { indent: 5, justify: true })
+          printText(normalizarCaixaAlta(disposicoes), 9.5, { indent: 5, justify: true })
           y += gapLg
         }
 
@@ -2101,8 +2127,10 @@ export default function PreparaMinuta() {
       try {
         const aiResult = await gerarMinutaPDF.mutateAsync({
           titulo: minuta.titulo,
-          objeto: solicitacao.objeto,
-          descricao_escopo: solicitacao.descricao_escopo ?? undefined,
+          // o formulario grava tudo em CAIXA ALTA (uppercase global dos inputs);
+          // sem normalizar, a IA copia o objeto gritando pro corpo do contrato
+          objeto: normalizarCaixaAlta(solicitacao.objeto),
+          descricao_escopo: normalizarCaixaAlta(solicitacao.descricao_escopo) || undefined,
           contraparte: solicitacao.contraparte_nome,
           contraparte_cnpj: solicitacao.contraparte_cnpj ?? undefined,
           contraparte_email: solicitacao.contraparte_email ?? undefined,
@@ -2118,7 +2146,7 @@ export default function PreparaMinuta() {
           grupo_contrato: solicitacao.grupo_contrato ?? undefined,
           obra_nome: solicitacao.obra?.nome ?? undefined,
           centro_custo: solicitacao.centro_custo ?? undefined,
-          justificativa: solicitacao.justificativa ?? undefined,
+          justificativa: normalizarCaixaAlta(solicitacao.justificativa) || undefined,
           melhorias: mel,
           contratante_razao: empresaData.razao,
           contratante_cnpj: empresaData.cnpj,
@@ -2290,7 +2318,7 @@ export default function PreparaMinuta() {
                 </p>
               </div>
               <button
-                onClick={() => handleAvancarResumo({ promoverFinal: true })}
+                onClick={() => handleAvancarResumo({ promoverFinal: true, confirmar: true })}
                 disabled={avancando}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
                   border border-slate-200 text-slate-600 text-xs font-semibold
@@ -2607,8 +2635,8 @@ export default function PreparaMinuta() {
                   excluindo={excluindoId === m.id}
                   onMelhoriasChange={handleMelhoriasChange}
                   pdfUrl={pdfUrlMap[m.id]}
-                  onEnviarAprovacao={pdfUrlMap[m.id] ? handleAvancarResumo : undefined}
-                  enviandoAprovacao={avancarEtapa.isPending}
+                  onEnviarAprovacao={pdfUrlMap[m.id] ? () => handleAvancarResumo({ promoverFinal: true }) : undefined}
+                  enviandoAprovacao={avancando}
                 />
               ))}
             </div>
