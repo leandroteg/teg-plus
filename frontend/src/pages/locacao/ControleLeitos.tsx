@@ -198,6 +198,33 @@ function statsDe(leitos: Leito[], ocupadosSet: Set<string>): Stats {
   return { total, ocupados, livres, taxa }
 }
 
+export interface PessoasFiltros {
+  busca: string; cidade: string; imovel: string; tipo: string
+  /** '7' | '30' | '90' = entrou nesse intervalo; '90+' = esta ha mais tempo */
+  desde: string
+}
+export interface HistFiltros {
+  busca: string; cidade: string; imovel: string
+  situacao: string   // 'atual' | 'encerrada'
+  origem: string     // admin | portal_qr | erp_equipe
+  periodo: string    // 7 | 30 | 90 | 365 — pela data de inicio
+}
+
+/** dias entre a data (YYYY-MM-DD) e hoje; null se a data nao vier */
+function diasAte(iso: string | null | undefined): number | null {
+  if (!iso) return null
+  const d = new Date(iso + 'T00:00:00')
+  if (Number.isNaN(d.getTime())) return null
+  return Math.floor((Date.now() - d.getTime()) / 86400000)
+}
+
+function passaPeriodo(iso: string | null | undefined, faixa: string): boolean {
+  if (!faixa) return true
+  const d = diasAte(iso)
+  if (d === null) return false
+  return faixa === '90+' ? d > 90 : d <= Number(faixa)
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 export default function ControleLeitos() {
   const { isDark } = useTheme()
@@ -210,6 +237,8 @@ export default function ControleLeitos() {
   const [fStatus, setFStatus] = useState<Set<string>>(new Set())
   const [aberto, setAberto] = useState<LocImovel | null>(null)
   const [mf, setMf] = useState<MapaFiltros>({ busca: '', tipo: 'todos', cidade: '', ocup: '', cc: '' })
+  const [pf, setPf] = useState<PessoasFiltros>({ busca: '', cidade: '', imovel: '', tipo: '', desde: '' })
+  const [hf, setHf] = useState<HistFiltros>({ busca: '', cidade: '', imovel: '', situacao: '', origem: '', periodo: '' })
 
   const { data: alojamentos = [], isLoading: loadAloj } = useAlojamentos()
   const { data: leitos = [], isLoading: loadLeitos } = useLeitos()
@@ -253,6 +282,9 @@ export default function ControleLeitos() {
   const alojCidades = useMemo(() =>
     [...new Set(alojamentos.map(a => a.cidade).filter(Boolean))].sort() as string[],
   [alojamentos])
+
+  const alojOrdenados = useMemo(() =>
+    [...alojamentos].sort((a, b) => nomeAloj(a).localeCompare(nomeAloj(b))), [alojamentos])
 
   const alojFiltrados = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -364,6 +396,84 @@ export default function ControleLeitos() {
               className={`p-1.5 ${viewMode === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
           </div>
         )}
+        {sub === 'pessoas' && (
+          <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+            <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 flex-1 min-w-[170px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
+              <Search size={14} className={txtMuted} />
+              <input type="text" placeholder="Buscar pessoa, matrícula…" value={pf.busca}
+                onChange={e => setPf(f => ({ ...f, busca: e.target.value }))}
+                className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
+            </div>
+            <select className={mapaSel} value={pf.cidade} onChange={e => setPf(f => ({ ...f, cidade: e.target.value }))}>
+              <option value="">Cidade</option>
+              {alojCidades.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className={mapaSel} value={pf.imovel} onChange={e => setPf(f => ({ ...f, imovel: e.target.value }))}>
+              <option value="">Alojamento</option>
+              {alojOrdenados.map(a => <option key={a.id} value={a.id}>{nomeAloj(a)}</option>)}
+            </select>
+            <select className={mapaSel} value={pf.tipo} onChange={e => setPf(f => ({ ...f, tipo: e.target.value }))}>
+              <option value="">Tipo</option>
+              <option value="ALOJ">Alojamento</option>
+              <option value="HTL">Hotel</option>
+            </select>
+            <select className={mapaSel} value={pf.desde} onChange={e => setPf(f => ({ ...f, desde: e.target.value }))}>
+              <option value="">Entrada</option>
+              <option value="7">Últimos 7 dias</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="90">Últimos 90 dias</option>
+              <option value="90+">Há mais de 90 dias</option>
+            </select>
+            {(pf.busca || pf.cidade || pf.imovel || pf.tipo || pf.desde) && (
+              <button onClick={() => setPf({ busca: '', cidade: '', imovel: '', tipo: '', desde: '' })}
+                className={`text-[11px] px-2 py-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-white hover:bg-white/[0.06]' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>
+                Limpar
+              </button>
+            )}
+          </div>
+        )}
+        {sub === 'historico' && (
+          <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
+            <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 flex-1 min-w-[170px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
+              <Search size={14} className={txtMuted} />
+              <input type="text" placeholder="Buscar colaborador, alojamento, leito…" value={hf.busca}
+                onChange={e => setHf(f => ({ ...f, busca: e.target.value }))}
+                className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
+            </div>
+            <select className={mapaSel} value={hf.cidade} onChange={e => setHf(f => ({ ...f, cidade: e.target.value }))}>
+              <option value="">Cidade</option>
+              {alojCidades.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className={mapaSel} value={hf.imovel} onChange={e => setHf(f => ({ ...f, imovel: e.target.value }))}>
+              <option value="">Alojamento</option>
+              {alojOrdenados.map(a => <option key={a.id} value={a.id}>{nomeAloj(a)}</option>)}
+            </select>
+            <select className={mapaSel} value={hf.situacao} onChange={e => setHf(f => ({ ...f, situacao: e.target.value }))}>
+              <option value="">Situação</option>
+              <option value="atual">Em curso</option>
+              <option value="encerrada">Encerrada</option>
+            </select>
+            <select className={mapaSel} value={hf.origem} onChange={e => setHf(f => ({ ...f, origem: e.target.value }))}>
+              <option value="">Origem</option>
+              <option value="admin">Admin</option>
+              <option value="portal_qr">Portal QR</option>
+              <option value="erp_equipe">Equipe</option>
+            </select>
+            <select className={mapaSel} value={hf.periodo} onChange={e => setHf(f => ({ ...f, periodo: e.target.value }))}>
+              <option value="">Período</option>
+              <option value="7">Últimos 7 dias</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="90">Últimos 90 dias</option>
+              <option value="365">Último ano</option>
+            </select>
+            {(hf.busca || hf.cidade || hf.imovel || hf.situacao || hf.origem || hf.periodo) && (
+              <button onClick={() => setHf({ busca: '', cidade: '', imovel: '', situacao: '', origem: '', periodo: '' })}
+                className={`text-[11px] px-2 py-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-white hover:bg-white/[0.06]' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>
+                Limpar
+              </button>
+            )}
+          </div>
+        )}
         {/* Toggle sub-visão — ícone discreto */}
         <div className={`flex items-center gap-1 rounded-xl border p-0.5 ${isDark ? 'border-white/10 bg-white/[0.04]' : 'border-slate-200 bg-white'}`}>
           <button onClick={() => setSub('alojamento')} title="Alojamentos"
@@ -402,12 +512,12 @@ export default function ControleLeitos() {
           alojamentos={alojFiltrados} leitosPorImovel={leitosPorImovel}
           ocupadosSet={ocupadosSet} viewMode={viewMode} isDark={isDark} onAbrir={setAberto} />
       ) : sub === 'pessoas' ? (
-        <PessoasView ocupacoes={ocupacoes} leitosById={leitosById} isDark={isDark}
+        <PessoasView ocupacoes={ocupacoes} leitosById={leitosById} isDark={isDark} f={pf}
           onAbrir={id => { const a = alojamentos.find(x => x.id === id); if (a) setAberto(a) }} />
       ) : sub === 'mapa' ? (
         <MapaImoveis leitosPorImovel={leitosPorImovel} ocupadosSet={ocupadosSet} onAbrir={setAberto} isDark={isDark} filtros={mf} />
       ) : (
-        <HistoricoView isDark={isDark} />
+        <HistoricoView isDark={isDark} f={hf} />
       )}
 
       {aberto && (
@@ -1399,10 +1509,10 @@ function MoverModal({ ocup, leitoAtual, leitosLivres, isDark, onClose }: {
 }
 
 // ── Sub-visão Pessoas — busca por nome → em qual leito/alojamento está ────────
-function PessoasView({ ocupacoes, leitosById, isDark, onAbrir }: {
-  ocupacoes: LeitoOcupacao[]; leitosById: Map<string, Leito>; isDark: boolean; onAbrir: (imovelId: string) => void
+function PessoasView({ ocupacoes, leitosById, isDark, f, onAbrir }: {
+  ocupacoes: LeitoOcupacao[]; leitosById: Map<string, Leito>; isDark: boolean
+  f: PessoasFiltros; onAbrir: (imovelId: string) => void
 }) {
-  const [busca, setBusca] = useState('')
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
 
@@ -1419,36 +1529,42 @@ function PessoasView({ ocupacoes, leitosById, isDark, onAbrir }: {
         cidade: im?.cidade ?? null,
         uf: im?.uf ?? null,
         imovelId: im?.id ?? leito?.imovel_id ?? null,
+        tipo: im?.tipo ?? null,
         desde: o.data_inicio,
       }
     }).sort((a, b) => a.nome.localeCompare(b.nome))
   }, [ocupacoes, leitosById])
 
   const filtrado = useMemo(() => {
-    const q = busca.trim().toLowerCase()
-    if (!q) return linhas
-    return linhas.filter(l =>
-      l.nome.toLowerCase().includes(q) ||
-      (l.matricula ?? '').toLowerCase().includes(q) ||
-      l.alojamento.toLowerCase().includes(q) ||
-      l.leitoLabel.toLowerCase().includes(q) ||
-      (l.cidade ?? '').toLowerCase().includes(q))
-  }, [linhas, busca])
+    const q = f.busca.trim().toLowerCase()
+    return linhas.filter(l => {
+      if (f.cidade && l.cidade !== f.cidade) return false
+      if (f.imovel && l.imovelId !== f.imovel) return false
+      if (f.tipo && l.tipo !== f.tipo) return false
+      if (!passaPeriodo(l.desde, f.desde)) return false
+      if (q && !(
+        l.nome.toLowerCase().includes(q) ||
+        (l.matricula ?? '').toLowerCase().includes(q) ||
+        l.alojamento.toLowerCase().includes(q) ||
+        l.leitoLabel.toLowerCase().includes(q) ||
+        (l.cidade ?? '').toLowerCase().includes(q))) return false
+      return true
+    })
+  }, [linhas, f])
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 flex-1 min-w-[220px] ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
-          <Search size={14} className={txtMuted} />
-          <input autoFocus type="text" placeholder="Buscar pessoa por nome, matrícula, alojamento…" value={busca} onChange={e => setBusca(e.target.value)}
-            className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
-        </div>
-        <p className={`text-xs ${txtMuted}`}><span className="font-semibold">{filtrado.length}</span> {filtrado.length === 1 ? 'pessoa alojada' : 'pessoas alojadas'}</p>
+      <div className="flex items-center justify-end">
+        <p className={`text-xs ${txtMuted}`}>
+          <span className="font-semibold">{filtrado.length}</span>
+          {filtrado.length === 1 ? ' pessoa alojada' : ' pessoas alojadas'}
+          {filtrado.length !== linhas.length && <span className="opacity-60"> de {linhas.length}</span>}
+        </p>
       </div>
       {filtrado.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <Users size={40} className={txtMuted} />
-          <p className={`text-sm ${txtMuted}`}>{busca ? 'Ninguém encontrado' : 'Nenhuma pessoa alojada'}</p>
+          <p className={`text-sm ${txtMuted}`}>{linhas.length ? 'Ninguém encontrado com esses filtros' : 'Nenhuma pessoa alojada'}</p>
         </div>
       ) : (
         <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
@@ -1483,22 +1599,31 @@ function PessoasView({ ocupacoes, leitosById, isDark, onAbrir }: {
 }
 
 // ── Sub-visão Histórico ──────────────────────────────────────────────────────
-function HistoricoView({ isDark }: { isDark: boolean }) {
+function HistoricoView({ isDark, f }: { isDark: boolean; f: HistFiltros }) {
   const { data: hist = [], isLoading } = useLeitosHistorico()
-  const [busca, setBusca] = useState('')
   const [detalhe, setDetalhe] = useState<OcupacaoHistorico | null>(null)
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
 
   const filtrado = useMemo(() => {
-    if (!busca) return hist
-    const q = busca.toLowerCase()
-    return hist.filter(h =>
-      h.colaborador_nome.toLowerCase().includes(q) ||
-      h.leito?.imovel?.descricao?.toLowerCase().includes(q) ||
-      h.leito?.imovel?.nome?.toLowerCase().includes(q) ||
-      h.leito?.codigo_leito?.toLowerCase().includes(q))
-  }, [hist, busca])
+    const q = f.busca.trim().toLowerCase()
+    return hist.filter(h => {
+      const im = h.leito?.imovel
+      if (f.cidade && im?.cidade !== f.cidade) return false
+      if (f.imovel && im?.id !== f.imovel) return false
+      if (f.situacao === 'atual' && h.data_fim) return false
+      if (f.situacao === 'encerrada' && !h.data_fim) return false
+      if (f.origem && h.origem !== f.origem) return false
+      if (!passaPeriodo(h.data_inicio, f.periodo)) return false
+      if (q && !(
+        h.colaborador_nome.toLowerCase().includes(q) ||
+        im?.descricao?.toLowerCase().includes(q) ||
+        im?.nome?.toLowerCase().includes(q) ||
+        im?.titulo?.toLowerCase().includes(q) ||
+        h.leito?.codigo_leito?.toLowerCase().includes(q))) return false
+      return true
+    })
+  }, [hist, f])
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-cyan-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -1506,15 +1631,17 @@ function HistoricoView({ isDark }: { isDark: boolean }) {
 
   return (
     <div className="space-y-3">
-      <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
-        <Search size={14} className={txtMuted} />
-        <input type="text" placeholder="Buscar por colaborador, alojamento ou leito…" value={busca} onChange={e => setBusca(e.target.value)}
-          className={`flex-1 text-sm bg-transparent outline-none ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`} />
+      <div className="flex items-center justify-end">
+        <p className={`text-xs ${txtMuted}`}>
+          <span className="font-semibold">{filtrado.length}</span>
+          {filtrado.length === 1 ? ' registro' : ' registros'}
+          {filtrado.length !== hist.length && <span className="opacity-60"> de {hist.length}</span>}
+        </p>
       </div>
       {filtrado.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <History size={40} className={txtMuted} />
-          <p className={`text-sm ${txtMuted}`}>Nenhum registro de ocupação ainda</p>
+          <p className={`text-sm ${txtMuted}`}>{hist.length ? 'Nenhum registro com esses filtros' : 'Nenhum registro de ocupação ainda'}</p>
         </div>
       ) : (
         <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-white border-slate-200'}`}>

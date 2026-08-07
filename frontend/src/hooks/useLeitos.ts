@@ -68,7 +68,7 @@ export interface OcupacaoHistorico extends LeitoOcupacao {
     codigo: string
     quarto: string | null
     imovel_id: string
-    imovel: { descricao: string; cidade: string | null; nome: string | null } | null
+    imovel: { id: string; titulo: string | null; descricao: string; cidade: string | null; nome: string | null; tipo: string | null } | null
   } | null
 }
 
@@ -177,7 +177,7 @@ export function useLeitosHistorico(filtros?: { imovel_id?: string; colaborador_i
     queryFn: async () => {
       let q = supabase
         .from('loc_leito_ocupacoes')
-        .select('*, colaborador:rh_colaboradores(matricula, nome), leito:loc_leitos(numero_seq, codigo_leito, codigo, quarto, imovel_id, imovel:loc_imoveis(descricao, cidade, nome, titulo))')
+        .select('*, colaborador:rh_colaboradores(matricula, nome), leito:loc_leitos(numero_seq, codigo_leito, codigo, quarto, imovel_id, imovel:loc_imoveis(id, titulo, descricao, cidade, nome, tipo))')
         .order('data_inicio', { ascending: false })
         .limit(500)
       if (filtros?.colaborador_id) q = q.eq('colaborador_id', filtros.colaborador_id)
