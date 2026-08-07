@@ -293,6 +293,10 @@ export default function NovaRequisicao() {
           ? item.valor_unitario_estimado
           : parseFloat(String(item.valor_unitario_estimado)) || 0,
         marca: item.marca ? toUpperNorm(String(item.marca).trim()) : undefined,
+        // parse v2 casa com o catalogo no servidor; jogar o id fora aqui
+        // desligava o item do estoque
+        est_item_id: item.est_item_id,
+        est_item_codigo: item.est_item_codigo,
       }))
       .filter(item => item.descricao.length > 0)
   , [])
