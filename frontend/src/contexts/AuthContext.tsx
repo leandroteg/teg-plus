@@ -712,7 +712,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const p = moduloPapeis[moduleKey] ?? moduloPapeis[normalized]
         if (p && ['requisitante','equipe','supervisor','diretor','ceo'].includes(p)) return p as PapelGlobal
       }
-      return papelGlobal
+      // Tem acesso ao modulo e nenhum papel definido nele = REQUISITANTE.
+      // O papel do modulo manda; o Perfil de Acesso nao eleva mais. E o que a
+      // tela de cadastro sempre prometeu: "Se nao definir, o modulo fica como
+      // Requisitante". Antes isto devolvia papelGlobal, e era por ai que a
+      // equipe de um modulo enxergava outro por inteiro.
+      return 'requisitante'
     },
   }
 
