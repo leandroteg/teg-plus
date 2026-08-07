@@ -269,7 +269,7 @@ async function parseArquivoComGemini(arquivo: { base64: string; nome: string; mi
 
   const controller = new AbortController()
   // PDFs grandes (20-50MB) podem demorar mais para processar
-  const timeoutMs = arquivo.base64.length > 15_000_000 ? 180_000 : 90_000
+  const timeoutMs = 180_000
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   const filtroCategoria = categoriaFiltro
@@ -375,11 +375,16 @@ Nome do arquivo: ${arquivo.nome}`
         else throw new Error('JSON inválido do Gemini')
       }
     } else {
-      // Estratégia 2: n8n endpoint (fallback)
-      const resp = await fetch(`${N8N_URL}/compras/parse-documento-ai`, {
+      // Estratégia 2: parse v2 no n8n — detecta o formato por magic bytes,
+      // extrai o texto em código, chama o Gemini com schema e casa com o
+      // catálogo NO SERVIDOR (tamanho é identidade, id validado contra a lista).
+      const resp = await fetch(`${N8N_URL}/compras/parse-documento-v2`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base64: arquivo.base64, nome: arquivo.nome, mime_type: arquivo.mime, texto_extra: textoExtra || '' }),
+        body: JSON.stringify({
+          base64: arquivo.base64, nome: arquivo.nome, mime_type: arquivo.mime,
+          texto_extra: textoExtra || '', categoria_codigo: categoriaFiltro?.codigo || '',
+        }),
         signal: controller.signal,
       })
       if (!resp.ok) throw new Error(`Erro ${resp.status} do servidor de IA`)
@@ -394,6 +399,9 @@ Nome do arquivo: ${arquivo.nome}`
       unidade: String(item.unidade || 'un').toLowerCase(),
       valor_unitario_estimado: Number(item.valor_unit || item.valor_unitario || item.valor_unitario_estimado || 0),
       marca: item.marca ? String(item.marca).trim() : undefined,
+      // v2: o servidor ja casou com o catalogo — id validado la, nao se recalcula aqui
+      est_item_id: typeof item.est_item_id === 'string' ? item.est_item_id : undefined,
+      est_item_codigo: typeof item.est_item_codigo === 'string' ? item.est_item_codigo : undefined,
     })).filter(i => i.descricao.length > 1)
 
     const joined = itens.map(i => i.descricao).join(' ').toLowerCase()
@@ -413,6 +421,9 @@ Nome do arquivo: ${arquivo.nome}`
       categoria_sugerida: categoria,
       justificativa_sugerida: (data.justificativa_sugerida as string) || `Itens extraídos de ${arquivo.nome}${data.fornecedor_nome ? ` — Fornecedor: ${data.fornecedor_nome}` : ''}`,
       confianca: itens.length > 0 ? (Number(data.confianca) || 0.9) : 0.3,
+      fonte: typeof data.fonte === 'string' ? data.fonte : undefined,
+      total_itens_documento: typeof data.total_itens_documento === 'number' ? data.total_itens_documento : undefined,
+      casados: typeof data.casados === 'number' ? data.casados : undefined,
     }
   } finally {
     clearTimeout(timeout)
@@ -426,6 +437,10 @@ export function useAiParse() {
       if (vars.arquivo) {
         try {
           const result = await parseArquivoComGemini(vars.arquivo, vars.texto, vars.categoria_filtro)
+          // resposta do v2 traz `fonte`: o catalogo ja foi casado (e validado) no
+          // servidor — re-rodar o matcher local por cima e o que colapsava
+          // tamanhos diferentes no mesmo item
+          if (result.fonte) return result
           return await matchCatalogItems(result, vars.categoria_filtro?.codigo)
         } catch (err) {
           // Se endpoint dedicado falhou, tenta o endpoint genérico

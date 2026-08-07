@@ -407,6 +407,11 @@ export interface AiParseResult {
   comprador_sugerido?: { id: string; nome: string }
   justificativa_sugerida?: string
   confianca: number
+  /** presente quando veio do parse v2 (n8n): o catálogo já foi casado no servidor */
+  fonte?: string
+  /** quantas linhas de item o documento declara ter (checagem de completude) */
+  total_itens_documento?: number
+  casados?: number
 }
 
 export interface KPIs {
