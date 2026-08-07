@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   BarChart3, MousePointerClick, PencilLine, Users, LayoutGrid, Info, Search,
-  TrendingUp, TrendingDown, Percent, X, Target, ShieldOff,
+  TrendingUp, TrendingDown, Percent, X, Target, ShieldOff, CalendarRange,
 } from 'lucide-react'
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -27,6 +27,39 @@ const fmtDataHora = (iso: string | null) =>
   iso
     ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
     : '—'
+// 'YYYY-MM-DD' → '08/07/2026' (sem passar por Date, que desloca o fuso)
+const fmtDataIso = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`
+
+// Intervalo de datas explícito dos últimos N dias (hoje inclusive)
+function intervaloDias(n: number) {
+  const hoje = new Date()
+  const inicio = new Date(hoje)
+  inicio.setDate(inicio.getDate() - (n - 1))
+  return { inicio: toIsoDate(inicio), fim: toIsoDate(hoje) }
+}
+
+// "08/07/2026 a 07/08/2026" — o que o usuário precisa ler para saber o recorte
+const fmtIntervalo = (inicio: string, fim: string) => `${fmtDataIso(inicio)} a ${fmtDataIso(fim)}`
+
+// Distância em dias entre um instante e agora, no fuso local, comparando datas
+// civis: "ontem" é o dia anterior no calendário, não 24h atrás.
+function diasAtras(iso: string): number {
+  const d = new Date(iso)
+  const a = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const hoje = new Date()
+  const b = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate())
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000)
+}
+
+// "hoje" / "ontem" / "há 5 dias" — a leitura rápida de recência
+function rotuloRecencia(iso: string): string {
+  const n = diasAtras(iso)
+  if (n <= 0) return 'hoje'
+  if (n === 1) return 'ontem'
+  if (n < 30) return `há ${n} dias`
+  if (n < 60) return 'há 1 mês'
+  return `há ${Math.floor(n / 30)} meses`
+}
 // busca sem diferenciar maiúsculas/acentos ("jose" encontra "JOSÉ")
 const normalizar = (s: string) =>
   s
@@ -35,6 +68,62 @@ const normalizar = (s: string) =>
     .filter((c) => c.charCodeAt(0) < 0x300 || c.charCodeAt(0) > 0x36f)
     .join('')
     .toLowerCase()
+
+// ── Último uso: data absoluta + recência relativa ─────────────────────────────
+
+function UltimoUso({ iso, isLight }: { iso: string | null; isLight: boolean }) {
+  if (!iso) {
+    return <span className={isLight ? 'text-slate-400' : 'text-slate-500'}>nunca</span>
+  }
+  const n = diasAtras(iso)
+  // verde = usou nos últimos 2 dias; âmbar = até 7; cinza = mais frio que isso
+  const tom = n <= 1
+    ? isLight ? 'text-emerald-600' : 'text-emerald-400'
+    : n <= 7
+      ? isLight ? 'text-amber-600' : 'text-amber-400'
+      : isLight ? 'text-slate-400' : 'text-slate-500'
+  return (
+    <span
+      className="whitespace-nowrap"
+      title={new Date(iso).toLocaleString('pt-BR', { dateStyle: 'full', timeStyle: 'short' })}
+    >
+      <span className={isLight ? 'text-slate-600' : 'text-slate-300'}>{fmtDataHora(iso)}</span>
+      <span className={`block text-[10px] ${tom}`}>{rotuloRecencia(iso)}</span>
+    </span>
+  )
+}
+
+// ── Faixa do período aplicado, fixa abaixo do cabeçalho ───────────────────────
+
+function BarraPeriodo({
+  inicio, fim, dias, excluirAdmins, isLight,
+}: {
+  inicio: string; fim: string; dias: number; excluirAdmins: boolean; isLight: boolean
+}) {
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border px-3 py-2 mb-4 text-[12px] ${
+        isLight ? 'bg-slate-50 border-slate-200 text-slate-600' : 'bg-white/[0.02] border-white/[0.06] text-slate-400'
+      }`}
+    >
+      <CalendarRange size={14} className="shrink-0" />
+      <span>Dados de</span>
+      <strong className={isLight ? 'text-slate-800' : 'text-slate-200'}>{fmtIntervalo(inicio, fim)}</strong>
+      <span>({dias} dias, até hoje)</span>
+      <span className={isLight ? 'text-slate-300' : 'text-slate-600'}>·</span>
+      <span>comparado com os {dias} dias anteriores</span>
+      {excluirAdmins && (
+        <>
+          <span className={isLight ? 'text-slate-300' : 'text-slate-600'}>·</span>
+          <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>administradores excluídos</span>
+        </>
+      )}
+      <span className={`ml-auto ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+        A tabela “Uso por usuário” tem período próprio.
+      </span>
+    </div>
+  )
+}
 
 // ── Delta vs período anterior ─────────────────────────────────────────────────
 
@@ -165,6 +254,7 @@ function ModuloDetalheModal({
   excluirAdmins: boolean; onClose: () => void
 }) {
   const { data, isLoading, isError, error } = useUsoModuloDetalhe(modulo, dias, excluirAdmins)
+  const intervalo = useMemo(() => intervaloDias(dias), [dias])
 
   const panel = isLight ? 'bg-white border-slate-200' : 'bg-[#0f172a] border-white/[0.08]'
   const inner = isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
@@ -193,7 +283,8 @@ function ModuloDetalheModal({
           <div className="mr-auto">
             <h2 className={`text-base font-bold ${heading}`}>{moduleLabel(modulo)}</h2>
             <p className={`text-[11px] ${label}`}>
-              Últimos {dias} dias{excluirAdmins ? ' · administradores excluídos' : ''}
+              {fmtIntervalo(intervalo.inicio, intervalo.fim)} · últimos {dias} dias
+              {excluirAdmins ? ' · administradores excluídos' : ''}
             </p>
           </div>
           <button
@@ -346,8 +437,18 @@ function ModuloDetalheModal({
                         <th className="py-1.5 pr-2 font-medium">Usuário</th>
                         <th className="py-1.5 pr-2 font-medium text-right">Acessos</th>
                         <th className="py-1.5 pr-2 font-medium text-right">Ações</th>
-                        <th className="py-1.5 pr-2 font-medium text-right">Dias ativos</th>
-                        <th className="py-1.5 font-medium">Último uso</th>
+                        <th className="py-1.5 pr-2 font-medium text-right">
+                          Dias ativos
+                          <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">
+                            de {dias}
+                          </span>
+                        </th>
+                        <th className="py-1.5 font-medium">
+                          Último uso
+                          <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">
+                            dentro do período
+                          </span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -360,7 +461,7 @@ function ModuloDetalheModal({
                           <td className={`py-1.5 pr-2 text-right tabular-nums ${label}`}>{fmtNum(u.acessos)}</td>
                           <td className={`py-1.5 pr-2 text-right tabular-nums ${label}`}>{fmtNum(u.acoes)}</td>
                           <td className={`py-1.5 pr-2 text-right tabular-nums ${label}`}>{u.dias_ativos}/{dias}</td>
-                          <td className={`py-1.5 whitespace-nowrap ${label}`}>{fmtDataHora(u.ultimo_uso)}</td>
+                          <td className="py-1.5"><UltimoUso iso={u.ultimo_uso} isLight={isLight} /></td>
                         </tr>
                       ))}
                     </tbody>
@@ -446,24 +547,37 @@ export default function UsoModulos() {
     })
   }, [])
 
-  // Converte a seleção em intervalo de datas + rótulo exibido nas colunas
+  // Intervalo real coberto pelo filtro geral do topo (KPIs, gráficos, módulos)
+  const intervaloGeral = useMemo(() => intervaloDias(dias), [dias])
+
+  // Converte a seleção em intervalo de datas + rótulos exibidos nas colunas.
+  // 'rotulo' é a forma curta usada em frases; 'datas' é o intervalo explícito.
   const periodoUso = useMemo(() => {
     const hoje = new Date()
     if (periodoUsuarios.startsWith('m:')) {
       const [ano, mes] = periodoUsuarios.slice(2).split('-').map(Number)
       const inicio = new Date(ano, mes - 1, 1)
       const fimMes = new Date(ano, mes, 0)
-      const nome = inicio.toLocaleDateString('pt-BR', { month: 'long' })
+      // mês corrente ainda não fechou: corta em hoje para não prometer dias futuros
+      const fim = fimMes > hoje ? hoje : fimMes
+      const nome = inicio.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
       return {
         inicio: toIsoDate(inicio),
-        fim: toIsoDate(fimMes > hoje ? hoje : fimMes),
-        rotulo: `no mês de ${nome}`,
+        fim: toIsoDate(fim),
+        rotulo: `em ${nome}`,
+        datas: fmtIntervalo(toIsoDate(inicio), toIsoDate(fim)),
+        parcial: fimMes > hoje,
       }
     }
     const n = Number(periodoUsuarios.slice(2))
-    const inicio = new Date(hoje)
-    inicio.setDate(inicio.getDate() - (n - 1))
-    return { inicio: toIsoDate(inicio), fim: toIsoDate(hoje), rotulo: `nos últimos ${n} dias` }
+    const { inicio, fim } = intervaloDias(n)
+    return {
+      inicio,
+      fim,
+      rotulo: `nos últimos ${n} dias`,
+      datas: fmtIntervalo(inicio, fim),
+      parcial: false,
+    }
   }, [periodoUsuarios])
 
   const { data: usoUsuarios, isLoading: carregandoUsuarios } = useUsoPorUsuario(
@@ -557,6 +671,14 @@ export default function UsoModulos() {
           </div>
         </div>
 
+        <BarraPeriodo
+          inicio={intervaloGeral.inicio}
+          fim={intervaloGeral.fim}
+          dias={dias}
+          excluirAdmins={excluirAdmins}
+          isLight={isLight}
+        />
+
         {isError && (
           <div className={`rounded-xl border p-4 text-[13px] ${isLight ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'}`}>
             Erro ao carregar as métricas: {(error as Error)?.message ?? 'tente novamente.'}
@@ -622,7 +744,10 @@ export default function UsoModulos() {
             <div className="grid xl:grid-cols-3 gap-4 mb-4">
               <div className={`rounded-2xl border p-4 xl:col-span-2 ${panel}`}>
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <h2 className={`text-sm font-semibold mr-auto ${heading}`}>Evolução diária</h2>
+                  <div className="mr-auto">
+                    <h2 className={`text-sm font-semibold ${heading}`}>Evolução diária</h2>
+                    <p className={`text-[11px] ${label}`}>{fmtIntervalo(intervaloGeral.inicio, intervaloGeral.fim)}</p>
+                  </div>
                   <select
                     value={moduloFiltro}
                     onChange={(e) => setModuloFiltro(e.target.value)}
@@ -733,7 +858,9 @@ export default function UsoModulos() {
             <div className={`rounded-2xl border p-4 mb-4 overflow-x-auto ${panel}`}>
               <div className="flex flex-wrap items-baseline gap-2 mb-3">
                 <h2 className={`text-sm font-semibold ${heading}`}>Uso por módulo</h2>
-                <span className={`text-[11px] ${label}`}>clique em um módulo para ver o detalhe</span>
+                <span className={`text-[11px] ${label}`}>
+                  {fmtIntervalo(intervaloGeral.inicio, intervaloGeral.fim)} · clique em um módulo para ver o detalhe
+                </span>
               </div>
               {data.por_modulo.length === 0 ? (
                 <p className={`text-[13px] ${label}`}>Nenhum uso registrado no período.</p>
@@ -810,7 +937,24 @@ export default function UsoModulos() {
             {/* Uso por usuário */}
             <div className={`rounded-2xl border p-4 mb-4 overflow-x-auto ${panel}`}>
               <div className="flex flex-wrap items-center gap-2 mb-3">
-                <h2 className={`text-sm font-semibold mr-auto ${heading}`}>Uso por usuário</h2>
+                <div className="mr-auto">
+                  <h2 className={`text-sm font-semibold ${heading}`}>Uso por usuário</h2>
+                  <p className={`flex flex-wrap items-center gap-1.5 text-[11px] ${label}`}>
+                    <CalendarRange size={12} className="shrink-0" />
+                    <strong className={isLight ? 'text-slate-700' : 'text-slate-300'}>{periodoUso.datas}</strong>
+                    <span>({usoUsuarios?.dias_periodo ?? '—'} dias{periodoUso.parcial ? ', mês em curso' : ''})</span>
+                    {periodoUso.inicio !== intervaloGeral.inicio && (
+                      <span
+                        className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${
+                          isLight ? 'bg-amber-50 text-amber-700' : 'bg-amber-500/15 text-amber-300'
+                        }`}
+                        title={`O restante da página usa ${fmtIntervalo(intervaloGeral.inicio, intervaloGeral.fim)}`}
+                      >
+                        período diferente do resto da página
+                      </span>
+                    )}
+                  </p>
+                </div>
                 <select
                   value={periodoUsuarios}
                   onChange={(e) => setPeriodoUsuarios(e.target.value)}
@@ -834,6 +978,16 @@ export default function UsoModulos() {
                     className={`${selectCls} pl-7 w-48`}
                   />
                 </div>
+                {periodoUso.inicio !== intervaloGeral.inicio && (
+                  <button
+                    type="button"
+                    onClick={() => setPeriodoUsuarios(`d:${dias}`)}
+                    title={`Usar o mesmo período do topo da página (${dias} dias)`}
+                    className={`text-[12px] px-2.5 py-1 rounded-lg border transition-colors ${panel} ${label}`}
+                  >
+                    Igualar ao topo ({dias}d)
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setMostrarSemUso((v) => !v)}
@@ -863,17 +1017,22 @@ export default function UsoModulos() {
                       <th className="py-2 pr-3 font-medium">Usuário</th>
                       <th className="py-2 pr-3 font-medium text-right">
                         Acessos
-                        <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">{periodoUso.rotulo}</span>
+                        <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">no período</span>
                       </th>
                       <th className="py-2 pr-3 font-medium text-right">
                         Ações
-                        <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">{periodoUso.rotulo}</span>
+                        <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">no período</span>
                       </th>
                       <th className="py-2 pr-3 font-medium text-right">
                         Dias ativos
-                        <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">{periodoUso.rotulo}</span>
+                        <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">
+                          de {usoUsuarios?.dias_periodo ?? '—'}
+                        </span>
                       </th>
-                      <th className="py-2 pr-3 font-medium">Último uso</th>
+                      <th className="py-2 pr-3 font-medium">
+                        Último uso
+                        <span className="block text-[9px] font-normal normal-case tracking-normal opacity-70">dentro do período</span>
+                      </th>
                       <th className="py-2 pr-3 font-medium">Módulos usados</th>
                       <th className="py-2 font-medium">Nunca usou</th>
                     </tr>
@@ -898,7 +1057,7 @@ export default function UsoModulos() {
                         >
                           {u.dias_ativos}/{usoUsuarios?.dias_periodo}
                         </td>
-                        <td className={`py-2 pr-3 whitespace-nowrap ${label}`}>{fmtDataHora(u.ultimo_uso)}</td>
+                        <td className="py-2 pr-3"><UltimoUso iso={u.ultimo_uso} isLight={isLight} /></td>
                         <td className="py-2 pr-3"><ModuloChips modulos={u.modulos_usados} isLight={isLight} /></td>
                         <td className="py-2"><ModuloChips modulos={nuncaUsados(u)} dim isLight={isLight} /></td>
                       </tr>
