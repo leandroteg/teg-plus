@@ -26,7 +26,7 @@ import { GRUPO_CONTRATO_LABEL, GRUPO_CONTRATO_OPTIONS } from '../../constants/co
 import type { GrupoContrato } from '../../types/contratos'
 import type { EtapaSolicitacao, ParcelaPlanejada, Solicitacao, TipoAssinatura } from '../../types/contratos'
 import { calcularDiferencaParcelas, normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../../utils/contratosParcelas'
-import { useLookupCentrosCusto } from '../../hooks/useLookups'
+import { useLookupCentrosCusto, useLookupEmpresas } from '../../hooks/useLookups'
 import NumericInput from '../../components/NumericInput'
 import AuditoriaCard from '../../components/AuditoriaCard'
 import SolicitacaoDocsSection from '../../components/SolicitacaoDocsSection'
@@ -995,6 +995,7 @@ export default function SolicitacaoDetalhe() {
   const atualizarSolicitacao = useAtualizarSolicitacao()
   const [editandoDados, setEditandoDados] = useState(false)
   const centrosCusto = useLookupCentrosCusto()
+  const empresas = useLookupEmpresas()
   const dadosIniciais = () => ({
     tipo_contrato: (solicitacao?.tipo_contrato ?? 'despesa') as string,
     grupo_contrato: (solicitacao?.grupo_contrato as string) ?? 'outro',
@@ -1007,6 +1008,7 @@ export default function SolicitacaoDetalhe() {
     contraparte_nome: solicitacao?.contraparte_nome ?? '',
     contraparte_cnpj: solicitacao?.contraparte_cnpj ?? '',
     centro_custo: solicitacao?.centro_custo ?? '',
+    empresa_contratante_id: (solicitacao as { empresa_contratante_id?: string } | null)?.empresa_contratante_id ?? '',
   })
   const [formDados, setFormDados] = useState(dadosIniciais)
 
@@ -1084,6 +1086,12 @@ export default function SolicitacaoDetalhe() {
         contraparte_nome: formDados.contraparte_nome.trim() || null,
         contraparte_cnpj: formDados.contraparte_cnpj.trim() || null,
         centro_custo: formDados.centro_custo || null,
+        empresa_contratante_id: formDados.empresa_contratante_id || null,
+        empresa_contratante_nome: formDados.empresa_contratante_id
+          ? (empresas.find(e => e.id === formDados.empresa_contratante_id)?.nome_fantasia
+             || empresas.find(e => e.id === formDados.empresa_contratante_id)?.razao_social
+             || null)
+          : null,
       } as never)
       setEditandoDados(false)
     } catch (e) {
@@ -1367,6 +1375,18 @@ export default function SolicitacaoDetalhe() {
                       </select>
                     </div>
                   )}
+                  <div className="sm:col-span-2">
+                    <label className={lblEdit}>Empresa Contratante (TEG)</label>
+                    <select value={formDados.empresa_contratante_id} className={inpEdit}
+                      onChange={e => setFormDados(f => ({ ...f, empresa_contratante_id: e.target.value }))}>
+                      <option value="">—</option>
+                      {empresas.map(emp => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.codigo ? `${emp.codigo} — ` : ''}{emp.nome_fantasia || emp.razao_social}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="sm:col-span-2">
                     <label className={lblEdit}>Contraparte</label>
                     <input value={formDados.contraparte_nome} className={inpEdit}
