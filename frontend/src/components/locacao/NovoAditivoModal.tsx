@@ -32,7 +32,10 @@ export default function NovoAditivoModal({ imovelInicial, onClose, onCriado }: {
 }) {
   const { isDark } = useTheme()
   const { perfil } = useAuth()
-  const { data: imoveis = [] } = useImoveis({ status: 'ativo' })
+  // Sem filtro de status: imóvel em_entrada/em_saida também pode receber
+  // aditivo (só inativo fica fora); o status vai como sufixo no nome.
+  const { data: todosImoveis = [] } = useImoveis()
+  const imoveis = useMemo(() => todosImoveis.filter(im => im.status !== 'inativo'), [todosImoveis])
   const criar = useCriarAditivo()
   const inputFile = useRef<HTMLInputElement>(null)
 
@@ -154,7 +157,10 @@ export default function NovoAditivoModal({ imovelInicial, onClose, onCriado }: {
               {cidades.map(cid => (
                 <optgroup key={cid} label={cid}>
                   {(porCidade.get(cid) ?? []).map(im => (
-                    <option key={im.id} value={im.id}>{im.titulo || im.nome || im.descricao}</option>
+                    <option key={im.id} value={im.id}>
+                      {im.titulo || im.nome || im.descricao}
+                      {im.status === 'em_entrada' ? ' (em entrada)' : im.status === 'em_saida' ? ' (em saída)' : ''}
+                    </option>
                   ))}
                 </optgroup>
               ))}
