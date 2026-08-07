@@ -25,7 +25,21 @@ export interface LeitoOcupacao {
   checkin_por_nome: string | null
   checkout_por_nome: string | null
   checkout_observacao: string | null
-  colaborador?: { matricula: string | null } | null
+  colaborador?: { matricula: string | null; nome: string | null } | null
+}
+
+/** O nome de quem ocupa o leito vem do Headcount, nao do texto gravado na
+ *  ocupacao. `colaborador_nome` e legado: em varias linhas antigas ele diverge
+ *  do cadastro (apelido, grafia da planilha, nome de outra pessoa) e virava a
+ *  versao que a tela mostrava. Com vinculo, manda o cadastro; o texto so
+ *  sobrevive como fallback para ocupacao sem colaborador_id (visitante). */
+function comNomeDoCadastro<T extends {
+  colaborador_nome: string
+  colaborador?: { nome: string | null } | null
+}>(rows: T[]): T[] {
+  return rows.map(r => (
+    r.colaborador?.nome ? { ...r, colaborador_nome: r.colaborador.nome } : r
+  ))
 }
 
 export interface Leito {
@@ -148,10 +162,10 @@ export function useOcupacoesAtivas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loc_leito_ocupacoes')
-        .select('id, leito_id, colaborador_id, colaborador_nome, data_inicio, data_fim, checkin_em, checkout_em, origem, observacao, checkin_foto_url, checkout_foto_url, checkin_por_nome, checkout_por_nome, checkout_observacao, colaborador:rh_colaboradores(matricula)')
+        .select('id, leito_id, colaborador_id, colaborador_nome, data_inicio, data_fim, checkin_em, checkout_em, origem, observacao, checkin_foto_url, checkout_foto_url, checkin_por_nome, checkout_por_nome, checkout_observacao, colaborador:rh_colaboradores(matricula, nome)')
         .is('data_fim', null)
       if (error) throw error
-      return (data ?? []) as unknown as LeitoOcupacao[]
+      return comNomeDoCadastro((data ?? []) as unknown as LeitoOcupacao[])
     },
   })
 }
@@ -163,13 +177,13 @@ export function useLeitosHistorico(filtros?: { imovel_id?: string; colaborador_i
     queryFn: async () => {
       let q = supabase
         .from('loc_leito_ocupacoes')
-        .select('*, colaborador:rh_colaboradores(matricula), leito:loc_leitos(numero_seq, codigo_leito, codigo, quarto, imovel_id, imovel:loc_imoveis(descricao, cidade, nome, titulo))')
+        .select('*, colaborador:rh_colaboradores(matricula, nome), leito:loc_leitos(numero_seq, codigo_leito, codigo, quarto, imovel_id, imovel:loc_imoveis(descricao, cidade, nome, titulo))')
         .order('data_inicio', { ascending: false })
         .limit(500)
       if (filtros?.colaborador_id) q = q.eq('colaborador_id', filtros.colaborador_id)
       const { data, error } = await q
       if (error) throw error
-      let rows = (data ?? []) as OcupacaoHistorico[]
+      let rows = comNomeDoCadastro((data ?? []) as OcupacaoHistorico[])
       if (filtros?.imovel_id) rows = rows.filter(r => r.leito?.imovel_id === filtros.imovel_id)
       return rows
     },
