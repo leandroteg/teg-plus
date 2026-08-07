@@ -737,7 +737,8 @@ export function useAditivos(filtros?: { imovel_id?: string }) {
     queryFn: async () => {
       let q = supabase
         .from('loc_aditivos')
-        .select(`*, imovel:loc_imoveis(id, descricao, endereco, numero, cidade)`)
+        // centro_custo e titulo entram para alimentar os filtros da aba
+        .select(`*, imovel:loc_imoveis(id, titulo, descricao, endereco, numero, cidade, centro_custo:sys_centros_custo(id, descricao))`)
         .order('created_at', { ascending: false })
 
       if (filtros?.imovel_id) q = q.eq('imovel_id', filtros.imovel_id)

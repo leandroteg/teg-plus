@@ -1,10 +1,26 @@
-import { useState } from 'react'
-import { RefreshCw, Search, List, LayoutGrid, Plus, Send, CheckCircle2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { RefreshCw, Search, List, LayoutGrid, X, ArrowUp, ArrowDown, Send, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAditivos, useAtualizarStatusAditivo } from '../../hooks/useLocacao'
-import NovoAditivoModal from '../../components/locacao/NovoAditivoModal'
 import { STATUS_ADITIVO_LABEL, fmtEndereco } from '../../types/locacao'
 import type { StatusAditivo, TipoAditivo, LocAditivo } from '../../types/locacao'
+
+const STATUSES = [
+  { key: 'todos',                 label: 'Todos' },
+  { key: 'rascunho',              label: 'Rascunho' },
+  { key: 'aguardando_assinatura', label: 'Aguardando' },
+  { key: 'assinado',              label: 'Assinado' },
+]
+
+const COLS: { key: string; label: string }[] = [
+  { key: 'imovel',  label: 'Imóvel' },
+  { key: 'cidade',  label: 'Cidade' },
+  { key: 'tipo',    label: 'Tipo' },
+  { key: 'periodo', label: 'Período' },
+  { key: 'valor',   label: 'Valor Anterior → Novo' },
+  { key: 'status',  label: 'Status' },
+  { key: '',        label: 'Ações' },
+]
 
 // ── Tipo label ────────────────────────────────────────────────────────────────
 const TIPO_LABEL: Record<TipoAditivo, string> = {
@@ -174,22 +190,81 @@ export default function AditivosRenovacoes() {
   const atualizarStatus = useAtualizarStatusAditivo()
   const onStatus = (id: string, status: StatusAditivo) => atualizarStatus.mutate({ id, status })
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('todos')
+  const [tipoFilter, setTipoFilter] = useState('')
+  const [ccFilter, setCcFilter] = useState('')
+  const [cidadeFilter, setCidadeFilter] = useState('')
+  const [vencFilter, setVencFilter] = useState('')
   const [view, setView] = useState<'table' | 'card'>('table')
-  const [showModal, setShowModal] = useState(false)
+  const [sortCol, setSortCol] = useState<string>('criado')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const toggleSort = (col: string) => {
+    if (sortCol === col) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortCol(col); setSortDir('asc') }
+  }
+  const limpar = () => {
+    setSearch(''); setStatusFilter('todos'); setTipoFilter('')
+    setCcFilter(''); setCidadeFilter(''); setVencFilter('')
+  }
 
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const selCls = `rounded-lg border px-2 py-1.5 text-[11px] ${isDark
+    ? 'bg-white/[0.04] border-white/[0.06] text-slate-200'
+    : 'border-slate-200 bg-white text-slate-600'}`
 
-  const filtered = aditivos.filter(ad => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return (
-      ad.imovel?.endereco?.toLowerCase().includes(q) ||
-      ad.imovel?.cidade?.toLowerCase().includes(q) ||
-      ad.imovel?.descricao?.toLowerCase().includes(q) ||
-      ad.descricao?.toLowerCase().includes(q) ||
-      ad.tipo?.toLowerCase().includes(q)
-    )
-  })
+  const cidades = useMemo(
+    () => [...new Set(aditivos.map(a => a.imovel?.cidade).filter(Boolean))].sort() as string[],
+    [aditivos])
+  const centrosCusto = useMemo(() => {
+    const m = new Map<string, string>()
+    aditivos.forEach(a => { const cc = a.imovel?.centro_custo; if (cc?.id) m.set(cc.id, cc.descricao) })
+    return [...m.entries()].sort((x, y) => x[1].localeCompare(y[1]))
+  }, [aditivos])
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const hoje = new Date().toISOString().slice(0, 10)
+    const limite = (d: number) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10)
+    const items = aditivos.filter(ad => {
+      if (statusFilter !== 'todos' && ad.status !== statusFilter) return false
+      if (tipoFilter && ad.tipo !== tipoFilter) return false
+      if (ccFilter && ad.imovel?.centro_custo?.id !== ccFilter) return false
+      if (cidadeFilter && ad.imovel?.cidade !== cidadeFilter) return false
+      if (vencFilter) {
+        const d = ad.data_fim
+        if (!d) return false
+        if (vencFilter === 'vencido' && !(d < hoje)) return false
+        if (vencFilter === '30d' && !(d >= hoje && d <= limite(30))) return false
+        if (vencFilter === '90d' && !(d >= hoje && d <= limite(90))) return false
+      }
+      if (q && !(
+        ad.imovel?.endereco?.toLowerCase().includes(q) ||
+        ad.imovel?.titulo?.toLowerCase().includes(q) ||
+        ad.imovel?.cidade?.toLowerCase().includes(q) ||
+        ad.imovel?.descricao?.toLowerCase().includes(q) ||
+        ad.descricao?.toLowerCase().includes(q) ||
+        ad.tipo?.toLowerCase().includes(q))) return false
+      return true
+    })
+    // '' nas datas/valores ausentes iria para o topo no asc; joga pro fim
+    const txtDe = (v?: string | null) => (v ?? '').toString()
+    items.sort((a, b) => {
+      let va: string | number, vb: string | number
+      switch (sortCol) {
+        case 'imovel':  va = txtDe(fmtEndereco(a.imovel)); vb = txtDe(fmtEndereco(b.imovel)); break
+        case 'cidade':  va = txtDe(a.imovel?.cidade);      vb = txtDe(b.imovel?.cidade); break
+        case 'tipo':    va = a.tipo ? TIPO_LABEL[a.tipo] : ''; vb = b.tipo ? TIPO_LABEL[b.tipo] : ''; break
+        case 'periodo': va = txtDe(a.data_fim) || '9999';  vb = txtDe(b.data_fim) || '9999'; break
+        case 'valor':   va = a.valor_novo ?? a.valor_anterior ?? -1; vb = b.valor_novo ?? b.valor_anterior ?? -1; break
+        case 'status':  va = txtDe(a.status);              vb = txtDe(b.status); break
+        default:        va = txtDe(a.created_at);          vb = txtDe(b.created_at); break
+      }
+      const cmp = typeof va === 'number' && typeof vb === 'number'
+        ? va - vb : String(va).localeCompare(String(vb))
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return items
+  }, [aditivos, search, statusFilter, tipoFilter, ccFilter, cidadeFilter, vencFilter, sortCol, sortDir])
 
   if (isLoading) {
     return (
@@ -201,43 +276,71 @@ export default function AditivosRenovacoes() {
 
   return (
     <div className="space-y-4">
-      {/* Header com botão */}
-      <div className="flex items-center justify-between">
-        <p className={`text-xs ${txtMuted}`}>{aditivos.length} registros</p>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors"
-        >
-          <Plus size={14} /> Novo Aditivo
-        </button>
-      </div>
-
-      {/* Toolbar */}
+      {/* Toolbar — tudo numa linha, mesmo conjunto da aba Ativos */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Busca */}
-        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 flex-1 min-w-[180px]
-          ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
-          <Search size={14} className={txtMuted} />
-          <input
-            type="text"
-            placeholder="Buscar aditivo..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className={`flex-1 text-sm bg-transparent outline-none
-              ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`}
-          />
+        <div className="relative flex-1 min-w-[150px] max-w-xs">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar aditivo..."
+            className={`w-full pl-9 pr-7 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30
+              ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white'}`} />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+              <X size={12} />
+            </button>
+          )}
         </div>
-        {/* Toggle view */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setView('table')}
+
+        <div className="flex items-center gap-0.5">
+          {STATUSES.map(s => (
+            <button key={s.key} onClick={() => setStatusFilter(s.key)}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${statusFilter === s.key
+                ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-800'
+                : isDark ? 'text-slate-500' : 'text-slate-400 hover:bg-slate-50'}`}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        <select value={tipoFilter} onChange={e => setTipoFilter(e.target.value)} className={selCls}>
+          <option value="">Tipo</option>
+          {(Object.entries(TIPO_LABEL) as [TipoAditivo, string][]).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+
+        <select value={ccFilter} onChange={e => setCcFilter(e.target.value)} className={selCls}>
+          <option value="">Centro de Custo</option>
+          {centrosCusto.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+        </select>
+
+        <select value={cidadeFilter} onChange={e => setCidadeFilter(e.target.value)} className={selCls}>
+          <option value="">Cidade</option>
+          {cidades.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+
+        {/* vencimento le a NOVA data de termino — e o que interessa acompanhar */}
+        <select value={vencFilter} onChange={e => setVencFilter(e.target.value)} className={selCls}>
+          <option value="">Vencimento</option>
+          <option value="vencido">Vencidos</option>
+          <option value="30d">Próximos 30 dias</option>
+          <option value="90d">Próximos 90 dias</option>
+        </select>
+
+        {(search || statusFilter !== 'todos' || tipoFilter || ccFilter || cidadeFilter || vencFilter) && (
+          <button onClick={limpar}
+            className={`text-[11px] px-2 py-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:text-white hover:bg-white/[0.06]' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>
+            Limpar
+          </button>
+        )}
+
+        <div className="ml-auto flex items-center gap-1">
+          <button onClick={() => setView('table')}
             className={`p-1.5 rounded-lg transition-colors ${view === 'table'
               ? isDark ? 'bg-white/10 text-white' : 'bg-indigo-100 text-indigo-700'
               : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
             <List size={16} />
           </button>
-          <button
-            onClick={() => setView('card')}
+          <button onClick={() => setView('card')}
             className={`p-1.5 rounded-lg transition-colors ${view === 'card'
               ? isDark ? 'bg-white/10 text-white' : 'bg-indigo-100 text-indigo-700'
               : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
@@ -259,9 +362,15 @@ export default function AditivosRenovacoes() {
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                  {['Imóvel', 'Cidade', 'Tipo', 'Período', 'Valor Anterior → Novo', 'Status', 'Ações'].map(h => (
-                    <th key={h} className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${txtMuted}`}>
-                      {h}
+                  {COLS.map(col => (
+                    <th key={col.label}
+                      onClick={() => col.key && toggleSort(col.key)}
+                      className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${txtMuted}
+                        ${col.key ? 'cursor-pointer select-none hover:text-indigo-500' : ''}`}>
+                      <span className="inline-flex items-center gap-1">
+                        {col.label}
+                        {sortCol === col.key && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                      </span>
                     </th>
                   ))}
                 </tr>
@@ -283,7 +392,6 @@ export default function AditivosRenovacoes() {
         </div>
       )}
 
-      {showModal && <NovoAditivoModal onClose={() => setShowModal(false)} />}
     </div>
   )
 }

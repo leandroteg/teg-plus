@@ -393,7 +393,7 @@ export interface LocAcordo {
 export interface LocAditivo {
   id: string
   imovel_id?: string
-  imovel?: LocImovel
+  imovel?: LocImovel & { centro_custo?: { id: string; descricao: string } | null }
   con_contrato_id?: string
   tipo?: TipoAditivo
   descricao?: string
