@@ -988,6 +988,23 @@ export default function SolicitacaoDetalhe() {
   const [execucaoErro, setExecucaoErro] = useState('')
   const [cancelandoPendencia, setCancelandoPendencia] = useState(false)
 
+  // ── Correcao dos dados da solicitacao ────────────────────────────────────
+  // Hooks ANTES de qualquer early return (React #310): a tela retorna cedo em
+  // loading e em "nao encontrada", e hook declarado depois quebra a ordem.
+  const atualizarSolicitacao = useAtualizarSolicitacao()
+  const [editandoDados, setEditandoDados] = useState(false)
+  const dadosIniciais = () => ({
+    tipo_contrato: (solicitacao?.tipo_contrato ?? 'despesa') as string,
+    grupo_contrato: (solicitacao?.grupo_contrato as string) ?? 'outro',
+    subtipo_contrato: solicitacao?.subtipo_contrato ?? '',
+    valor_estimado: solicitacao?.valor_estimado != null ? String(solicitacao.valor_estimado) : '',
+    forma_pagamento: solicitacao?.forma_pagamento ?? '',
+    prazo_meses: solicitacao?.prazo_meses != null ? String(solicitacao.prazo_meses) : '',
+    data_inicio: (solicitacao?.data_inicio_prevista ?? '').slice(0, 10),
+    data_fim: (solicitacao?.data_fim_prevista ?? '').slice(0, 10),
+  })
+  const [formDados, setFormDados] = useState(dadosIniciais)
+
   // Hook must be called unconditionally (before any early return)
   const etapaAtual = solicitacao?.etapa_atual
   const valorContrato_ = Number(resumoExecutivo?.valor_total ?? solicitacao?.valor_estimado ?? 0)
@@ -1043,28 +1060,10 @@ export default function SolicitacaoDetalhe() {
 
   const s = solicitacao as Solicitacao
 
-  // ── Correcao dos dados da solicitacao ────────────────────────────────────
-  // A classificacao errada na abertura trava o fluxo adiante: e o grupo que
-  // filtra os modelos de minuta. Editavel ate a assinatura; depois disso o
-  // contrato ja existe e o dado vira historico.
-  const atualizarSolicitacao = useAtualizarSolicitacao()
-  const [editandoDados, setEditandoDados] = useState(false)
   const podeEditarDados = !['assinado', 'concluido', 'cancelado'].includes(s?.etapa_atual ?? '')
-  const dadosIniciais = () => ({
-    tipo_contrato: (s?.tipo_contrato ?? 'despesa') as string,
-    grupo_contrato: (s?.grupo_contrato as string) ?? 'outro',
-    subtipo_contrato: s?.subtipo_contrato ?? '',
-    valor_estimado: s?.valor_estimado != null ? String(s.valor_estimado) : '',
-    forma_pagamento: s?.forma_pagamento ?? '',
-    prazo_meses: s?.prazo_meses != null ? String(s.prazo_meses) : '',
-    data_inicio: (s?.data_inicio_prevista ?? '').slice(0, 10),
-    data_fim: (s?.data_fim_prevista ?? '').slice(0, 10),
-  })
-  const [formDados, setFormDados] = useState(dadosIniciais)
   const subtiposDoGrupo = GRUPO_CONTRATO_OPTIONS.find(o => o.value === formDados.grupo_contrato)?.subtipos ?? []
   const lblEdit = 'block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1'
   const inpEdit = 'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none'
-
   const handleSalvarDados = async () => {
     try {
       await atualizarSolicitacao.mutateAsync({
@@ -1083,6 +1082,8 @@ export default function SolicitacaoDetalhe() {
       window.alert(e instanceof Error ? e.message : 'Nao foi possivel salvar as correcoes.')
     }
   }
+
+
   const etapa = s.etapa_atual
   const valorContrato = Number(resumoExecutivo?.valor_total ?? s.valor_estimado ?? 0)
   const destinoFinanceiro = s.tipo_contrato === 'receita' ? 'cr' : 'cp'
