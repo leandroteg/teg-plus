@@ -26,6 +26,7 @@ import { GRUPO_CONTRATO_LABEL, GRUPO_CONTRATO_OPTIONS } from '../../constants/co
 import type { GrupoContrato } from '../../types/contratos'
 import type { EtapaSolicitacao, ParcelaPlanejada, Solicitacao, TipoAssinatura } from '../../types/contratos'
 import { calcularDiferencaParcelas, normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../../utils/contratosParcelas'
+import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import NumericInput from '../../components/NumericInput'
 import AuditoriaCard from '../../components/AuditoriaCard'
 import SolicitacaoDocsSection from '../../components/SolicitacaoDocsSection'
@@ -993,6 +994,7 @@ export default function SolicitacaoDetalhe() {
   // loading e em "nao encontrada", e hook declarado depois quebra a ordem.
   const atualizarSolicitacao = useAtualizarSolicitacao()
   const [editandoDados, setEditandoDados] = useState(false)
+  const centrosCusto = useLookupCentrosCusto()
   const dadosIniciais = () => ({
     tipo_contrato: (solicitacao?.tipo_contrato ?? 'despesa') as string,
     grupo_contrato: (solicitacao?.grupo_contrato as string) ?? 'outro',
@@ -1002,6 +1004,9 @@ export default function SolicitacaoDetalhe() {
     prazo_meses: solicitacao?.prazo_meses != null ? String(solicitacao.prazo_meses) : '',
     data_inicio: (solicitacao?.data_inicio_prevista ?? '').slice(0, 10),
     data_fim: (solicitacao?.data_fim_prevista ?? '').slice(0, 10),
+    contraparte_nome: solicitacao?.contraparte_nome ?? '',
+    contraparte_cnpj: solicitacao?.contraparte_cnpj ?? '',
+    centro_custo: solicitacao?.centro_custo ?? '',
   })
   const [formDados, setFormDados] = useState(dadosIniciais)
 
@@ -1076,6 +1081,9 @@ export default function SolicitacaoDetalhe() {
         prazo_meses: formDados.prazo_meses ? Number(formDados.prazo_meses) : null,
         data_inicio_prevista: formDados.data_inicio || null,
         data_fim_prevista: formDados.data_fim || null,
+        contraparte_nome: formDados.contraparte_nome.trim() || null,
+        contraparte_cnpj: formDados.contraparte_cnpj.trim() || null,
+        centro_custo: formDados.centro_custo || null,
       } as never)
       setEditandoDados(false)
     } catch (e) {
@@ -1359,6 +1367,38 @@ export default function SolicitacaoDetalhe() {
                       </select>
                     </div>
                   )}
+                  <div className="sm:col-span-2">
+                    <label className={lblEdit}>Contraparte</label>
+                    <input value={formDados.contraparte_nome} className={inpEdit}
+                      placeholder="Razão social ou nome de quem assina do outro lado"
+                      onChange={e => setFormDados(f => ({ ...f, contraparte_nome: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className={lblEdit}>CNPJ / CPF da Contraparte</label>
+                    <input value={formDados.contraparte_cnpj} className={inpEdit}
+                      placeholder="somente números"
+                      onChange={e => setFormDados(f => ({ ...f, contraparte_cnpj: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className={lblEdit}>Centro de Custo</label>
+                    {/* lista do cadastro, igual a Nova Solicitacao. O valor gravado
+                        continua sendo a DESCRICAO (a coluna e texto), mas o campo
+                        antigo pode ter valor fora da lista — por isso ele entra
+                        como opcao, senao a edicao apagaria o CC atual sem avisar. */}
+                    <select value={formDados.centro_custo} className={inpEdit}
+                      onChange={e => setFormDados(f => ({ ...f, centro_custo: e.target.value }))}>
+                      <option value="">—</option>
+                      {formDados.centro_custo &&
+                        !centrosCusto.some(cc => cc.descricao === formDados.centro_custo) && (
+                        <option value={formDados.centro_custo}>{formDados.centro_custo} (atual)</option>
+                      )}
+                      {centrosCusto.map(cc => (
+                        <option key={cc.id} value={cc.descricao}>
+                          {cc.codigo ? `${cc.codigo} — ` : ''}{cc.descricao}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div>
                     <label className={lblEdit}>Valor Estimado (R$)</label>
                     <input type="number" step="0.01" value={formDados.valor_estimado} className={inpEdit}
