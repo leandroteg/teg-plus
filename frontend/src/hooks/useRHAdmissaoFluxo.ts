@@ -296,6 +296,7 @@ export type AcaoAdmissao =
   | 'solicitar_aprovacao' | 'aprovar' | 'rejeitar' | 'esclarecer'
   | 'enviar_documentacao' | 'documentacao_recebida' | 'apto_registro'
   | 'registro_concluido' | 'mobilizacao_concluida'
+  | 'encerrar_aguardando_contrato'
 
 export interface TransicaoInput {
   adm: RHAdmissao
@@ -359,6 +360,14 @@ export function useTransicaoAdmissao() {
         para = 'integracao'
         patch = { etapa: 'integracao' }
         histAcao = 'mobilizacao_concluida'
+      }
+
+      if (acao === 'encerrar_aguardando_contrato') {
+        // PJ nao passa pelo resto da esteira: sai do board e o colaborador nasce
+        // quando o contrato 'equipe_pj' for assinado (trg_con_pj_lifecycle).
+        // Mantem a etapa — o historico e que conta o que aconteceu.
+        patch = { arquivada: true }
+        histAcao = 'encerrada_aguardando_contrato'
       }
 
       const { error } = await supabase.from('rh_admissoes').update(patch).eq('id', adm.id)

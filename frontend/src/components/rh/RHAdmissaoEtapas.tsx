@@ -10,6 +10,7 @@ import {
   Stethoscope, GraduationCap, Truck, Home, HeartHandshake, CheckCircle2, Circle,
   Loader2, Smartphone, Plus, Trash2, ChevronRight as ChevR, Calendar, Building2,
   Briefcase, User, PenLine, Handshake, Upload, FileText, Download, Laptop, Clock, Archive, Send,
+  FileSignature,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -58,6 +59,39 @@ const ASO_LABEL: Record<RHExame['status'], { label: string; cls: string }> = {
   realizado: { label: 'Realizado', cls: 'bg-violet-100 text-violet-700' },
   apto:      { label: 'Apto ✓',    cls: 'bg-emerald-100 text-emerald-700' },
   inapto:    { label: 'Inapto',    cls: 'bg-red-100 text-red-700' },
+}
+
+/** PJ nao passa pelo resto da esteira: os documentos, o ASO e a ficha de
+ *  registro sao exigencias de vinculo CLT. O colaborador PJ nasce no modulo
+ *  Contratos, quando o contrato 'equipe_pj' e assinado (trg_con_pj_lifecycle).
+ *  Este botao so encerra a requisicao — nao cria ninguem. */
+export const ETAPAS_ENCERRA_PJ = ['documentacao', 'exames_treinamentos', 'registro']
+
+export function EncerrarPJBtn({ adm, autorNome }: { adm: RHAdmissao; autorNome?: string }) {
+  const { perfil } = useAuth()
+  const transicao = useTransicaoAdmissao()
+  const ehPJ = (adm.tipo_contrato ?? '').trim().toUpperCase() === 'PJ'
+  if (!ehPJ || !ETAPAS_ENCERRA_PJ.includes(adm.etapa ?? '')) return null
+  return (
+    <button
+      type="button"
+      disabled={transicao.isPending}
+      onClick={e => {
+        e.stopPropagation()
+        if (!confirm('Encerrar esta admissão? O colaborador PJ será criado no módulo Contratos, ao assinar o contrato.')) return
+        transicao.mutate({
+          adm, acao: 'encerrar_aguardando_contrato',
+          autorId: perfil?.id, autorNome: autorNome ?? perfil?.nome ?? undefined,
+          motivo: 'PJ — cadastro será criado pelo contrato Equipe PJ.',
+        })
+      }}
+      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
+      title="PJ não segue a esteira CLT: o cadastro nasce ao assinar o contrato Equipe PJ"
+    >
+      {transicao.isPending ? <Loader2 size={11} className="animate-spin" /> : <FileSignature size={11} />}
+      Encerrar e Aguardar Contratos
+    </button>
+  )
 }
 
 // ── Wrapper comum: dados da vaga + candidatos ────────────────────────────────
@@ -119,6 +153,8 @@ function VagaCard({ adm, isDark, onClick, children }: {
       </button>
       <ExcluirAdmissaoBtn admId={adm.id} nome={nomeAlvo} className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50" />
       <div className="space-y-2">{children}</div>
+      {/* PJ: atalho para sair da esteira CLT (só nas etapas em que ela vira CLT) */}
+      <EncerrarPJBtn adm={adm} />
     </div>
   )
 }

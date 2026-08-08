@@ -19,7 +19,7 @@ import {
 import RHAdmissaoForm from '../../components/rh/RHAdmissaoForm'
 import RHAdmissaoModal from '../../components/rh/RHAdmissaoModal'
 import RHFluxoToolbar, { type ViewMode } from '../../components/rh/RHFluxoToolbar'
-import { PropostaCard, ExamesCard, RegistroCard, MobilizacaoCard, IntegracaoCard, LiberadoCard, ExcluirAdmissaoBtn } from '../../components/rh/RHAdmissaoEtapas'
+import { PropostaCard, ExamesCard, RegistroCard, MobilizacaoCard, IntegracaoCard, LiberadoCard, ExcluirAdmissaoBtn, EncerrarPJBtn } from '../../components/rh/RHAdmissaoEtapas'
 import { useAuth } from '../../contexts/AuthContext'
 import type { RHAdmissao, EtapaAdmissaoFluxo } from '../../types/rh'
 
@@ -410,6 +410,11 @@ function DocumentacaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: b
           <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum candidato.</p>
         )}
       </div>
+
+      {/* PJ: os documentos exigidos aqui sao de vinculo CLT (CTPS, titulo de
+          eleitor, reservista). Atalho para encerrar e deixar o cadastro a cargo
+          do modulo Contratos. */}
+      <EncerrarPJBtn adm={adm} />
     </div>
   )
 }
