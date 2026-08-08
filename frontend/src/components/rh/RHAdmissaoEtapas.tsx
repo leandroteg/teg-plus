@@ -64,15 +64,20 @@ const ASO_LABEL: Record<RHExame['status'], { label: string; cls: string }> = {
 /** PJ nao passa pelo resto da esteira: os documentos, o ASO e a ficha de
  *  registro sao exigencias de vinculo CLT. O colaborador PJ nasce no modulo
  *  Contratos, quando o contrato 'equipe_pj' e assinado (trg_con_pj_lifecycle).
- *  Este botao so encerra a requisicao — nao cria ninguem. */
+ *  Este botao so encerra a requisicao — nao cria ninguem.
+ *  `bloco` envolve num rodape alinhado a direita (uso nos cards); sem ele
+ *  devolve so o botao, para o modal encaixar na linha de acoes existente. */
 export const ETAPAS_ENCERRA_PJ = ['documentacao', 'exames_treinamentos', 'registro']
 
-export function EncerrarPJBtn({ adm, autorNome }: { adm: RHAdmissao; autorNome?: string }) {
+export function EncerrarPJBtn({ adm, autorNome, bloco }: {
+  adm: RHAdmissao; autorNome?: string; bloco?: boolean
+}) {
   const { perfil } = useAuth()
   const transicao = useTransicaoAdmissao()
   const ehPJ = (adm.tipo_contrato ?? '').trim().toUpperCase() === 'PJ'
   if (!ehPJ || !ETAPAS_ENCERRA_PJ.includes(adm.etapa ?? '')) return null
-  return (
+
+  const btn = (
     <button
       type="button"
       disabled={transicao.isPending}
@@ -85,13 +90,14 @@ export function EncerrarPJBtn({ adm, autorNome }: { adm: RHAdmissao; autorNome?:
           motivo: 'PJ — cadastro será criado pelo contrato Equipe PJ.',
         })
       }}
-      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50 whitespace-nowrap"
       title="PJ não segue a esteira CLT: o cadastro nasce ao assinar o contrato Equipe PJ"
     >
-      {transicao.isPending ? <Loader2 size={11} className="animate-spin" /> : <FileSignature size={11} />}
+      {transicao.isPending ? <Loader2 size={12} className="animate-spin" /> : <FileSignature size={12} />}
       Encerrar e Aguardar Contratos
     </button>
   )
+  return bloco ? <div className="flex justify-end mt-2">{btn}</div> : btn
 }
 
 // ── Wrapper comum: dados da vaga + candidatos ────────────────────────────────
@@ -153,8 +159,8 @@ function VagaCard({ adm, isDark, onClick, children }: {
       </button>
       <ExcluirAdmissaoBtn admId={adm.id} nome={nomeAlvo} className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50" />
       <div className="space-y-2">{children}</div>
-      {/* PJ: atalho para sair da esteira CLT (só nas etapas em que ela vira CLT) */}
-      <EncerrarPJBtn adm={adm} />
+      {/* PJ: atalho para sair da esteira CLT — alinhado a direita, como as demais acoes */}
+      <EncerrarPJBtn adm={adm} bloco />
     </div>
   )
 }

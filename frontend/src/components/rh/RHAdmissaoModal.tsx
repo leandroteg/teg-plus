@@ -16,7 +16,7 @@ import {
   type AcaoAdmissao,
 } from '../../hooks/useRHAdmissaoFluxo'
 import { TIPOS_ANEXO_ADMISSAO, TIPOS_CONTRATO } from '../../types/rh'
-import { RegistroCard, IntegracaoCard, ExamesCard, LiberadoCard } from './RHAdmissaoEtapas'
+import { RegistroCard, IntegracaoCard, ExamesCard, LiberadoCard, EncerrarPJBtn } from './RHAdmissaoEtapas'
 import type { RHAdmissao, RHAdmissaoCandidato } from '../../types/rh'
 
 const EDIT_INPUT = 'w-full border border-slate-200 rounded-lg px-2.5 py-2 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none'
@@ -344,6 +344,8 @@ export default function RHAdmissaoModal({ adm, onClose }: { adm: RHAdmissao; onC
               )}
             </div>
             <div className="flex items-center gap-2">
+            {/* PJ: encerra e deixa o cadastro com o modulo Contratos */}
+            <EncerrarPJBtn adm={adm} autorNome={autorNome} />
             {etapa === 'requisicao' && (
               <button onClick={() => executar('solicitar_aprovacao')} disabled={transicao.isPending}
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-60 shadow-sm">

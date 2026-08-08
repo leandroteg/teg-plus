@@ -414,7 +414,7 @@ function DocumentacaoCard({ adm, isDark, onClick }: { adm: RHAdmissao; isDark: b
       {/* PJ: os documentos exigidos aqui sao de vinculo CLT (CTPS, titulo de
           eleitor, reservista). Atalho para encerrar e deixar o cadastro a cargo
           do modulo Contratos. */}
-      <EncerrarPJBtn adm={adm} />
+      <EncerrarPJBtn adm={adm} bloco />
     </div>
   )
 }
